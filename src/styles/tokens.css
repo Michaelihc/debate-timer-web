@@ -1,0 +1,171 @@
+/* ============================================================================
+   TOKENS - spec 2.2 to 2.5. The whole palette, scale and motion vocabulary.
+
+   PERIPHERY / CORE is the rule these tokens exist to enforce:
+   identity colour (--side-*) may only paint the outer frame - edge bars, rails,
+   nameplates. Clock-state colour (--state-*) may only paint the optical core -
+   digits, depletion bar, overtime fill. No element ever carries both.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* --- Console: structure (dark, the default) --------------------------- */
+  --bg-app: #0B0D10;        /* app ground; never #000 on an LCD, it reads crushed */
+  --bg-panel: #12161B;
+  --bg-sunken: #191F26;
+  --bg-raised: #202832;
+  --rule: #262F3A;          /* the only separator in the app */
+  --rule-strong: #3A4653;
+  --text-hi: #E8EDF3;
+  --text-mid: #AEB8C4;
+  --text-lo: #7C8794;
+  --text-inv: #0B0D10;
+  --focus: #7CC1FF;
+  --ok: #3FB268;
+  --danger: #E8503A;
+  --warn-ink: #FFD166;
+
+  /* --- Stage: fixed, theme-independent ----------------------------------
+     A projector renders #000000 as no light; anything above it is a glowing
+     grey rectangle on the wall. The stage is always true black. */
+  --stage-bg: #000000;
+  --stage-rule: #1B1B1F;
+  --stage-ink: #F5F3EC;                     /* 93% white: pure white blooms at 268px */
+  --stage-dim: #6E7278;
+  --stage-track: rgba(245, 243, 236, 0.16);
+  --stage-hold: #0E1114;
+
+  /* --- State: core only -------------------------------------------------- */
+  --state-normal: #F5F3EC;  /* running, above every cue threshold */
+  --state-warn: #FFD166;    /* at or below the first warning cue */
+  --state-final: #FFB020;   /* last 10 seconds */
+  --state-over: #E8503A;    /* remaining <= 0 */
+  --state-live: #3FD07A;    /* the console running pip; never on the stage core */
+
+  /* --- Identity: periphery only -----------------------------------------
+     Okabe-Ito amber / azure, dL 0.264, both >= 3:1 on black. The running app
+     overwrites --side-a / --side-b (and their auto-ink) from the config. */
+  --side-a: #E69F00;
+  --side-b: #0072B2;
+  --side-a-ink: #08080A;    /* auto-ink: dark when the slab luminance is >= 0.32 */
+  --side-b-ink: #F5F3EC;
+
+  /* --- Type ------------------------------------------------------------- */
+  --font-ui: "Archivo", "Helvetica Neue", Arial, "Liberation Sans", system-ui, sans-serif;
+  --font-cjk: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Source Han Sans SC", var(--font-ui);
+
+  /* Console scale: 11 / 13 / 15 / 18 / 22 / 28, hand-tuned, not a ratio. */
+  --t-cap: 0.6875rem;   /* 11px - silkscreen labels, column heads, keycaps */
+  --t-meta: 0.8125rem;  /* 13px - durations, counts, hints */
+  --t-ctl: 0.9375rem;   /* 15px - buttons, inputs */
+  --t-row: 1.125rem;    /* 18px - roster + run-sheet rows */
+  --t-name: 1.375rem;   /* 22px - current speaker */
+  --t-read: 1.75rem;    /* 28px - pane totals, round length */
+  --t-clock: clamp(2.5rem, 9vw, 7rem);
+
+  /* Width axis: 125 = time, 100 = people, 87 = structure. */
+  --wd-time: 125%;
+  --wd-body: 100%;
+  --wd-struct: 87%;
+
+  /* Stage scale. Display type floats with --u; metadata type is floored, or a
+     15px rail label becomes 9.6px mush on a 1024x768 venue projector. */
+  --u: min(100vw / 1600, 100vh / 900);
+  --ts-clock: max(96px, calc(268 * var(--u)));
+  --ts-name: max(32px, calc(96 * var(--u)));
+  --ts-chess: max(64px, calc(168 * var(--u)));
+  --ts-role: max(16px, calc(34 * var(--u)));
+  --ts-next: max(18px, calc(44 * var(--u)));
+  --ts-rail-name: max(15px, calc(28 * var(--u)));
+  --ts-rail-meta: max(12px, calc(15 * var(--u)));
+  --ts-ribbon: max(12px, calc(20 * var(--u)));
+  --ts-context: max(14px, calc(28 * var(--u)));
+
+  /* --- Space, rhythm, radius, borders ----------------------------------- */
+  --s-0: 0;
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 8px;
+  --s-4: 12px;
+  --s-5: 16px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 48px;
+  --s-9: 64px;
+  --s-10: 96px;
+  --row: 44px;              /* roster + run sheet + timeline pips share one rhythm */
+  --rail: clamp(240px, 20%, 300px);
+  --gutter: 24px;
+  --r-0: 0;
+  --r-1: 2px;               /* inputs and buttons only */
+  --r-pill: 999px;          /* status chips and the running pip only */
+  --hair: 1px solid var(--rule);
+  /* There are no box-shadows anywhere in the app. Depth is value steps plus 1px
+     rules. The only shadow-like effect is the focus ring. */
+  --focus-ring: 2px solid var(--focus);
+  --focus-offset: 2px;
+
+  /* --- Motion: five animations, every one carries state ------------------ */
+  --d-fast: 120ms;          /* M1 state chip / colour cross-fade */
+  --d-base: 240ms;          /* M2 view + slab transitions */
+  --d-swell: 400ms;         /* M3 warning swell, then a solid hold */
+  --d-blip: 90ms;           /* M4 final-10s seconds-glyph blip */
+  --d-hold: 600ms;          /* M5 hold-to-confirm arc */
+  --d-nudge: 1400ms;        /* M6 on-deck caret nudge, loops */
+  --ease-out: cubic-bezier(.2, 0, 0, 1);
+  --ease-nudge: ease-in-out;
+  /* Multiplier on every translate/scale distance; reduced motion sets it to 0. */
+  --motion-scale: 1;
+}
+
+/* --- Console: structure (light) - daylight setup work only. The stage tokens
+   and the state tokens deliberately do not change. ------------------------ */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-app: #F4F1EA;
+  --bg-panel: #FBF9F4;
+  --bg-sunken: #EAE6DC;
+  --bg-raised: #FFFFFF;
+  --rule: #D5CFC1;
+  --rule-strong: #B6AE9C;
+  --text-hi: #16150F;
+  --text-mid: #575349;
+  --text-lo: #8C877A;
+  --text-inv: #F4F1EA;
+  --focus: #1B62B5;
+  --ok: #2F5D3A;
+  --danger: #8C2F1E;
+  --warn-ink: #8A6100;
+
+  /* State colours need a light variant of their own. The dark values are near-white and
+     hot amber, which sit at ~1.01:1 on this ground — the clock would be invisible. These
+     keep the neutral -> amber -> hot amber -> red progression while clearing 4.5:1.
+     The stage re-pins the dark values on its own root; it is never themed. */
+  --state-normal: #16150F;
+  --state-warn: #7A5600;
+  --state-final: #943D00;
+  --state-over: #9B2C1B;
+  --state-live: #1B6E3D;
+}
+
+/* Reduced motion keeps every colour state and every flash - those ARE the cue -
+   and drops only the movement. Components that translate or scale must either
+   multiply their distance by --motion-scale or carry one of the .m-* classes,
+   so this block can switch them off without touching the state colours. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-scale: 0;
+    --d-base: var(--d-fast);
+    --d-swell: var(--d-fast);
+    --d-nudge: 1ms;
+  }
+
+  .m-blip,
+  .m-nudge,
+  .m-pulse,
+  .m-slide {
+    animation: none !important;
+    transform: none !important;
+  }
+}

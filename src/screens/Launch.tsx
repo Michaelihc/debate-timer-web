@@ -1,0 +1,600 @@
+/**
+ * LAUNCH `#/` — cold URL to a running round in well under a minute.
+ *
+ * The order of the page is the order of the operator's urgency:
+ *   1. an interrupted live round (< 8h) — losing your place mid-round is the one
+ *      failure this app may never commit, so the offer sits above everything,
+ *   2. the seven formats, each showing its Ribbon so the SHAPE of the round is
+ *      legible before you commit to it,
+ *   3. rounds this browser has run before,
+ *   4. a paste-or-drop field for a share link, a `.debate.json`, or a legacy Unity
+ *      `save.json`,
+ *   5. a plain description of what this is.
+ *
+ * A format is a starting point and nothing more: opening one never locks the roster,
+ * the order or the times, and nothing on this screen compares a round back against
+ * the preset it came from.
+ */
+
+import type { ChangeEvent, DragEvent, JSX } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+
+import type { Lang, RoundConfig } from '../domain/config';
+import type { MigrationProblem } from '../domain/migrate';
+import { plan as buildPlan } from '../domain/plan';
+import type { PresetKey, PresetMeta } from '../domain/presets';
+import {
+  DEFAULT_PRESET,
+  PRESET_META,
+  instantiateConfig,
+  instantiatePreset,
+} from '../domain/presets';
+import type { RecentEntry } from '../engine/persist';
+import {
+  clearRecents,
+  readApplied,
+  readLibrary,
+  readLive,
+  readRecents,
+  saveToLibrary,
+} from '../engine/persist';
+import { roundPhase } from '../engine/selectors';
+import { useRound } from '../engine/store';
+import type { StringKey } from '../i18n/strings';
+import { useLang } from '../i18n/useLang';
+import { formatTime } from '../lib/format';
+import { useConfirm } from '../ui/useConfirm';
+import { Icon } from '../ui/Icons';
+import { Keycaps } from '../ui/KeyLegendOverlay';
+import { Ribbon } from '../ui/Ribbon';
+import { ribbonFromPlan, ribbonFromShares } from '../ui/ribbonData';
+
+import type { OpenOptions } from '../app/boot';
+import {
+  acceptResume,
+  clearShareError,
+  discardResume,
+  hasRound,
+  importText,
+  openConfig,
+  toggleTheme,
+  useBootState,
+  useTheme,
+} from '../app/boot';
+import { useHotkeys } from '../app/hotkeys';
+import { ROUTES } from '../app/router';
+
+import './screens.css';
+
+/* ------------------------------------------------------------------- helpers */
+
+const PRESET_NAME: Record<PresetKey, StringKey> = {
+  chinese4v4: 'pr.chinese',
+  bp: 'pr.bp',
+  wsdc: 'pr.wsdc',
+  ld: 'pr.ld',
+  policy: 'pr.policy',
+  pf: 'pr.pf',
+  blank: 'pr.blank',
+};
+
+/** `2 hours ago` / `2小时前`, from the platform rather than a table of plural forms. */
+function agoPhrase(ms: number, lang: Lang): string {
+  const rtf = new Intl.RelativeTimeFormat(lang === 'zh' ? 'zh-CN' : 'en', {
+    numeric: 'always',
+  });
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return rtf.format(-seconds, 'second');
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return rtf.format(-minutes, 'minute');
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return rtf.format(-hours, 'hour');
+  return rtf.format(-Math.round(hours / 24), 'day');
+}
+
+function sideColors(config: RoundConfig): { A?: string; B?: string } {
+  const a = config.sides[0]?.color;
+  const b = config.sides[1]?.color;
+  const out: { A?: string; B?: string } = {};
+  if (a !== undefined) out.A = a;
+  if (b !== undefined) out.B = b;
+  return out;
+}
+
+async function textOfDrop(event: DragEvent<HTMLElement>): Promise<string> {
+  const file = event.dataTransfer.files.item(0);
+  if (file) return file.text();
+  return event.dataTransfer.getData('text');
+}
+
+/* -------------------------------------------------------------------- screen */
+
+export default function Launch(): JSX.Element {
+  const { t, l10n, lang, toggleLang } = useLang();
+  const boot = useBootState();
+  const theme = useTheme();
+  const session = useRound();
+  const { ask, dialog } = useConfirm();
+
+  const [recents, setRecents] = useState<RecentEntry[]>(() => readRecents());
+  // One reading of the wall clock for the whole visit: "2 hours ago" has no business
+  // changing under the operator between two renders of the same list.
+  const [listedAt] = useState(() => Date.now());
+  const [pasted, setPasted] = useState('');
+  const [staged, setStaged] = useState<RoundConfig | null>(null);
+  const [problems, setProblems] = useState<MigrationProblem[]>([]);
+  const [reading, setReading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // The only thing worth a dialog on this screen: walking away from a round that is
+  // mid-flight. Everything else here is either additive or trivially reversible.
+  const inProgress = roundPhase(session.state, session.plan) === 'in';
+
+  const openWith = useCallback(
+    async (config: RoundConfig, opts: OpenOptions = {}): Promise<void> => {
+      if (inProgress) {
+        const ok = await ask({ title: t('d.leaveRound'), confirmLabel: t('d.confirm') });
+        if (!ok) return;
+      }
+      if (opts.recent !== false) {
+        // Recents store only a title; the config itself lives in the library, which is
+        // what makes a recent row re-openable on the next visit.
+        saveToLibrary(config.id, config, l10n(config.title) || t('lc.untitled'));
+      }
+      openConfig(config, opts);
+    },
+    [ask, inProgress, l10n, t],
+  );
+
+  useHotkeys('launch', {
+    editor: () => {
+      const config = hasRound() ? session.config : instantiatePreset(DEFAULT_PRESET);
+      void openWith(config, { route: ROUTES.edit, recent: false });
+    },
+  });
+
+  /* --- recents ---------------------------------------------------------- */
+
+  // A recent row is only shown when its config can actually be produced; a row that
+  // cannot open is worse than no row.
+  const openable = useMemo(() => {
+    const library = readLibrary();
+    const applied = readApplied();
+    const live = readLive();
+    const rows: { entry: RecentEntry; config: RoundConfig; totalMs: number }[] = [];
+    for (const entry of recents) {
+      let found: RoundConfig | null = null;
+      if (session.config.id === entry.id) found = session.config;
+      else if (library[entry.id]) found = library[entry.id]?.config ?? null;
+      else if (applied && applied.id === entry.id) found = applied;
+      else if (live && live.config.id === entry.id) found = live.config;
+      if (found) rows.push({ entry, config: found, totalMs: buildPlan(found).totalMs });
+    }
+    return rows;
+  }, [recents, session.config]);
+
+  const clearList = useCallback(async (): Promise<void> => {
+    const ok = await ask({
+      title: t('lc.clearRecent'),
+      body: t('lc.clearRecentConfirm'),
+      confirmLabel: t('d.confirm'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    clearRecents();
+    setRecents([]);
+  }, [ask, t]);
+
+  /* --- import ----------------------------------------------------------- */
+
+  const ingest = useCallback(async (text: string): Promise<void> => {
+    if (text.trim() === '') return;
+    setReading(true);
+    try {
+      const outcome = await importText(text);
+      setProblems(outcome.problems);
+      setStaged(outcome.config);
+    } finally {
+      setReading(false);
+    }
+  }, []);
+
+  const onDrop = useCallback(
+    (event: DragEvent<HTMLElement>): void => {
+      event.preventDefault();
+      setDragging(false);
+      void textOfDrop(event).then((text) => ingest(text));
+    },
+    [ingest],
+  );
+
+  const onFile = useCallback(
+    (event: ChangeEvent<HTMLInputElement>): void => {
+      const file = event.target.files?.item(0);
+      event.target.value = '';
+      if (file) void file.text().then((text) => ingest(text));
+    },
+    [ingest],
+  );
+
+  const discardImport = useCallback((): void => {
+    setStaged(null);
+    setProblems([]);
+    setPasted('');
+  }, []);
+
+  const resume = boot.resume;
+
+  return (
+    <section className="scr" aria-labelledby="lc-title">
+      <header className="scr__bar">
+        <div className="scr__brand">
+          <span id="lc-title" className="scr__brandname t-name">
+            {t('app.name')}
+          </span>
+          <span className="scr__brandsub">{t('app.tagline')}</span>
+        </div>
+        <div className="scr__tools">
+          <button type="button" className="btn btn--quiet" onClick={toggleLang}>
+            {t('kb.langToggle')}
+          </button>
+          <button
+            type="button"
+            className="btn btn--quiet"
+            onClick={toggleTheme}
+            aria-label={`${t('nav.theme')}: ${theme === 'dark' ? t('nav.themeDark') : t('nav.themeLight')}`}
+          >
+            {theme === 'dark' ? t('nav.themeDark') : t('nav.themeLight')}
+          </button>
+          <span className="scr__keyhint">
+            <Keycaps caps={['?']} />
+            {t('kb.title')}
+          </span>
+        </div>
+      </header>
+
+      <div className="scr__scroll">
+        <div className="scr__inner">
+          {resume === null ? null : (
+            <div className="lc__resume" role="region" aria-labelledby="lc-resume">
+              <div className="lc__resumemain">
+                <h2 id="lc-resume" className="lc__resumetitle t-row">
+                  {t('d.resumeTitle')}
+                </h2>
+                <p className="lc__resumebody">
+                  {t('d.resumeBody', {
+                    title: l10n(resume.title) || t('lc.untitled'),
+                    i: resume.segmentIndex,
+                    n: resume.segmentCount,
+                    time: formatTime(resume.remainingMs),
+                  })}
+                </p>
+                <span className="lc__resumeage">
+                  {t('lc.updated', { time: agoPhrase(resume.ageMs, lang) })}
+                </span>
+              </div>
+              <div className="scr__acts">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => acceptResume(resume)}
+                >
+                  {t('d.resume')}
+                </button>
+                <button type="button" className="btn btn--quiet" onClick={discardResume}>
+                  {t('d.discard')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {boot.shareError === null ? null : (
+            <div className="scr__alert" data-tone="warn" role="alert">
+              <span className="scr__alerttext" title={boot.shareError}>
+                <Icon name="alert" />
+                {t('lc.linkBad')}
+              </span>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                onClick={clearShareError}
+                aria-label={t('ed.close')}
+              >
+                <Icon name="close" />
+              </button>
+            </div>
+          )}
+
+          {boot.storage ? null : (
+            <div className="scr__alert" data-tone="warn">
+              <span className="scr__alerttext">
+                <Icon name="alert" />
+                {t('lc.noStorage')}
+              </span>
+            </div>
+          )}
+
+          <section className="scr__sec" aria-labelledby="lc-formats">
+            <div className="scr__sechead">
+              <h2 id="lc-formats" className="scr__sectitle t-row">
+                {t('lc.presets')}
+              </h2>
+              <span className="scr__note">{t('pr.basedOn')}</span>
+            </div>
+            <p className="scr__note">{t('lc.presetNote')}</p>
+            <div className="lc__grid">
+              {PRESET_META.map((meta) => (
+                <PresetCard
+                  key={meta.key}
+                  meta={meta}
+                  onRun={(config) => void openWith(config)}
+                  onEdit={(config) =>
+                    void openWith(config, { route: ROUTES.edit, recent: false })
+                  }
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="scr__sec" aria-labelledby="lc-recent">
+            <div className="scr__sechead">
+              <h2 id="lc-recent" className="scr__sectitle t-row">
+                {t('lc.recent')}
+              </h2>
+              {openable.length === 0 ? null : (
+                <button type="button" className="btn btn--quiet" onClick={() => void clearList()}>
+                  {t('lc.clearRecent')}
+                </button>
+              )}
+            </div>
+            {openable.length === 0 ? (
+              <p className="lc__empty">{t('lc.noRecent')}</p>
+            ) : (
+              <ul className="lc__list">
+                {openable.map(({ entry, config, totalMs }) => (
+                  <li key={entry.id} className="lc__row">
+                    <div className="lc__rowmain">
+                      <span className="lc__rowtitle t-ctl">
+                        {l10n(entry.title) || t('lc.untitled')}
+                      </span>
+                      <span className="lc__rowmeta">
+                        {t('lc.structure', {
+                          sides: `${config.speakers.filter((s) => s.side === 'A').length}v${config.speakers.filter((s) => s.side === 'B').length}`,
+                          n: config.segments.length,
+                          len: formatTime(totalMs),
+                        })}
+                        {' · '}
+                        {t('lc.updated', { time: agoPhrase(listedAt - entry.updatedAt, lang) })}
+                      </span>
+                    </div>
+                    <div className="scr__acts">
+                      <button
+                        type="button"
+                        className="btn btn--quiet"
+                        onClick={() => void openWith(config, { route: ROUTES.edit, recent: false })}
+                      >
+                        {t('pr.editIt')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => void openWith(config)}
+                      >
+                        {t('lc.open')}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="scr__sec" aria-labelledby="lc-open">
+            <div className="scr__sechead">
+              <h2 id="lc-open" className="scr__sectitle t-row">
+                {t('lc.openRound')}
+              </h2>
+            </div>
+            <div
+              className="lc__import"
+              data-drag={dragging ? '' : undefined}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+            >
+              <label className="sr-only" htmlFor="lc-paste">
+                {t('sh.import')}
+              </label>
+              <textarea
+                id="lc-paste"
+                className="lc__paste"
+                value={pasted}
+                spellCheck={false}
+                placeholder={t('sh.import')}
+                onChange={(event) => setPasted(event.target.value)}
+              />
+              <div className="lc__importacts">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={reading || pasted.trim() === ''}
+                  onClick={() => void ingest(pasted)}
+                >
+                  {t('lc.import')}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Icon name="download" />
+                  {t('lc.openFile')}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  className="sr-only"
+                  accept=".json,application/json"
+                  tabIndex={-1}
+                  onChange={onFile}
+                />
+                <span className="scr__note">{t('lc.dropHint')}</span>
+              </div>
+
+              {problems.length === 0 ? null : (
+                <div className="scr__sec" role="status">
+                  <span className="t-cap">{t('sh.migrationReport')}</span>
+                  <ul className="lc__problems">
+                    {problems.map((problem, i) => (
+                      <li
+                        key={`${problem.code}-${String(i)}`}
+                        className="lc__problem"
+                        data-sev={problem.severity}
+                      >
+                        <Icon name={problem.severity === 'info' ? 'check' : 'alert'} />
+                        {l10n(problem.message)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {staged === null ? null : (
+                <StagedRound
+                  config={staged}
+                  onRun={() => void openWith(staged)}
+                  onEdit={() => void openWith(staged, { route: ROUTES.edit, recent: false })}
+                  onDiscard={discardImport}
+                />
+              )}
+            </div>
+          </section>
+
+          <section className="scr__sec" aria-labelledby="lc-about">
+            <div className="scr__sechead">
+              <h2 id="lc-about" className="scr__sectitle t-row">
+                {t('app.name')}
+              </h2>
+            </div>
+            <p className="scr__note">{t('lc.about')}</p>
+          </section>
+        </div>
+      </div>
+
+      {dialog}
+    </section>
+  );
+}
+
+/* --------------------------------------------------------------- preset card */
+
+interface PresetCardProps {
+  meta: PresetMeta;
+  onRun: (config: RoundConfig) => void;
+  onEdit: (config: RoundConfig) => void;
+}
+
+function PresetCard({ meta, onRun, onEdit }: PresetCardProps): JSX.Element {
+  const { t, lang } = useLang();
+  const segments = useMemo(
+    () => ribbonFromShares(meta.ribbon, meta.totalMs, lang),
+    [meta, lang],
+  );
+  const colors = useMemo(() => sideColors(meta.config), [meta]);
+  const isDefault = meta.key === DEFAULT_PRESET;
+  const name = t(PRESET_NAME[meta.key]);
+
+  return (
+    <article className="lc__card" data-default={isDefault ? '' : undefined}>
+      <div className="lc__cardhead">
+        <h3 className="lc__cardname t-ctl">{name}</h3>
+        {isDefault ? <span className="lc__chip">{t('lc.defaultFormat')}</span> : null}
+      </div>
+
+      {segments.length === 0 ? null : (
+        <Ribbon scale="thumb" segments={segments} colors={colors} />
+      )}
+
+      <p className="lc__cardmeta">
+        {meta.segmentCount === 0
+          ? t('lc.newRound')
+          : t('lc.structure', {
+              sides: `${meta.speakersPerSide.A}v${meta.speakersPerSide.B}`,
+              n: meta.segmentCount,
+              len: formatTime(meta.totalMs),
+            })}
+      </p>
+
+      <div className="lc__cardacts">
+        <button
+          type="button"
+          className="btn btn--quiet"
+          onClick={() => onEdit(instantiateConfig(meta.config))}
+        >
+          <Icon name="edit" />
+          {t('pr.editIt')}
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => onRun(instantiateConfig(meta.config))}
+        >
+          {t('pr.runNow')}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/* ------------------------------------------------------- staged import panel */
+
+interface StagedRoundProps {
+  config: RoundConfig;
+  onRun: () => void;
+  onEdit: () => void;
+  onDiscard: () => void;
+}
+
+/**
+ * §12.2 — an import is staged and described before it is applied. Nothing about the
+ * incoming run order is judged here; it is drawn exactly as it arrived.
+ */
+function StagedRound({ config, onRun, onEdit, onDiscard }: StagedRoundProps): JSX.Element {
+  const { t, l10n, lang } = useLang();
+  const runPlan = useMemo(() => buildPlan(config), [config]);
+  const segments = useMemo(() => ribbonFromPlan(runPlan, null, lang), [runPlan, lang]);
+  const colors = useMemo(() => sideColors(config), [config]);
+
+  return (
+    <div className="lc__staged">
+      <span className="t-cap">{t('lc.staged')}</span>
+      <span className="t-ctl">{l10n(config.title) || t('lc.untitled')}</span>
+      {segments.length === 0 ? null : (
+        <Ribbon scale="thumb" segments={segments} colors={colors} />
+      )}
+      <span className="lc__cardmeta">
+        {t('lc.structure', {
+          sides: `${config.speakers.filter((s) => s.side === 'A').length}v${config.speakers.filter((s) => s.side === 'B').length}`,
+          n: config.segments.length,
+          len: formatTime(runPlan.totalMs),
+        })}
+      </span>
+      <div className="scr__acts">
+        <button type="button" className="btn btn--primary" onClick={onRun}>
+          {t('pr.runNow')}
+        </button>
+        <button type="button" className="btn" onClick={onEdit}>
+          <Icon name="edit" />
+          {t('pr.editIt')}
+        </button>
+        <button type="button" className="btn btn--quiet" onClick={onDiscard}>
+          {t('ed.discard')}
+        </button>
+      </div>
+    </div>
+  );
+}

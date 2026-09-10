@@ -1,0 +1,188 @@
+/* ============================================================================
+   TYPE - one family across the whole app, worked across its width axis.
+   wdth 125 = time, wdth 100 = people, wdth 87 = structure.
+   Fonts are linked from Google Fonts in index.html; every stack carries a real
+   fallback so a blocked CDN degrades to a metric-similar grotesque.
+   ========================================================================== */
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--t-ctl);
+  font-weight: 400;
+  font-stretch: 100%;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Width-axis utilities ---------------------------------------------- */
+.wd-time { font-stretch: var(--wd-time); }
+.wd-body { font-stretch: var(--wd-body); }
+.wd-struct { font-stretch: var(--wd-struct); }
+
+/* --- Numerals: no glyph may ever shift while a clock runs --------------- */
+.num,
+.t-clock,
+.t-read,
+.t-meta,
+.s-clock,
+.s-chess,
+input,
+time,
+[data-numeric] {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* --- Console scale ------------------------------------------------------ */
+.t-cap {
+  font-size: var(--t-cap);
+  font-weight: 600;
+  font-stretch: var(--wd-struct);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.t-meta {
+  font-size: var(--t-meta);
+  font-weight: 400;
+  font-stretch: var(--wd-body);
+}
+
+.t-ctl {
+  font-size: var(--t-ctl);
+  font-weight: 500;
+  font-stretch: var(--wd-body);
+}
+
+.t-row {
+  font-size: var(--t-row);
+  font-weight: 500;
+  font-stretch: var(--wd-body);
+  line-height: 1.2;
+}
+
+.t-name {
+  font-size: var(--t-name);
+  font-weight: 600;
+  font-stretch: var(--wd-body);
+  line-height: 1.15;
+}
+
+.t-read {
+  font-size: var(--t-read);
+  font-weight: 600;
+  font-stretch: var(--wd-body);
+  line-height: 1.1;
+}
+
+.t-clock {
+  font-size: var(--t-clock);
+  font-weight: 700;
+  font-stretch: var(--wd-time);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* --- Stage scale -------------------------------------------------------- */
+.s-clock {
+  font-size: var(--ts-clock);
+  font-weight: 700;
+  font-stretch: var(--wd-time);
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+}
+
+.s-chess {
+  font-size: var(--ts-chess);
+  font-weight: 700;
+  font-stretch: var(--wd-time);
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+.s-name {
+  font-size: var(--ts-name);
+  font-weight: 700;
+  font-stretch: var(--wd-body);
+  line-height: 1.05;
+}
+
+.s-role {
+  font-size: var(--ts-role);
+  font-weight: 600;
+  font-stretch: var(--wd-struct);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.s-next {
+  font-size: var(--ts-next);
+  font-weight: 500;
+  font-stretch: var(--wd-body);
+}
+
+.s-rail-name {
+  font-size: var(--ts-rail-name);
+  font-weight: 500;
+  font-stretch: var(--wd-body);
+}
+
+.s-rail-meta {
+  font-size: var(--ts-rail-meta);
+  font-weight: 500;
+  font-stretch: var(--wd-struct);
+}
+
+.s-ribbon {
+  font-size: var(--ts-ribbon);
+  font-weight: 600;
+  font-stretch: var(--wd-struct);
+}
+
+.s-context {
+  font-size: var(--ts-context);
+  font-weight: 400;
+  font-stretch: var(--wd-body);
+}
+
+/* --- CJK ----------------------------------------------------------------
+   Swap the stack, and never uppercase or letterspace Chinese: both are Latin
+   devices that wreck Han glyph rhythm. Noto Sans SC has no width axis either,
+   so structure labels lean on weight instead of wdth. */
+html[lang="zh"] body,
+html[lang|="zh"] body {
+  font-family: var(--font-cjk);
+}
+
+:lang(zh) {
+  font-family: var(--font-cjk);
+}
+
+:lang(zh).t-cap,
+:lang(zh) .t-cap,
+:lang(zh).s-role,
+:lang(zh) .s-role {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
+:lang(zh).s-name,
+:lang(zh) .s-name {
+  font-weight: 900;
+}
+
+/* Structure labels only. The clock keeps wdth 125 in every language - its glyphs
+   are Latin numerals, which the CJK fallback never touches. */
+:lang(zh).wd-struct,
+:lang(zh) .wd-struct {
+  font-stretch: 100%;
+}

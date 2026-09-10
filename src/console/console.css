@@ -1,0 +1,826 @@
+/* ============================================================================
+   THE CONSOLE — four bands, two rails, one core.
+
+   Tokens only: no hex, no box-shadows, no radius beyond --r-1 / --r-pill, no px
+   outside the --s-* scale (the 10px floor bar and the 4px identity tick are the
+   two figures the spec names by hand, in §3.2).
+
+   PERIPHERY / CORE is enforced by selector, not by discipline:
+     - `--side-*` appears only under .rail, .plate and .chess__plate;
+     - `--state-*` appears only under .core, .digits and .dbar.
+   Nothing in this file paints both on one element. The bank readout in overtime
+   uses --danger, the token for overrun figures on chrome, not --state-over.
+   ========================================================================== */
+
+.console {
+  display: grid;
+  /* 44 / 1fr / 64 / 40 — the 40px band has no token of its own, so it is built
+     out of two that do. */
+  grid-template-rows:
+    minmax(var(--row), auto)
+    minmax(0, 1fr)
+    var(--s-9)
+    minmax(calc(var(--s-9) - var(--s-6)), auto);
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+/* --- Band 1: the run-sheet bar ----------------------------------------- */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+  padding-inline: var(--s-4);
+  border-bottom: var(--hair);
+  background: var(--bg-panel);
+}
+
+.bar__id {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.bar__title {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bar__sub {
+  color: var(--text-lo);
+  white-space: nowrap;
+}
+
+.bar__seg,
+.bar__round {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0;
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+
+.bar__seg {
+  color: var(--text-lo);
+}
+
+.bar__roundlabel,
+.bar__slash {
+  color: var(--text-lo);
+}
+
+.bar__delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pill);
+  color: var(--text-mid);
+}
+
+.bar__delta[data-schedule='behind'] {
+  color: var(--warn-ink);
+  border-color: var(--warn-ink);
+}
+
+.bar__delta[data-schedule='ahead'] {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+/* One word per state, and only the true one is shown — colour is never alone. */
+.bar__deltaword {
+  display: none;
+}
+
+.bar__delta[data-schedule='on'] .bar__deltaword[data-w='on'],
+.bar__delta[data-schedule='ahead'] .bar__deltaword[data-w='ahead'],
+.bar__delta[data-schedule='behind'] .bar__deltaword[data-w='behind'] {
+  display: inline;
+}
+
+.bar__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-inline-start: auto;
+}
+
+.bar__btn,
+.bar__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--s-7);
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-sunken);
+  color: var(--text-mid);
+}
+
+.bar__btn:hover {
+  color: var(--text-hi);
+  background: var(--bg-raised);
+}
+
+.bar__chip {
+  border-radius: var(--r-pill);
+  color: var(--text-lo);
+}
+
+.bar__pip {
+  width: var(--s-3);
+  height: var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+}
+
+.bar__pip[data-live] {
+  background: var(--state-live);
+  border-color: var(--state-live);
+}
+
+.bar__blocked {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-basis: 100%;
+  margin: 0;
+  padding-block: var(--s-2);
+  color: var(--warn-ink);
+}
+
+.bar__link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* --- Band 2: rails + core ---------------------------------------------- */
+
+.console__body {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
+  min-height: 0;
+}
+
+.console__core {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  border-inline: var(--hair);
+}
+
+/* --- Rails (periphery: identity colour lives here) ---------------------- */
+
+.rail {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-panel);
+}
+
+.rail[data-side='A'] {
+  --side: var(--side-a);
+  --ink: var(--side-a-ink);
+}
+
+.rail[data-side='B'] {
+  --side: var(--side-b);
+  --ink: var(--side-b-ink);
+  flex-direction: row-reverse;
+}
+
+/* The outermost 10px column: full identity colour when that side has the floor. */
+.rail__floor {
+  flex: 0 0 10px;
+  background: var(--rule);
+}
+
+.rail__floor[data-floor='on'] {
+  background: var(--side);
+}
+
+.rail__floor[data-floor='half'] {
+  background: color-mix(in srgb, var(--side) 60%, transparent);
+}
+
+.rail__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--s-3) var(--s-3) var(--s-4);
+  overflow: hidden;
+}
+
+.rail__head {
+  margin: 0;
+  color: var(--text-mid);
+}
+
+.rail[data-lit] .rail__head {
+  color: var(--text-hi);
+}
+
+.rail__floorword {
+  margin: 0;
+  color: var(--text-mid);
+}
+
+.rail__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rail__row {
+  display: flex;
+  min-height: var(--row);
+}
+
+.rail__bank {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: var(--row);
+  margin-top: auto;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--bg-sunken);
+  color: var(--text-mid);
+  text-align: start;
+}
+
+.rail__bank:hover {
+  color: var(--text-hi);
+  border-color: var(--rule-strong);
+}
+
+.rail__bank[data-drawing] {
+  border-color: var(--side);
+  color: var(--text-hi);
+}
+
+/* An overdrawn bank is chrome, not core: --danger is the token for overrun
+   figures. The leading `+` carries the same fact without colour. */
+.rail__bank[data-over] .rail__banktime {
+  color: var(--danger);
+}
+
+/* --- Plates (periphery) -------------------------------------------------- */
+
+.plate {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.plate--rail {
+  flex: 1 1 auto;
+  padding: var(--s-2) var(--s-3);
+  border-inline-start: var(--s-2) solid transparent;
+  color: var(--text-mid);
+}
+
+.plate--rail[data-mirror] {
+  flex-direction: row-reverse;
+  border-inline-start: 0;
+  border-inline-end: var(--s-2) solid transparent;
+  text-align: end;
+}
+
+.plate--rail[data-state='ondeck'],
+.plate--rail[data-state='spoken'] {
+  color: var(--text-hi);
+}
+
+.plate--rail[data-state='spoken'] {
+  color: var(--text-lo);
+}
+
+/* The row of whoever is on the clock inverts to solid identity colour with
+   auto-ink, plus a 4px tick on the rail's outer edge. A filled rectangle reads
+   at ten feet; the original's 20px speech-bubble icon did not. */
+.plate--rail[data-state='speaking'] {
+  background: var(--side);
+  color: var(--ink);
+  border-inline-start-color: var(--side);
+}
+
+.plate--rail[data-state='speaking'][data-mirror] {
+  border-inline-end-color: var(--side);
+}
+
+.plate__mark {
+  display: inline-flex;
+  flex: 0 0 var(--s-5);
+  justify-content: center;
+}
+
+.plate__ord {
+  flex: 0 0 auto;
+  min-width: 1.25em;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.plate__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--t-row);
+  font-weight: 500;
+}
+
+.plate__time {
+  flex: 0 0 auto;
+}
+
+.plate--plate {
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-0);
+  background: var(--side);
+  color: var(--ink);
+}
+
+.plate--plate[data-side='A'] {
+  --side: var(--side-a);
+  --ink: var(--side-a-ink);
+}
+
+.plate--plate[data-side='B'] {
+  --side: var(--side-b);
+  --ink: var(--side-b-ink);
+}
+
+.plate--plate .plate__name {
+  font-size: var(--t-name);
+  font-weight: 600;
+}
+
+.plate--plate .plate__role {
+  flex: 0 0 auto;
+  color: inherit;
+  opacity: 0.82;
+}
+
+/* --- Core (state colour lives here; identity colour never does) ---------- */
+
+.core {
+  display: grid;
+  align-content: center;
+  gap: var(--s-5);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--s-5);
+}
+
+.core--card {
+  justify-items: center;
+  text-align: center;
+}
+
+.core__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.core__label {
+  margin: 0;
+  color: var(--text-mid);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.core__status {
+  flex: 0 0 auto;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-pill);
+  color: var(--text-mid);
+}
+
+.core__status[data-transport='running'] {
+  color: var(--state-live);
+  border-color: var(--state-live);
+}
+
+.core__status[data-band='warning'] {
+  color: var(--state-warn);
+  border-color: var(--state-warn);
+}
+
+.core__status[data-band='final10'] {
+  color: var(--state-final);
+  border-color: var(--state-final);
+}
+
+.core__status[data-band='over'] {
+  color: var(--state-over);
+  border-color: var(--state-over);
+}
+
+.core__clock {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* ARMED is loud: the digits sit back, the bar is full and static, and the state
+   word beside the label says so in so many words. */
+.core[data-armed] .digits {
+  opacity: 0.4;
+}
+
+.core__plates {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-3);
+}
+
+.core__neutral,
+.core__motion,
+.core__hint {
+  margin: 0;
+  color: var(--text-mid);
+}
+
+.core__motion {
+  color: var(--text-hi);
+}
+
+.core__ondeck {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin: 0;
+  color: var(--text-mid);
+}
+
+.core__ondecklabel {
+  color: var(--text-lo);
+}
+
+.core__ondeckname {
+  color: var(--text-hi);
+  font-weight: 600;
+}
+
+.core__ondeck[data-urgent] .core__ondeckname {
+  color: var(--state-over);
+}
+
+/* --- Chess core ---------------------------------------------------------- */
+
+.core--chess {
+  align-content: center;
+}
+
+.chess {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-6);
+  min-width: 0;
+}
+
+.chess__side {
+  display: grid;
+  gap: var(--s-3);
+  min-width: 0;
+  transform-origin: top center;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+
+/* The idle side says it three ways at once: smaller, desaturated, and in words. */
+.chess__side[data-idle] {
+  transform: scale(0.82);
+  filter: saturate(0.3);
+  opacity: 0.7;
+}
+
+.chess__plate {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  text-align: center;
+}
+
+.chess__plate[data-side='A'] {
+  background: var(--side-a);
+  color: var(--side-a-ink);
+}
+
+.chess__plate[data-side='B'] {
+  background: var(--side-b);
+  color: var(--side-b-ink);
+}
+
+.chess__digits {
+  display: flex;
+  justify-content: center;
+}
+
+.chess__digits .digits--console .digits__figure {
+  font-size: calc(var(--t-clock) * 0.6);
+}
+
+.chess__word {
+  margin: 0;
+  color: var(--text-lo);
+  text-align: center;
+}
+
+.chess__floor {
+  margin: 0;
+  color: var(--text-mid);
+  text-align: center;
+}
+
+/* --- Transport ----------------------------------------------------------- */
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border-top: var(--hair);
+  background: var(--bg-panel);
+}
+
+.transport__main,
+.transport__aux {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.transport__aux {
+  margin-inline-start: auto;
+}
+
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: var(--row);
+  min-width: var(--row);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-raised);
+  color: var(--text-hi);
+  font-size: var(--t-ctl);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+
+.tbtn:hover:not(:disabled) {
+  background: var(--bg-sunken);
+}
+
+.tbtn:disabled {
+  color: var(--text-lo);
+  border-color: var(--rule);
+  background: var(--bg-panel);
+}
+
+.tbtn--primary {
+  background: var(--text-hi);
+  border-color: var(--text-hi);
+  color: var(--text-inv);
+}
+
+.tbtn--primary:hover:not(:disabled) {
+  background: var(--text-mid);
+  border-color: var(--text-mid);
+}
+
+.tbtn--primary .keycap {
+  background: transparent;
+  color: var(--text-inv);
+  border-color: color-mix(in srgb, var(--text-inv) 40%, transparent);
+}
+
+.tbtn__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.holdbtn.tbtn--hold {
+  gap: var(--s-2);
+  white-space: nowrap;
+}
+
+/* --- Undo chip ----------------------------------------------------------- */
+
+.undochip {
+  /* An absolutely positioned grid child only honours `grid-row` once one inset is
+     non-auto; with all four auto it falls back to its static position, which put the
+     chip on top of the transport row. Pinning `bottom` makes row 1 the containing
+     block, so the chip floats just above the controls instead of covering them. */
+  position: absolute;
+  grid-row: 1;
+  inset-inline: 0;
+  bottom: var(--s-3);
+  z-index: 2;
+  width: fit-content;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  background: var(--bg-raised);
+  color: var(--text-mid);
+}
+
+.undochip__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--s-7);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-hi);
+}
+
+.undochip__btn:hover {
+  background: var(--bg-sunken);
+}
+
+/* --- Band 3: the Ribbon -------------------------------------------------- */
+
+.console__ribbon {
+  display: flex;
+  align-items: center;
+  padding: var(--s-2) var(--s-4);
+  border-top: var(--hair);
+  background: var(--bg-panel);
+}
+
+/* --- Band 4: the permanent keycap legend --------------------------------- */
+
+.keylegend {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--s-9) - var(--s-6));
+  padding: var(--s-2) var(--s-4);
+  border-top: var(--hair);
+  background: var(--bg-app);
+  overflow: hidden;
+}
+
+.keylegend__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.keylegend__row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.keylegend__text {
+  color: var(--text-lo);
+}
+
+/* --- M6: the on-deck caret nudge ---------------------------------------- */
+
+@keyframes dt-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(calc(4px * var(--motion-scale)));
+  }
+}
+
+.m-nudge {
+  animation: dt-nudge var(--d-nudge) var(--ease-nudge) infinite;
+}
+
+/* --- Responsive ----------------------------------------------------------
+   1180px: the rails narrow. 900px: they collapse to their floor bars and the
+   transport becomes a row of large targets — deliberately reduced, not a
+   cramped port. Nothing scrolls sideways at any width. ------------------- */
+
+@media (max-width: 1180px) {
+  .console__body {
+    grid-template-columns: 200px minmax(0, 1fr) 200px;
+  }
+
+  .plate__time {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .console {
+    grid-template-rows: auto minmax(0, 1fr) var(--s-9);
+  }
+
+  .console__body {
+    grid-template-columns: 10px minmax(0, 1fr) 10px;
+  }
+
+  .rail__body {
+    display: none;
+  }
+
+  .rail__floor {
+    flex: 1 1 auto;
+  }
+
+  .keylegend {
+    display: none;
+  }
+
+  .transport {
+    gap: var(--s-2);
+  }
+
+  .transport__aux {
+    margin-inline-start: 0;
+  }
+
+  .tbtn,
+  .transport .holdbtn {
+    flex: 1 1 auto;
+    min-height: 56px;
+  }
+
+  .tbtn .keycaps {
+    display: none;
+  }
+
+  .chess {
+    gap: var(--s-3);
+  }
+}
+
+@media (max-width: 640px) {
+  .bar__seg,
+  .bar__sub {
+    display: none;
+  }
+
+  .core__ondeckrole {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .tbtn,
+  .transport .holdbtn {
+    min-height: 56px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .plate--rail[data-state='ondeck'] {
+    outline: 1px solid var(--rule-strong);
+    outline-offset: calc(-1 * var(--s-1));
+  }
+}

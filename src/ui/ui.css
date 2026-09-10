@@ -1,0 +1,736 @@
+/* ============================================================================
+   SHARED PRIMITIVES — every rule here uses only tokens from tokens.css.
+   No hex, no shadows, no radius beyond --r-1 / --r-pill, no px outside --s-*.
+
+   PERIPHERY / CORE is enforced structurally, not by discipline:
+   .digits, .dbar and .ribbon__fill read --state-*; only .ribbon__edge and the
+   rails read --side-*. Nothing here paints both on one element.
+   ========================================================================== */
+
+/* --- Utility ------------------------------------------------------------ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Icons -------------------------------------------------------------- */
+
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icon {
+  display: inline-block;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  vertical-align: -0.15em;
+}
+
+/* --- Buttons ------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: var(--row);
+  min-width: var(--row);
+  padding: var(--s-3) var(--s-5);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-raised);
+  color: var(--text-hi);
+  font-size: var(--t-ctl);
+  font-weight: 500;
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-sunken);
+}
+
+.btn:disabled {
+  color: var(--text-lo);
+  border-color: var(--rule);
+  background: var(--bg-panel);
+}
+
+.btn--primary {
+  background: var(--text-hi);
+  color: var(--text-inv);
+  border-color: var(--text-hi);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--text-mid);
+  border-color: var(--text-mid);
+}
+
+.btn--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-inv);
+}
+
+.btn--quiet {
+  background: none;
+  border-color: transparent;
+}
+
+.btn--quiet:hover:not(:disabled) {
+  border-color: var(--rule);
+}
+
+@media (pointer: coarse) {
+  .btn {
+    min-height: 56px;
+  }
+}
+
+/* --- Keycaps ------------------------------------------------------------ */
+
+.keycaps {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-sunken);
+  color: var(--text-mid);
+  font-family: var(--font-ui);
+  font-size: var(--t-cap);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+/* --- Digits ------------------------------------------------------------- */
+
+.digits {
+  display: block;
+  color: var(--state-normal);
+  transition: color var(--d-fast) var(--ease-out);
+}
+
+.digits[data-band='warning'] {
+  color: var(--state-warn);
+}
+
+.digits[data-band='final10'] {
+  color: var(--state-final);
+}
+
+.digits[data-band='over'] {
+  color: var(--state-over);
+}
+
+.digits__figure {
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-stretch: var(--wd-time);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.digits--console .digits__figure {
+  font-size: var(--t-clock);
+}
+
+.digits--stage .digits__figure {
+  font-size: var(--ts-clock);
+  line-height: 0.9;
+}
+
+.digits--chess .digits__figure {
+  font-size: var(--ts-chess);
+  line-height: 0.95;
+}
+
+.digits__sign {
+  font-size: 0.62em;
+  padding-right: 0.06em;
+}
+
+.digits__sec {
+  display: inline-block;
+}
+
+@keyframes dt-blip {
+  0% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(calc(-4px * var(--motion-scale)));
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.digits__sec.m-blip {
+  animation: dt-blip var(--d-blip) var(--ease-out);
+}
+
+/* --- Depletion bar ------------------------------------------------------ */
+
+.dbar {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 14px;
+  --dbar-ink: var(--state-normal);
+}
+
+.dbar[data-band='warning'] {
+  --dbar-ink: var(--state-warn);
+}
+
+.dbar[data-band='final10'] {
+  --dbar-ink: var(--state-final);
+}
+
+.dbar[data-band='over'] {
+  --dbar-ink: var(--state-over);
+}
+
+.dbar__track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--stage-track);
+  overflow: hidden;
+}
+
+.dbar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  background: var(--dbar-ink);
+  transition: background-color var(--d-fast) var(--ease-out);
+}
+
+/* Overrun leaves the block. That is the point: a long speech is visibly outside
+   its own allotment rather than parked at a tidy zero. */
+.dbar__spill {
+  flex: 0 0 auto;
+  width: 0;
+  background: var(--state-over);
+}
+
+.dbar__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--bg-app);
+  opacity: 0.85;
+}
+
+.dbar__grat {
+  position: absolute;
+  top: 35%;
+  bottom: 0;
+  width: 1px;
+  background: var(--bg-app);
+  opacity: 0.5;
+}
+
+.dbar__hatch {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--stage-track) 0 3px,
+    transparent 3px 8px
+  );
+  outline: 1px solid var(--stage-track);
+  outline-offset: -1px;
+}
+
+.dbar--stage {
+  height: 20px;
+}
+
+@media (prefers-contrast: more) {
+  .dbar {
+    height: 20px;
+  }
+}
+
+/* --- Ribbon ------------------------------------------------------------- */
+
+.ribbon {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  gap: 1px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.ribbon--thumb {
+  height: var(--s-3);
+}
+
+/* A thumbnail sits on a card that is already --bg-panel, so blocks painted in the same
+   value disappear and only their 2px identity edges survive — the line reads as scattered
+   ticks instead of the shape of the round. Sinking the block body one step restores the
+   proportional widths, which is the entire point of showing a ribbon on the card. */
+.ribbon--thumb .ribbon__block {
+  background: var(--bg-sunken);
+}
+
+.ribbon--spine {
+  height: var(--s-4);
+}
+
+.ribbon--live {
+  height: var(--row);
+}
+
+.ribbon__block {
+  container-type: inline-size;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: var(--bg-panel);
+  color: var(--text-mid);
+  overflow: hidden;
+  --block-edge: var(--rule-strong);
+}
+
+.ribbon__block[data-state='current'] {
+  background: var(--bg-raised);
+  color: var(--text-hi);
+}
+
+.ribbon__block[data-state='future'] {
+  color: var(--text-lo);
+}
+
+.ribbon--live .ribbon__block[data-selected] {
+  outline: var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-offset));
+}
+
+.ribbon__block:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-offset));
+}
+
+/* Identity colour lives here and nowhere else in this component. */
+.ribbon__edge {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--block-edge);
+}
+
+.ribbon__fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  width: 0;
+  background: var(--state-normal);
+  opacity: 0.55;
+}
+
+.ribbon--live .ribbon__fill {
+  height: 4px;
+}
+
+.ribbon__spill {
+  position: absolute;
+  inset: auto 0 0 auto;
+  height: 4px;
+  width: 0;
+  background: var(--state-over);
+}
+
+.ribbon__label {
+  position: relative;
+  padding-inline: var(--s-3) var(--s-2);
+  padding-left: calc(var(--s-3) + 2px);
+  font-size: var(--t-cap);
+  font-weight: 600;
+  font-stretch: var(--wd-struct);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+:lang(zh) .ribbon__label {
+  letter-spacing: 0;
+  font-stretch: 100%;
+}
+
+.ribbon__label-short {
+  display: none;
+}
+
+@container (max-width: 60px) {
+  .ribbon__label-long {
+    display: none;
+  }
+  .ribbon__label-short {
+    display: inline;
+  }
+}
+
+@container (max-width: 30px) {
+  .ribbon__label {
+    display: none;
+  }
+}
+
+/* The current block always names itself, however narrow it is. */
+.ribbon__block[data-state='current'] .ribbon__label {
+  display: block;
+}
+
+/* --- TimeField ---------------------------------------------------------- */
+
+.timefield {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.timefield__label {
+  color: var(--text-lo);
+}
+
+.timefield__input {
+  width: 100%;
+  min-width: 4.5em;
+  min-height: var(--row);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: var(--bg-sunken);
+  color: var(--text-hi);
+  font-size: var(--t-ctl);
+  font-stretch: var(--wd-time);
+  text-align: right;
+}
+
+.timefield__input:focus {
+  border-color: var(--rule-strong);
+}
+
+.timefield__input[data-inherited] {
+  color: var(--text-lo);
+}
+
+.timefield__input:disabled {
+  color: var(--text-lo);
+  background: var(--bg-panel);
+}
+
+/* --- HoldButton --------------------------------------------------------- */
+
+.holdbtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: var(--row);
+  min-width: var(--row);
+  padding: var(--s-3) var(--s-5);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-raised);
+  color: var(--text-hi);
+  font-size: var(--t-ctl);
+  font-weight: 500;
+}
+
+.holdbtn--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.holdbtn[data-holding] {
+  background: var(--bg-sunken);
+}
+
+.holdbtn:disabled {
+  color: var(--text-lo);
+  border-color: var(--rule);
+}
+
+.holdbtn__arc {
+  display: inline-flex;
+  flex: none;
+}
+
+.holdbtn__arc svg {
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.holdbtn__arc-track,
+.holdbtn__arc-fill {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.holdbtn__arc-track {
+  stroke: var(--rule-strong);
+}
+
+/* 2 * pi * 6.25 = 39.27 — the dash array is the whole circumference, and the
+   component drives stroke-dashoffset from 39.27 down to 0 across --d-hold. */
+.holdbtn__arc-fill {
+  stroke: currentColor;
+  stroke-dasharray: 39.27;
+  stroke-dashoffset: 39.27;
+  transition: stroke-dashoffset var(--d-fast) linear;
+}
+
+/* --- Overlay ------------------------------------------------------------ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-5);
+  background: color-mix(in srgb, var(--bg-app) 82%, transparent);
+}
+
+.overlay--dim {
+  background: color-mix(in srgb, var(--stage-bg) 80%, transparent);
+}
+
+.overlay__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  width: 100%;
+  max-height: calc(100vh - var(--s-8));
+  padding: var(--s-6);
+  border: 1px solid var(--rule-strong);
+  background: var(--bg-panel);
+  overflow: auto;
+}
+
+.overlay__panel--sm {
+  max-width: 440px;
+}
+
+.overlay__panel--md {
+  max-width: 640px;
+}
+
+.overlay__panel--lg {
+  max-width: 900px;
+}
+
+.overlay__panel--full {
+  max-width: none;
+  height: 100%;
+  max-height: none;
+}
+
+.overlay__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-5);
+  padding-bottom: var(--s-4);
+  border-bottom: var(--hair);
+}
+
+.overlay__title {
+  margin: 0;
+}
+
+.overlay__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--row);
+  height: var(--row);
+  margin: calc(-1 * var(--s-3)) calc(-1 * var(--s-3)) 0 0;
+  border-radius: var(--r-1);
+  color: var(--text-mid);
+}
+
+.overlay__close:hover {
+  color: var(--text-hi);
+}
+
+/* --- Confirm ------------------------------------------------------------ */
+
+.confirm__body {
+  color: var(--text-mid);
+}
+
+.confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-3);
+}
+
+/* --- Key legend --------------------------------------------------------- */
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s-6);
+}
+
+.legend__head {
+  color: var(--text-lo);
+  padding-bottom: var(--s-3);
+  border-bottom: var(--hair);
+  margin-bottom: var(--s-3);
+}
+
+.legend__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-2) 0;
+}
+
+.legend__row[data-inert] {
+  color: var(--text-lo);
+  opacity: 0.6;
+}
+
+.legend__row .keycaps {
+  flex: 0 0 96px;
+  justify-content: flex-end;
+}
+
+.legend__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.legend__zh {
+  color: var(--text-mid);
+}
+
+.legend__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  color: var(--text-lo);
+}
+
+/* --- App shell ---------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-app);
+  color: var(--text-hi);
+}
+
+.app__screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app__splash {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  color: var(--text-lo);
+}
+
+.app__banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  border-bottom: var(--hair);
+  background: var(--bg-panel);
+  color: var(--warn-ink);
+  font-size: var(--t-meta);
+}
+
+.app__audio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  background: var(--bg-sunken);
+  color: var(--text-mid);
+  font-size: var(--t-cap);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:lang(zh) .app__audio {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.app__audio[data-status='armed'] {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.app__audio[data-status='locked'] {
+  color: var(--warn-ink);
+  border-color: var(--warn-ink);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --rule: var(--rule-strong);
+  }
+}

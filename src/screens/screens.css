@@ -1,0 +1,568 @@
+/* ============================================================================
+   SCREEN LAYOUTS — Launch (#/) and Summary (#/summary).
+
+   Tokens only: no hex, no shadows, no radius beyond --r-1 / --r-pill, no px
+   outside the --s-* scale.
+
+   PERIPHERY / CORE: neither screen carries a live clock, so no --state-* token
+   appears here at all — an overrun in the box score is structural bad news and
+   takes --danger. Identity colour (--side-*) appears only as a leading edge tick
+   on a row or a panel. No element carries both.
+   ========================================================================== */
+
+/* --- Shared screen chrome ----------------------------------------------- */
+
+.scr {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+.scr__bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-5);
+  padding: var(--s-4) var(--gutter);
+  border-bottom: var(--hair);
+  background: var(--bg-panel);
+}
+
+.scr__brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.scr__brandname {
+  color: var(--text-hi);
+}
+
+.scr__brandsub {
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+}
+
+.scr__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.scr__keyhint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-inline: var(--s-2);
+  color: var(--text-lo);
+  font-size: var(--t-cap);
+  white-space: nowrap;
+}
+
+.scr__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.scr__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-block: var(--s-7) var(--s-9);
+  padding-inline: var(--gutter);
+}
+
+.scr__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.scr__sechead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-4);
+  padding-bottom: var(--s-2);
+  border-bottom: var(--hair);
+}
+
+.scr__sectitle {
+  color: var(--text-hi);
+}
+
+.scr__note {
+  max-width: 68ch;
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+  line-height: 1.5;
+}
+
+.scr__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+
+/* A message the operator must read, never a dialog: the page keeps working. */
+.scr__alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-5);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--rule-strong);
+  background: var(--bg-panel);
+  color: var(--text-mid);
+  font-size: var(--t-meta);
+}
+
+.scr__alert[data-tone='warn'] {
+  border-color: var(--warn-ink);
+  color: var(--warn-ink);
+}
+
+.scr__alerttext {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  flex: 1 1 20ch;
+}
+
+/* --- Launch: the interrupted round, above everything -------------------- */
+
+.lc__resume {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4) var(--s-6);
+  padding: var(--s-5);
+  border: 1px solid var(--rule-strong);
+  background: var(--bg-raised);
+}
+
+.lc__resumemain {
+  display: flex;
+  flex: 1 1 24ch;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.lc__resumetitle {
+  color: var(--text-hi);
+}
+
+.lc__resumebody {
+  color: var(--text-mid);
+  font-size: var(--t-ctl);
+}
+
+.lc__resumeage {
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+}
+
+/* --- Launch: format cards ------------------------------------------------ */
+
+.lc__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--s-4);
+}
+
+.lc__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: var(--hair);
+  background: var(--bg-panel);
+}
+
+.lc__card[data-default] {
+  border-color: var(--rule-strong);
+  background: var(--bg-raised);
+}
+
+.lc__cardhead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.lc__cardname {
+  color: var(--text-hi);
+}
+
+.lc__chip {
+  flex: none;
+  padding-inline: var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-lo);
+  font-size: var(--t-cap);
+  line-height: 1.9;
+  white-space: nowrap;
+}
+
+.lc__cardmeta {
+  color: var(--text-mid);
+  font-size: var(--t-meta);
+}
+
+.lc__cardacts {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: auto;
+  padding-top: var(--s-1);
+}
+
+.lc__cardacts .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: var(--s-3);
+}
+
+/* --- Launch: recent rounds ---------------------------------------------- */
+
+.lc__list {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--hair);
+}
+
+.lc__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3) var(--s-5);
+  min-height: var(--row);
+  padding-block: var(--s-3);
+  border-bottom: var(--hair);
+}
+
+.lc__rowmain {
+  display: flex;
+  flex: 1 1 22ch;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.lc__rowtitle {
+  overflow: hidden;
+  color: var(--text-hi);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc__rowmeta {
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+}
+
+.lc__empty {
+  padding-block: var(--s-5);
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+}
+
+/* --- Launch: paste / drop ------------------------------------------------ */
+
+.lc__import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
+  border: 1px dashed var(--rule-strong);
+  background: var(--bg-panel);
+  transition: border-color var(--d-fast) var(--ease-out),
+    background var(--d-fast) var(--ease-out);
+}
+
+.lc__import[data-drag] {
+  border-color: var(--focus);
+  border-style: solid;
+  background: var(--bg-sunken);
+}
+
+.lc__paste {
+  width: 100%;
+  min-height: 88px;
+  padding: var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-sunken);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  font-size: var(--t-meta);
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.lc__paste::placeholder {
+  color: var(--text-lo);
+}
+
+.lc__importacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.lc__problems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  font-size: var(--t-meta);
+}
+
+.lc__problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  color: var(--text-mid);
+}
+
+.lc__problem[data-sev='error'] {
+  color: var(--danger);
+}
+
+.lc__problem[data-sev='warning'] {
+  color: var(--warn-ink);
+}
+
+.lc__staged {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--rule-strong);
+  background: var(--bg-raised);
+}
+
+/* --- Summary ------------------------------------------------------------- */
+
+.sum__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2) var(--s-6);
+}
+
+.sum__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  color: var(--text-mid);
+  font-size: var(--t-meta);
+}
+
+.sum__figure {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.sum__figureval {
+  color: var(--text-hi);
+  font-size: var(--t-read);
+  font-stretch: var(--wd-time);
+}
+
+.sum__delta[data-over] .sum__figureval {
+  color: var(--danger);
+}
+
+.sum__tablewrap {
+  overflow-x: auto;
+}
+
+.sum__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-meta);
+}
+
+.sum__table th,
+.sum__table td {
+  padding: var(--s-3);
+  border-bottom: var(--hair);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.sum__table th {
+  color: var(--text-lo);
+  font-size: var(--t-cap);
+  font-weight: 600;
+  font-stretch: var(--wd-struct);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:lang(zh) .sum__table th {
+  font-stretch: 100%;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sum__table tbody tr:hover {
+  background: var(--bg-panel);
+}
+
+.sum__order {
+  width: 3ch;
+  color: var(--text-lo);
+  text-align: right;
+}
+
+/* Identity colour, leading edge only. The side is also named in the row. */
+.sum__label {
+  position: relative;
+  min-width: 14ch;
+  padding-left: var(--s-4);
+  color: var(--text-hi);
+  white-space: normal;
+}
+
+.sum__tick {
+  position: absolute;
+  inset: var(--s-2) auto var(--s-2) 0;
+  width: 3px;
+  background: var(--rule-strong);
+}
+
+.sum__tick[data-side='A'] {
+  background: var(--side-a);
+}
+
+.sum__tick[data-side='B'] {
+  background: var(--side-b);
+}
+
+.sum__who {
+  color: var(--text-mid);
+  white-space: normal;
+}
+
+.sum__num {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-stretch: var(--wd-time);
+  text-align: right;
+}
+
+.sum__over {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.sum__none {
+  color: var(--text-lo);
+}
+
+.sum__table tfoot td {
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 0;
+  color: var(--text-hi);
+  font-weight: 600;
+}
+
+.sum__totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s-4);
+}
+
+.sum__total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  border: var(--hair);
+  border-left: 3px solid var(--rule-strong);
+  background: var(--bg-panel);
+}
+
+.sum__total[data-side='A'] {
+  border-left-color: var(--side-a);
+}
+
+.sum__total[data-side='B'] {
+  border-left-color: var(--side-b);
+}
+
+.sum__totalname {
+  color: var(--text-mid);
+}
+
+.sum__totalval {
+  color: var(--text-hi);
+  font-size: var(--t-read);
+  font-stretch: var(--wd-time);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.sum__totalnote {
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+}
+
+.sum__totalnote[data-over] {
+  color: var(--danger);
+}
+
+.sum__fallback {
+  width: 100%;
+  min-height: 140px;
+  padding: var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-sunken);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  font-size: var(--t-meta);
+  white-space: pre;
+}
+
+/* --- Narrow ------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .scr__inner {
+    gap: var(--s-7);
+    padding-block: var(--s-5) var(--s-8);
+    padding-inline: var(--s-5);
+  }
+
+  .scr__bar {
+    padding-inline: var(--s-5);
+  }
+
+  .lc__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lc__import {
+    padding: var(--s-4);
+  }
+}
