@@ -337,7 +337,16 @@ export interface VettedPair {
   labelB: L10n;
 }
 
-/** The six shipped duos of section 2.2, default first. The picker recomputes ΔL live. */
+/**
+ * The shipped duos, default first, then the original's own pair.
+ *
+ * The first six are the colour-vision-safe set. The last is `#0000FF` / `#FF0000` — what
+ * the Unity app shipped and what every legacy `save.json` carries, so it has to be
+ * reachable by name rather than only by typing hex. It is offered, not endorsed: the
+ * picker measures whatever is selected and names the reason a pair falls short. Blue on
+ * black is a low-contrast figure and the readout says so; it is still applied, because a
+ * round imported from the original must be able to look like the original.
+ */
 export const VETTED_PAIRS: readonly VettedPair[] = [
   { a: '#E69F00', b: '#0072B2', labelA: { en: 'Amber', zh: '琥珀' }, labelB: { en: 'Azure', zh: '天青' } },
   { a: '#F0E442', b: '#0072B2', labelA: { en: 'Yellow', zh: '明黄' }, labelB: { en: 'Azure', zh: '天青' } },
@@ -347,4 +356,5 @@ export const VETTED_PAIRS: readonly VettedPair[] = [
   // Slate is lightened from the spec's #3C5A73, which lands at 2.90:1 on black and
   // so trips this file's own 3:1 warning. A shipped swatch must clear its own gate.
   { a: '#EDE7D3', b: '#43627C', labelA: { en: 'Ivory', zh: '象牙' }, labelB: { en: 'Slate', zh: '石青' } },
+  { a: '#0000FF', b: '#FF0000', labelA: { en: 'Classic Blue', zh: '经典蓝' }, labelB: { en: 'Classic Red', zh: '经典红' } },
 ];

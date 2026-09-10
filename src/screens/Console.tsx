@@ -1,16 +1,17 @@
 /**
- * `#/console` — the operator's instrument.
+ * `#/console` — the operator's instrument, in the original's layout.
  *
- * Four bands: chrome, the working area (rails + core), the Ribbon, the keycap legend.
- * The transport row is always visible and every control stays live at and past zero,
- * because a clock never decides that a speech is over — the operator does.
+ * The Unity app is one picture: the motion across the top, the two teams facing each other
+ * as rows of person-shaped figures, a radial countdown ring between them, and a strip of
+ * small square events along the bottom. This screen is that picture, with the operator's
+ * controls added underneath rather than pushed into the middle of it.
  *
- * Two rules this screen exists to keep honest:
+ * Two rules it exists to keep honest:
  *
- *   PERIPHERY / CORE. Identity colour is confined to the rails, the floor bars and the
- *   nameplate slabs; clock-state colour is confined to the digits, the depletion bar and
- *   the overtime fill. Asking "is that amber the Con team or the 30-second warning?" is
- *   structurally impossible here.
+ *   PERIPHERY / CORE. Identity colour is confined to the figures, the team names and the
+ *   floor bars; clock-state colour is confined to the ring, the digits and the free-debate
+ *   fills. Asking "is that yellow the Con team or the 30-second warning?" is structurally
+ *   impossible here.
  *
  *   THE RUN ORDER IS THE OPERATOR'S. Speaker 3 before speaker 2, speaker 2 twice, speaker
  *   1 never — all of it is data, drawn exactly as arranged. Nothing on this screen warns,
@@ -26,30 +27,30 @@ import { armAudioNow, useAudio } from '../app/boot';
 import type { HotkeyAction } from '../app/hotkeys';
 import { useHotkeys } from '../app/hotkeys';
 import { ROUTES, navigate } from '../app/router';
-import type { Id, L10n, SideId, SpeakerCfg } from '../domain/config';
+import type { Id, SideId, SpeakerCfg } from '../domain/config';
 import { chessClockId } from '../domain/plan';
 import { startLeader } from '../engine/channel';
 import { elapsedMs, now } from '../engine/chronometer';
-import { registerTick } from '../engine/loop';
+import { onCue, registerTick } from '../engine/loop';
 import { canSwap, clockView, roundView } from '../engine/selectors';
 import { toggleMuted } from '../engine/sound';
 import { dispatch, getSession, redo, undo, useRound } from '../engine/store';
 import { useLang } from '../i18n/useLang';
 import { formatTime } from '../lib/format';
-import { Icon } from '../ui/Icons';
-import type { RibbonHandle } from '../ui/Ribbon';
-import { Ribbon } from '../ui/Ribbon';
-import { ribbonFromPlan } from '../ui/ribbonData';
+import type { DebaterOverlay } from '../ui/unity/Debater';
+import { RingTimer } from '../ui/unity/RingTimer';
+import '../ui/unity/unity.css';
 
-import type { ChessSideView } from '../console/ChessCore';
-import { ChessCore } from '../console/ChessCore';
-import { CoreClock } from '../console/CoreClock';
+import type { ChessSideView } from '../console/ChessBars';
+import { ChessBars } from '../console/ChessBars';
 import { KeyLegend } from '../console/KeyLegend';
-import { RunSheetBar } from '../console/RunSheetBar';
-import type { FloorLevel } from '../console/SideRail';
-import { SideRail } from '../console/SideRail';
-import { SharedCore } from '../console/SharedCore';
-import { SpeakerPlate } from '../console/SpeakerPlate';
+import { RingCore } from '../console/RingCore';
+import type { FloorLevel } from '../console/Teams';
+import { TeamColumn } from '../console/Teams';
+import type { TimelineHandle } from '../console/Timeline';
+import { Timeline } from '../console/Timeline';
+import { pipsFromPlan, rosterOrdinals } from '../console/timelineData';
+import { TopBar } from '../console/TopBar';
 import { Transport } from '../console/Transport';
 import { UndoChip } from '../console/UndoChip';
 import '../console/console.css';
@@ -66,7 +67,8 @@ export default function Console(): JSX.Element {
   const audio = useAudio();
   const { state, plan, config } = session;
 
-  const ribbonRef = useRef<RibbonHandle>(null);
+  const timelineRef = useRef<TimelineHandle>(null);
+  const flashRef = useRef<HTMLSpanElement>(null);
   const [selected, setSelected] = useState(0);
   const [advancedTo, setAdvancedTo] = useState<string | null>(null);
   const [resetProgress, setResetProgress] = useState(0);
@@ -99,6 +101,9 @@ export default function Console(): JSX.Element {
     [config.speakers],
   );
 
+  /** Each speaker's number within their own side — what the figure and the pip print. */
+  const ordinals = useMemo(() => rosterOrdinals(config.speakers), [config.speakers]);
+
   /** History, not judgement: who has already had the floor at least once. */
   const spokenIds = useMemo<Set<Id>>(() => {
     const ids = new Set<Id>();
@@ -115,7 +120,7 @@ export default function Console(): JSX.Element {
     [plan.banks],
   );
 
-  const ribbon = useMemo(() => ribbonFromPlan(plan, state, lang), [plan, state, lang]);
+  const pips = useMemo(() => pipsFromPlan(plan, lang, t), [plan, lang, t]);
 
   const mode: CoreMode =
     view.bankDraw !== null
@@ -129,6 +134,13 @@ export default function Console(): JSX.Element {
             : ps.kind === 'speech'
               ? 'speech'
               : 'shared';
+
+  /**
+   * The phase overlay EVERY figure carries at once, exactly as `AnimationController` does
+   * it: clipboards during prep, the group icon during free debate.
+   */
+  const overlay: DebaterOverlay =
+    view.bankDraw !== null || ps?.kind === 'prep' ? 'prep' : isChess ? 'free' : 'none';
 
   /* ------------------------------------------------------------------ commands */
 
@@ -174,9 +186,25 @@ export default function Console(): JSX.Element {
 
   /* -------------------------------------------------------------------- effects */
 
-  // The console is the leader of the console↔stage link, always. The stage never claims
+  // The console is the leader of the console-stage link, always. The stage never claims
   // leadership: a two-leader flicker is worse than a frozen room display.
   useEffect(() => startLeader(), []);
+
+  // flash.anim — the original's one-shot screen pulse on a warning cue. Re-firing restarts
+  // the animation, which is what the forced reflow between the two writes buys.
+  useEffect(
+    () =>
+      onCue((event) => {
+        // A grace bell sits at a negative threshold and is not a warning.
+        if (event.cue.atMs < 0) return;
+        const el = flashRef.current;
+        if (!el) return;
+        delete el.dataset['fire'];
+        void el.offsetWidth;
+        el.dataset['fire'] = '';
+      }),
+    [],
+  );
 
   // Polled only for the pip, and only while a window of ours is open.
   useEffect(() => {
@@ -196,7 +224,7 @@ export default function Console(): JSX.Element {
     setSelected(Math.max(0, Math.min(state.cursor, plan.segments.length - 1)));
   }, [state.cursor, plan.segments.length]);
 
-  // The current block fills to ACTUAL consumption, sixty times a second, without a render.
+  // The current square fills to ACTUAL consumption, sixty times a second, without a render.
   useEffect(() => {
     return registerTick((n) => {
       const s = getSession();
@@ -205,7 +233,7 @@ export default function Console(): JSX.Element {
       if (!current) return;
       let used = 0;
       for (const id of current.clockIds) used += elapsedMs(s.state, id, n);
-      ribbonRef.current?.write(i, used);
+      timelineRef.current?.write(i, used);
     });
   }, []);
 
@@ -266,7 +294,7 @@ export default function Console(): JSX.Element {
     { onHoldProgress },
   );
 
-  /* ---------------------------------------------------------------------- rails */
+  /* ----------------------------------------------------------------------- teams */
 
   const floorLevels = useMemo<Record<SideId, FloorLevel>>(() => {
     const off: Record<SideId, FloorLevel> = { A: 'off', B: 'off' };
@@ -341,53 +369,49 @@ export default function Console(): JSX.Element {
   const canStart =
     !isChess || view.floor !== null || firstFloor !== 'operator' || view.phase !== 'in';
 
-  const roleOf = useCallback(
-    (speaker: { role?: L10n }): string => l10n(speaker.role),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lang],
-  );
-
   const bankSide = view.bankDraw;
   const bankPlan = bankSide === null ? null : plan.banks[bankSide];
 
-  let core: JSX.Element;
-  if (mode === 'pre') {
-    core = (
-      <div className="core core--card">
-        <h2 className="core__label t-cap">{t('st.preRound')}</h2>
-        <p className="core__motion t-read">{l10n(config.title)}</p>
-        <p className="core__hint t-meta">{t('st.armed')}</p>
-      </div>
+  /** Who the centre clock belongs to, named. Never a bare index. */
+  const coreName =
+    mode === 'bank' && bankSide !== null
+      ? sideLabels[bankSide]
+      : mode === 'speech'
+        ? (ps?.speaker?.name ?? '')
+        : mode === 'shared' && ps
+          ? ps.participants.map((sp) => sp.name).join(' · ')
+          : '';
+
+  const upNext =
+    nextPs === null ? null : (
+      <p className="ucore__next" data-urgent={view.onDeckUrgent ? '' : undefined}>
+        <span className="ucore__nextlabel">{t('st.upNext')}</span>
+        <span className="ucore__nextname">{nextPs.speaker?.name ?? l10n(nextPs.label)}</span>
+        <span className="ucore__nextrole">{l10n(nextPs.label)}</span>
+        <span data-numeric="">{formatTime(nextPs.allottedMs)}</span>
+      </p>
     );
-  } else if (mode === 'bank' && bankSide !== null && bankPlan !== null) {
+
+  let core: JSX.Element;
+  if (mode === 'bank' && bankSide !== null && bankPlan !== null) {
     core = (
-      <CoreClock
+      <RingCore
         clockId={bankPlan.id}
         allottedMs={bankPlan.allottedMs}
         remainingMs={primary?.remainingMs ?? bankPlan.allottedMs}
         band={primary?.band ?? 'normal'}
+        fill={primary?.fill ?? 1}
         transport={primary?.transport ?? 'armed'}
-        cues={bankPlan.cues}
-        label={`${sideLabels[bankSide]} · ${t('st.prepBank')}`}
+        label={t('st.prepBank')}
         status={statusWord}
-        name={sideLabels[bankSide]}
+        name={coreName}
         secondsOnly={secondsOnly}
         armed={armed}
-      >
-        <div className="core__plates">
-          <SpeakerPlate
-            side={bankSide}
-            name={sideLabels[bankSide]}
-            role={t('st.prepBank')}
-            state="speaking"
-            variant="plate"
-          />
-        </div>
-      </CoreClock>
+      />
     );
   } else if (mode === 'chess' && ps && chessSides) {
     core = (
-      <ChessCore
+      <ChessBars
         label={l10n(ps.label)}
         status={statusWord}
         sides={chessSides}
@@ -395,73 +419,58 @@ export default function Console(): JSX.Element {
         awaitingFloor={view.awaitingFloor}
         operatorChooses={firstFloor === 'operator'}
         firstFloorLabel={firstFloor === 'operator' ? '' : sideLabels[firstFloor]}
-        cues={ps.cues}
+        swap={swapAllowed}
+        onSwap={() => dispatch({ t: 'SWAP' })}
         secondsOnly={secondsOnly}
       />
     );
-  } else if (mode === 'speech' && ps) {
-    const speaker = ps.speaker;
+  } else if ((mode === 'speech' || mode === 'shared') && ps) {
     core = (
-      <CoreClock
+      <RingCore
         clockId={ps.primaryClockId}
         allottedMs={primary?.allottedMs ?? ps.allottedMs}
         remainingMs={primary?.remainingMs ?? ps.allottedMs}
         band={primary?.band ?? 'normal'}
+        fill={primary?.fill ?? 1}
         transport={primary?.transport ?? 'armed'}
-        cues={ps.cues}
-        protectedMs={ps.protectedMs}
         label={l10n(ps.label)}
         status={statusWord}
-        name={speaker?.name ?? ''}
+        name={coreName}
         secondsOnly={secondsOnly}
         armed={armed}
       >
-        {speaker ? (
-          <div className="core__plates">
-            <SpeakerPlate
-              side={speaker.side}
-              name={speaker.name}
-              role={roleOf(speaker)}
-              state="speaking"
-              variant="plate"
-            />
-          </div>
-        ) : null}
-        <OnDeck
-          name={nextPs?.speaker?.name ?? null}
-          label={nextPs === null ? null : l10n(nextPs.label)}
-          timeMs={nextPs?.allottedMs ?? null}
-          urgent={view.onDeckUrgent}
-        />
-      </CoreClock>
-    );
-  } else if (mode === 'shared' && ps) {
-    core = (
-      <SharedCore
-        clockId={ps.primaryClockId}
-        allottedMs={primary?.allottedMs ?? ps.allottedMs}
-        remainingMs={primary?.remainingMs ?? ps.allottedMs}
-        band={primary?.band ?? 'normal'}
-        transport={primary?.transport ?? 'armed'}
-        cues={ps.cues}
-        label={l10n(ps.label)}
-        status={statusWord}
-        secondsOnly={secondsOnly}
-        armed={armed}
-        participants={ps.participants}
-        sides={ps.liveSides}
-        sideLabels={sideLabels}
-        roleOf={roleOf}
-      />
+        {upNext}
+      </RingCore>
     );
   } else {
+    // Pre-round and end-of-round: the ring still holds the screen, showing the round's
+    // scheduled length rather than going blank.
+    const pre = mode === 'pre';
     core = (
-      <div className="core core--card">
-        <h2 className="core__label t-cap">{t('st.complete')}</h2>
-        <p className="core__motion t-read">{l10n(config.title)}</p>
-        <button type="button" className="btn btn--primary" onClick={() => navigate(ROUTES.summary)}>
-          {t('nav.summary')}
-        </button>
+      <div className="ucore ucore--idle">
+        <div className="ucore__ring">
+          <RingTimer fraction={pre ? 1 : 0} state="normal" label={t('a11y.timerRegion')}>
+            <span className="ucore__static" data-numeric="">
+              {formatTime(plan.totalMs)}
+            </span>
+          </RingTimer>
+        </div>
+        <div className="ucore__caption">
+          <p className="ucore__label">
+            <span>{pre ? t('st.preRound') : t('st.complete')}</span>
+          </p>
+          {pre ? (
+            upNext
+          ) : (
+            <button
+              type="button"
+              className="ubtn ubtn--lime"
+              onClick={() => navigate(ROUTES.summary)}
+            >
+              {t('nav.summary')}
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -469,8 +478,17 @@ export default function Console(): JSX.Element {
   /* --------------------------------------------------------------------- render */
 
   return (
-    <section className="console" data-mode={mode} aria-label={t('a11y.consoleRegion')}>
-      <RunSheetBar
+    <section className="uconsole" data-mode={mode} aria-label={t('a11y.consoleRegion')}>
+      <span
+        ref={flashRef}
+        className="u-flash"
+        aria-hidden="true"
+        onAnimationEnd={(e) => {
+          delete e.currentTarget.dataset['fire'];
+        }}
+      />
+
+      <TopBar
         title={l10n(config.title)}
         subtitle={`${sideLabels.A} · ${sideLabels.B}`}
         segmentIndex={Math.min(Math.max(state.cursor + 1, 0), plan.segments.length)}
@@ -489,128 +507,97 @@ export default function Console(): JSX.Element {
         onEditor={() => navigate(ROUTES.edit)}
       />
 
-      <div className="console__body">
-        <SideRail
+      <div className="uconsole__stage">
+        <TeamColumn
           side="A"
           label={sideLabels.A}
           speakers={rosters.A}
+          ordinals={ordinals}
           speakingId={view.currentSpeaker?.side === 'A' ? speakingId : null}
           onDeckId={view.onDeck?.side === 'A' ? onDeckId : null}
           spokenIds={spokenIds}
+          overlay={overlay}
+          urgent={view.onDeckUrgent}
           floor={floorLevels.A}
           lit={ps === null ? false : ps.liveSides.includes('A')}
-          drawing={view.bankDraw === 'A'}
           hasBank={hasBank.A}
           bankMs={view.bank.A}
+          drawing={view.bankDraw === 'A'}
           onDrawBank={() => dispatch({ t: 'BANK_DRAW', side: 'A' })}
-          urgent={view.onDeckUrgent}
         />
 
-        <div className="console__core">
-          {core}
+        <div className="uconsole__centre">{core}</div>
 
-          <Transport
-            phase={view.phase}
-            transport={view.transport}
-            hold={view.hold}
-            chess={isChess}
-            swap={swapAllowed}
-            canStart={canStart}
-            sideLabels={sideLabels}
-            canPrev={state.cursor > 0}
-            canUndo={view.canUndo}
-            canRedo={view.canRedo}
-            resetProgress={resetProgress}
-            on={{
-              toggle: () => dispatch({ t: 'TOGGLE' }),
-              togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
-              advance: () => doAdvance(),
-              prev: () => dispatch({ t: 'PREV' }),
-              reset: () => dispatch({ t: 'RESET_SEGMENT' }),
-              hold: () => dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' }),
-              swap: () => dispatch({ t: 'SWAP' }),
-              adjust,
-              floor: (side) => dispatch({ t: 'GIVE_FLOOR', side }),
-              undo: () => undo(),
-              redo: () => redo(),
-            }}
-          />
-
-          <UndoChip
-            name={advancedTo}
-            onUndo={() => {
-              undo();
-              setAdvancedTo(null);
-            }}
-            onExpire={() => setAdvancedTo(null)}
-          />
-        </div>
-
-        <SideRail
+        <TeamColumn
           side="B"
           label={sideLabels.B}
           speakers={rosters.B}
+          ordinals={ordinals}
           speakingId={view.currentSpeaker?.side === 'B' ? speakingId : null}
           onDeckId={view.onDeck?.side === 'B' ? onDeckId : null}
           spokenIds={spokenIds}
+          overlay={overlay}
+          urgent={view.onDeckUrgent}
           floor={floorLevels.B}
           lit={ps === null ? false : ps.liveSides.includes('B')}
-          drawing={view.bankDraw === 'B'}
           hasBank={hasBank.B}
           bankMs={view.bank.B}
+          drawing={view.bankDraw === 'B'}
           onDrawBank={() => dispatch({ t: 'BANK_DRAW', side: 'B' })}
-          urgent={view.onDeckUrgent}
         />
       </div>
 
-      <div className="console__ribbon">
-        <Ribbon
-          ref={ribbonRef}
-          scale="live"
-          segments={ribbon}
-          cursor={state.cursor}
-          selected={selected}
-          onSelect={setSelected}
-          onLoad={loadAt}
-          colors={{ A: config.sides[0].color, B: config.sides[1].color }}
-          ariaLabel={t('ed.runsheet')}
-        />
-      </div>
+      <Timeline
+        ref={timelineRef}
+        pips={pips}
+        cursor={state.cursor}
+        selected={selected}
+        onSelect={setSelected}
+        onLoad={loadAt}
+        onNext={() => doAdvance()}
+        nextDisabled={view.phase === 'complete'}
+        colors={{ A: config.sides[0].color, B: config.sides[1].color }}
+      />
+
+      <Transport
+        phase={view.phase}
+        transport={view.transport}
+        hold={view.hold}
+        chess={isChess}
+        canStart={canStart}
+        sideLabels={sideLabels}
+        canPrev={state.cursor > 0}
+        canUndo={view.canUndo}
+        canRedo={view.canRedo}
+        resetProgress={resetProgress}
+        on={{
+          toggle: () => dispatch({ t: 'TOGGLE' }),
+          togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
+          advance: () => doAdvance(),
+          prev: () => dispatch({ t: 'PREV' }),
+          reset: () => dispatch({ t: 'RESET_SEGMENT' }),
+          hold: () => dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' }),
+          adjust,
+          floor: (side) => dispatch({ t: 'GIVE_FLOOR', side }),
+          undo: () => undo(),
+          redo: () => redo(),
+        }}
+      />
 
       <KeyLegend chess={isChess} swap={swapAllowed} />
+
+      <UndoChip
+        name={advancedTo}
+        onUndo={() => {
+          undo();
+          setAdvancedTo(null);
+        }}
+        onExpire={() => setAdvancedTo(null)}
+      />
 
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>
     </section>
-  );
-}
-
-/** The next-up strip. It names a person; it never prints a bare index. */
-function OnDeck({
-  name,
-  label,
-  timeMs,
-  urgent,
-}: {
-  name: string | null;
-  label: string | null;
-  timeMs: number | null;
-  urgent: boolean;
-}): JSX.Element | null {
-  const { t } = useLang();
-  if (label === null) return null;
-  return (
-    <p className="core__ondeck t-ctl" data-urgent={urgent ? '' : undefined}>
-      <span className="t-cap core__ondecklabel">{t('st.upNext')}</span>
-      <Icon name="caret" size={14} className={urgent ? 'm-nudge' : undefined} />
-      {name === null ? null : <span className="core__ondeckname">{name}</span>}
-      <span className="core__ondeckrole t-meta">{label}</span>
-      {timeMs === null ? null : (
-        <span className="t-meta" data-numeric="">
-          {formatTime(timeMs)}
-        </span>
-      )}
-    </p>
   );
 }

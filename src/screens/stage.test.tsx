@@ -1,6 +1,8 @@
 /**
  * The stage's contract with the room. Every assertion here is something a projector
- * audience would notice going wrong from fifteen metres.
+ * audience would notice going wrong from fifteen metres — and, since the restoration,
+ * something the ORIGINAL app put on the wall: the two teams facing each other as person
+ * figures, a radial ring with the time in it, and a strip of timeline pips.
  */
 
 import { act, cleanup, render, screen } from '@testing-library/react';
@@ -37,6 +39,8 @@ test('opened with no leader and no round, the stage is legible rather than broke
   expect(region).toHaveAttribute('data-variant', 'idle');
   expect(screen.getByText(/waiting for the console/i)).toBeInTheDocument();
   expect(screen.queryAllByRole('timer')).toHaveLength(0);
+  // Nothing to walk, so no rail and no pips — never an empty strip.
+  expect(document.querySelectorAll('.stage__pip')).toHaveLength(0);
 });
 
 test('pre-round is a standby card, not a zeroed clock', () => {
@@ -44,23 +48,30 @@ test('pre-round is a standby card, not a zeroed clock', () => {
   render(<Stage />);
   expect(screen.getByRole('region')).toHaveAttribute('data-variant', 'standby');
   expect(screen.queryAllByRole('timer')).toHaveLength(0);
+  // The teams are already facing each other, and the motion is already up.
+  expect(document.querySelectorAll('.udeb')).toHaveLength(8);
+  expect(document.querySelectorAll('.stage__team')).toHaveLength(2);
 });
 
-test('a speech names the speaker, the phase and who is next', () => {
+test('a speech is a ring with the time in it, one speaking figure and one on deck', () => {
   loadChinese();
   render(<Stage />);
   asLeader(() => dispatch({ t: 'ADVANCE' }));
 
   expect(screen.getByRole('region')).toHaveAttribute('data-variant', 'speech');
   expect(screen.getAllByRole('timer')).toHaveLength(1);
-  // The nameplate carries identity colour; the digits never do.
-  const plate = document.querySelector('.stage__plate');
-  expect(plate).not.toBeNull();
+
+  // The countdown is the radial ring, and the digits sit inside its core.
+  expect(document.querySelector('.uring__arc')).not.toBeNull();
+  expect(document.querySelector('.uring__core .digits')).not.toBeNull();
+
+  // Identity colour tints the figures; the digits never carry it.
   expect(document.querySelector('.digits')?.getAttribute('data-side')).toBeNull();
-  expect(document.querySelector('.stage__next')).not.toBeNull();
+  expect(document.querySelectorAll('.udeb[data-state="speaking"]')).toHaveLength(1);
+  expect(document.querySelectorAll('.udeb[data-state="next"]')).toHaveLength(1);
 });
 
-test('free debate shows both side clocks, and both banks', () => {
+test('free debate shows both side bars, both banks, and a group icon on every figure', () => {
   const p = loadChinese();
   render(<Stage />);
   const chessAt = p.segments.findIndex((s) => s.kind === 'chess');
@@ -69,7 +80,12 @@ test('free debate shows both side clocks, and both banks', () => {
 
   expect(screen.getByRole('region')).toHaveAttribute('data-variant', 'chess');
   expect(screen.getAllByRole('timer')).toHaveLength(2);
+  // The original's two vertical fill bars, not one ring.
+  expect(document.querySelectorAll('.stage__vbar')).toHaveLength(2);
+  expect(document.querySelector('.uring')).toBeNull();
   expect(document.querySelectorAll('.stage__bank')).toHaveLength(2);
+  // Every figure holds the group icon through free debate, as the original does.
+  expect(document.querySelectorAll('.udeb[data-overlay="free"]')).toHaveLength(8);
   // Neither side has the floor yet, so neither stands lit.
   expect(document.querySelectorAll('.stage__chesside[data-live]')).toHaveLength(0);
 });
@@ -98,13 +114,24 @@ test('the whole run order paints without a single re-render throwing', () => {
   expect(screen.getByRole('region')).toHaveAttribute('data-variant', 'complete');
 });
 
-test('the ribbon draws the operator order verbatim — no flag, no reorder', () => {
+test('the timeline draws the operator order verbatim — no flag, no reorder', () => {
   const p = loadChinese();
   render(<Stage />);
   asLeader(() => dispatch({ t: 'ADVANCE' }));
-  const blocks = document.querySelectorAll('.stage__ribbon .ribbon__block');
-  expect(blocks).toHaveLength(p.segments.length);
+
+  const pips = document.querySelectorAll('.stage__pip');
+  expect(pips).toHaveLength(p.segments.length);
+  expect(document.querySelectorAll('.stage__pip[data-state="current"]')).toHaveLength(1);
+  expect(document.querySelector('.stage__rail')).not.toBeNull();
+
   // Nothing on the stage is interactive: no listbox, no options, no tab stops.
   expect(document.querySelectorAll('.stage [tabindex]')).toHaveLength(0);
   expect(document.querySelectorAll('.stage button')).toHaveLength(0);
+});
+
+test('the warning flash is mounted where the room can see it', () => {
+  loadChinese();
+  render(<Stage />);
+  asLeader(() => dispatch({ t: 'ADVANCE' }));
+  expect(document.querySelector('.stage .u-flash')).not.toBeNull();
 });

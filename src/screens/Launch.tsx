@@ -4,8 +4,9 @@
  * The order of the page is the order of the operator's urgency:
  *   1. an interrupted live round (< 8h) — losing your place mid-round is the one
  *      failure this app may never commit, so the offer sits above everything,
- *   2. the seven formats, each showing its Ribbon so the SHAPE of the round is
- *      legible before you commit to it,
+ *   2. the seven formats, each showing its roster as figures and its Ribbon as the
+ *      timeline strip, so the SHAPE of the round — who is in the room, and how the
+ *      time is divided — is legible before you commit to it,
  *   3. rounds this browser has run before,
  *   4. a paste-or-drop field for a share link, a `.debate.json`, or a legacy Unity
  *      `save.json`,
@@ -16,7 +17,7 @@
  * the preset it came from.
  */
 
-import type { ChangeEvent, DragEvent, JSX } from 'react';
+import type { ChangeEvent, CSSProperties, DragEvent, JSX } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { Lang, RoundConfig } from '../domain/config';
@@ -42,12 +43,14 @@ import { roundPhase } from '../engine/selectors';
 import { useRound } from '../engine/store';
 import type { StringKey } from '../i18n/strings';
 import { useLang } from '../i18n/useLang';
+import { autoInk } from '../lib/contrast';
 import { formatTime } from '../lib/format';
 import { useConfirm } from '../ui/useConfirm';
 import { Icon } from '../ui/Icons';
 import { Keycaps } from '../ui/KeyLegendOverlay';
 import { Ribbon } from '../ui/Ribbon';
 import { ribbonFromPlan, ribbonFromShares } from '../ui/ribbonData';
+import { Debater } from '../ui/unity/Debater';
 
 import type { OpenOptions } from '../app/boot';
 import {
@@ -99,6 +102,21 @@ function sideColors(config: RoundConfig): { A?: string; B?: string } {
   if (a !== undefined) out.A = a;
   if (b !== undefined) out.B = b;
   return out;
+}
+
+/**
+ * A card paints a preset's own colours, not the loaded round's, so the four identity
+ * tokens `<Debater>` reads are set on the card rather than on the document root.
+ */
+function sideTokens(config: RoundConfig): CSSProperties {
+  const a = config.sides[0].color;
+  const b = config.sides[1].color;
+  return {
+    ['--side-a' as string]: a,
+    ['--side-a-ink' as string]: autoInk(a),
+    ['--side-b' as string]: b,
+    ['--side-b-ink' as string]: autoInk(b),
+  } as CSSProperties;
 }
 
 async function textOfDrop(event: DragEvent<HTMLElement>): Promise<string> {
@@ -490,6 +508,52 @@ export default function Launch(): JSX.Element {
   );
 }
 
+/* ------------------------------------------------------------ roster preview */
+
+/** Past this many figures a side is summarised instead; the exact count is in the
+ *  structure line directly below either way. */
+const FIGURE_CAP = 8;
+
+/**
+ * The round's two sides, drawn with the same figures the console and the stage draw,
+ * facing each other across the card. Nothing here is interactive and nothing is
+ * judged: the roster is shown in the order the config gives it.
+ */
+function RosterPreview({ config }: { config: RoundConfig }): JSX.Element | null {
+  const { t, l10n } = useLang();
+  const rows = (['A', 'B'] as const).map((side) => ({
+    side,
+    label: l10n(config.sides[side === 'A' ? 0 : 1].label),
+    people: config.speakers.filter((speaker) => speaker.side === side),
+  }));
+  if (rows.every((row) => row.people.length === 0)) return null;
+
+  return (
+    <div className="lc__roster" style={sideTokens(config)}>
+      {rows.map((row) => {
+        const shown = row.people.slice(0, FIGURE_CAP);
+        const hidden = row.people.length - shown.length;
+        return (
+          <ul
+            key={row.side}
+            className={row.side === 'A' ? 'lc__side' : 'lc__side lc__side--b'}
+            aria-label={t('c.roster', { side: row.label })}
+          >
+            {shown.map((speaker, i) => (
+              <li key={speaker.id}>
+                <Debater side={row.side} index={i + 1} state="idle" />
+              </li>
+            ))}
+            {hidden > 0 ? (
+              <li className="lc__more">{t('lc.plusMore', { n: hidden })}</li>
+            ) : null}
+          </ul>
+        );
+      })}
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------- preset card */
 
 interface PresetCardProps {
@@ -514,6 +578,8 @@ function PresetCard({ meta, onRun, onEdit }: PresetCardProps): JSX.Element {
         <h3 className="lc__cardname t-ctl">{name}</h3>
         {isDefault ? <span className="lc__chip">{t('lc.defaultFormat')}</span> : null}
       </div>
+
+      <RosterPreview config={meta.config} />
 
       {segments.length === 0 ? null : (
         <Ribbon scale="thumb" segments={segments} colors={colors} />
@@ -573,6 +639,7 @@ function StagedRound({ config, onRun, onEdit, onDiscard }: StagedRoundProps): JS
     <div className="lc__staged">
       <span className="t-cap">{t('lc.staged')}</span>
       <span className="t-ctl">{l10n(config.title) || t('lc.untitled')}</span>
+      <RosterPreview config={config} />
       {segments.length === 0 ? null : (
         <Ribbon scale="thumb" segments={segments} colors={colors} />
       )}

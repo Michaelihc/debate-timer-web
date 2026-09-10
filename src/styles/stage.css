@@ -1,41 +1,80 @@
 /* ============================================================================
-   STAGE — the projector window. Tokens only; no hex, no shadows, no radius.
+   STAGE — the projector wall, in the Unity app's own visual language.
 
-   THE THEME DOES NOT REACH THIS FILE. Every colour below comes from the
-   theme-independent --stage-* / --state-* / --side-* tokens, because a projector
-   renders #000000 as no light and anything above it as a glowing grey rectangle
-   on the wall. The console is never black; the stage is never anything else.
+   The original's canvas is 800x600, match=0, cleared to #000000: a black screen
+   with the motion at the top, the two teams facing each other as tinted person
+   figures, a radial countdown ring in the middle, and a strip of small square
+   timeline pips over a white rail along the bottom. This file is that layout,
+   scaled for a room.
+
+   THE THEME DOES NOT REACH THIS FILE. Every colour comes from the theme-independent
+   --stage-* / --state-* / --pip-* / --side-* tokens, and the projector state ramp is
+   re-pinned on `.stage` itself so a console running in light theme can never leak
+   dark ink onto a black wall.
 
    PERIPHERY / CORE:
-     periphery — .stage__edge, .stage__rail*, .stage__plate   → --side-*
-     core      — .digits, .dbar, .stage__frame                → --state-*
-   No selector here paints both on one element.
+     periphery — the debater figures, their names, the side labels   -> --side-*
+     core      — the ring, the digits, the vertical bars, the frame  -> --state-*
 
-   Display type floats with --u. Metadata type is FLOORED with max(12px, …) so a
-   1024x768 venue projector does not turn a rail label into 9px of mush.
+   Display type floats with --u. Metadata type is FLOORED with max(12px, ...) so a
+   1024x768 venue projector does not turn a label into 9px of mush.
    ========================================================================== */
 
 .stage {
-  --pad-x: max(20px, calc(34 * var(--u)));
-  --pad-y: max(12px, calc(20 * var(--u)));
-  --ribbon-h: max(34px, calc(56 * var(--u)));
-  --edge-w: max(6px, calc(10 * var(--u)));
-  --frame-w: 6px;
-  --gap: max(10px, calc(18 * var(--u)));
+  /* The reference box. Everything below is authored against it. */
+  --u: min(100vw / 1600, 100vh / 900);
+
+  --pad-x: max(16px, calc(40 * var(--u)));
+  --pad-y: max(12px, calc(26 * var(--u)));
+  --gap: max(10px, calc(22 * var(--u)));
+  --frame-w: max(4px, calc(8 * var(--u)));
+
+  /* Count Down sits at (0, 44) in an 800x600 box at 314.7 wide — just under 40% of
+     the canvas. Capped against the viewport's short axis so the ring, the motion and
+     the timeline all fit with no scrollbar. */
+  --ring-d: min(52vh, 40vw, 620px);
+
+  /* The figures. Capped by how many rows the taller roster needs, so a six-speaker
+     side shrinks its people instead of running off the bottom of the wall. `--rows`
+     is set inline from the roster. */
+  --fig-cap: calc((100vh - max(220px, calc(330 * var(--u)))) / var(--rows, 4));
+  --fig: clamp(44px, min(calc(150 * var(--u)), var(--fig-cap)), 190px);
+
+  /* Type. The clock is sized off the ring it sits inside, not off the viewport, or
+     it grows out through the stroke. */
+  --ts-clock: max(40px, calc(var(--ring-d) * 0.2));
+  --ts-chess: max(30px, calc(var(--ring-d) * 0.15));
+  --ts-title: max(20px, calc(48 * var(--u)));
+  --ts-role: max(14px, calc(28 * var(--u)));
+  --ts-meta: max(12px, calc(20 * var(--u)));
+  --ts-figname: max(12px, calc(24 * var(--u)));
+  --ts-card: max(30px, calc(96 * var(--u)));
+
+  /* Timeline Buttons: 31.3 x 30.7 with spacing 2, over a 648 x 10 white rail. */
+  --pip: max(18px, calc(36 * var(--u)));
+  --pip-gap: max(2px, calc(4 * var(--u)));
+  --tick: max(4px, calc(9 * var(--u)));
+  --rail-h: max(3px, calc(9 * var(--u)));
 
   /* Re-pinned, not inherited: the stage ignores [data-theme] entirely (a projector
-     renders #000 as no light), so the state ramp must stay the projector ramp even when
-     the operator is running the console in light theme. */
-  --state-normal: #F5F3EC;
-  --state-warn: #FFD166;
-  --state-final: #FFB020;
-  --state-over: #E8503A;
+     renders no light for black), so the state ramp must stay the projector ramp
+     even while the operator runs the console in light theme. --pj-* is the
+     original TimerController ramp and is never redefined by a theme. */
+  --state-normal: var(--pj-normal);
+  --state-warn: var(--pj-warn);
+  --state-final: var(--pj-warn);
+  --state-over: var(--pj-over);
+  --ring-track: var(--pj-track);
+  --ring-track-over: var(--pj-track-over);
+  --pip-idle: var(--pj-pip-idle);
+  --pip-current: var(--pj-live);
+  --pip-ink: var(--pj-pip-ink);
 
   position: fixed;
   inset: 0;
   z-index: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--gap);
   padding: var(--pad-y) var(--pad-x);
   background: var(--stage-bg);
@@ -47,41 +86,14 @@
   cursor: none;
 }
 
-/* Rule 11 — Chinese is never uppercased and never letterspaced, including where it
-   sits inside a Latin structure label that carries both. */
+/* Chinese is never uppercased and never letterspaced, including inside a Latin
+   structure label that carries both. */
 .stage :lang(zh) {
   letter-spacing: 0;
   text-transform: none;
 }
 
-/* --- Edge bars: the floor indicator, 10px, identity colour ----------------
-   Inset by the overtime frame's width so the two never overlap. */
-
-.stage__edge {
-  position: absolute;
-  inset-block: var(--frame-w);
-  width: var(--edge-w);
-  background: var(--stage-rule);
-  transition: background-color var(--d-base) var(--ease-out);
-}
-
-.stage__edge[data-side='A'] {
-  inset-inline-start: var(--frame-w);
-}
-
-.stage__edge[data-side='B'] {
-  inset-inline-end: var(--frame-w);
-}
-
-.stage__edge[data-side='A'][data-lit] {
-  background: var(--side-a);
-}
-
-.stage__edge[data-side='B'][data-lit] {
-  background: var(--side-b);
-}
-
-/* --- Overtime frame: core colour, 6px, 0.5Hz for 10s then solid ---------- */
+/* --- Overtime frame: core colour, five pulses then solid ----------------- */
 
 .stage__frame {
   position: absolute;
@@ -107,441 +119,314 @@
   }
 }
 
-/* --- Top rail ------------------------------------------------------------ */
+/* --- Top: the motion, centred, with the metadata either side ------------- */
 
 .stage__top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
   align-items: baseline;
   gap: var(--gap);
+  min-width: 0;
+}
+
+.stage__meta {
+  min-width: 0;
+  font-size: var(--ts-meta);
+  font-weight: 500;
+  color: var(--stage-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage__meta--end {
+  text-align: end;
+}
+
+/* Topic: 36pt white, centred, auto-sized down. Two lines at most. */
+.stage__title {
+  min-width: 0;
+  font-size: var(--ts-title);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--stage-ink);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* --- Body: team | ring | team, the way the canvas anchors them ----------- */
+
+.stage__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: max(8px, calc(24 * var(--u)));
+  min-width: 0;
+  min-height: 0;
+}
+
+.stage__team {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: max(6px, calc(14 * var(--u)));
+  min-width: 0;
+  min-height: 0;
+}
+
+.stage__team[data-side='B'] {
+  align-items: flex-end;
+}
+
+.stage__teamhead {
+  max-width: 100%;
+  font-size: var(--ts-meta);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--side-a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage__team[data-side='B'] .stage__teamhead {
+  color: var(--side-b);
+  text-align: end;
+}
+
+.stage__figures {
+  display: flex;
+  flex-direction: column;
+  gap: max(6px, calc(16 * var(--u)));
+  min-width: 0;
+  min-height: 0;
+}
+
+.stage__team[data-side='B'] .stage__figures {
+  align-items: flex-end;
+}
+
+/* The figure height is the stage's to set — the primitive's own default does not know
+   how many rows this roster needs. */
+.stage .udeb--stage {
+  --fig-h: var(--fig);
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* The next-speaker arrow hangs outboard of the figure; this is the room it needs so the
+   stage's own overflow never clips the one thing that says "you are up". */
+.stage__team[data-side='A'] .stage__figures {
+  padding-inline-start: calc(var(--fig) * 0.42);
+}
+
+.stage__team[data-side='B'] .stage__figures {
+  padding-inline-end: calc(var(--fig) * 0.42);
+}
+
+/* The roster names are room-legible here, not console-sized. */
+.stage .udeb__name {
+  font-size: var(--ts-figname);
   color: var(--stage-dim);
 }
 
-.stage__topleft {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stage__motion {
-  min-width: 0;
+.stage .udeb[data-state='speaking'] .udeb__name {
   color: var(--stage-ink);
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.stage__round {
-  min-width: 0;
-  text-align: end;
-  white-space: nowrap;
+.stage .udeb[data-state='done'] .udeb__name {
+  color: var(--stage-dim);
+  opacity: 0.5;
 }
 
-.stage__rule {
-  display: block;
-  height: 1px;
-  background: var(--stage-rule);
-}
-
-/* --- Body: rail | core | rail ------------------------------------------- */
-
-.stage__body {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 3.2fr) minmax(0, 0.9fr);
-  gap: max(12px, calc(28 * var(--u)));
-  min-height: 0;
-}
+/* --- Core: the ring, or the two free-debate bars, or a card -------------- */
 
 .stage__core {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: calc(14 * var(--u));
+  gap: max(8px, calc(18 * var(--u)));
   min-width: 0;
   min-height: 0;
   text-align: center;
 }
 
-.stage__role {
-  color: var(--stage-dim);
+.stage__label {
   max-width: 100%;
+  font-size: var(--ts-role);
+  font-weight: 600;
+  color: var(--stage-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* M3 — the warning swell crosses to --state-warn over 400ms and then HOLDS.
-   No loop: a pulsing clock is noise the room learns to ignore. */
+.stage__ringwrap {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  transition: opacity var(--d-base) var(--ease-out);
+}
+
+/* The primitive caps itself against the viewport; the stage caps it against the row
+   it has to share with the motion and the timeline. */
+.stage .uring--stage {
+  width: var(--ring-d);
+}
+
+.stage .uring__core {
+  gap: max(2px, calc(6 * var(--u)));
+  max-width: 76%;
+}
+
+/* M3 — the warning swell crosses over 400ms and then HOLDS. No loop: a pulsing
+   clock is noise the room learns to ignore. */
 .stage .digits {
   transition: color var(--d-swell) var(--ease-out);
 }
 
-.stage .dbar__fill {
-  transition: background-color var(--d-swell) var(--ease-out);
-}
-
-.stage .dbar {
-  height: max(12px, calc(20 * var(--u)));
-}
-
-/* The ticks and graticules are cut-outs, so on the stage they cut to the stage's
-   own ground rather than to the console's. */
-.stage .dbar__tick,
-.stage .dbar__grat {
-  background: var(--stage-bg);
-}
-
-.stage__barwrap {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: calc(6 * var(--u));
-  width: min(100%, calc(1180 * var(--u)));
-}
-
-.stage__cues {
-  position: relative;
-  height: calc(2.2 * var(--ts-rail-meta));
-}
-
-.stage__cue {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  color: var(--stage-dim);
-  white-space: nowrap;
-}
-
-.stage__cue::before {
-  content: '';
-  display: block;
-  width: 0;
-  height: 0;
-  margin: 0 auto calc(2 * var(--u));
-  border-inline: 3px solid transparent;
-  border-bottom: 4px solid var(--stage-dim);
-}
-
-.stage__protected {
-  color: var(--stage-dim);
-}
-
-/* --- Nameplates: identity colour, auto-inked ---------------------------- */
-
-.stage__plates {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: max(8px, calc(16 * var(--u)));
-  width: 100%;
-}
-
-.stage__plate {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: calc(2 * var(--u));
-  min-width: 0;
+.stage__ringnote {
   max-width: 100%;
-  padding: calc(8 * var(--u)) max(12px, calc(28 * var(--u)));
-  border-radius: var(--r-0);
-}
-
-.stage__plate[data-side='A'] {
-  background: var(--side-a);
-  color: var(--side-a-ink);
-  /* M2 — the incoming slab enters from the side that just gained the floor. */
-  animation: dt-plate-a var(--d-base) var(--ease-out);
-}
-
-.stage__plate[data-side='B'] {
-  background: var(--side-b);
-  color: var(--side-b-ink);
-  animation: dt-plate-b var(--d-base) var(--ease-out);
-}
-
-@keyframes dt-plate-a {
-  from {
-    opacity: 0;
-    transform: translateX(calc(-40px * var(--motion-scale)));
-  }
-}
-
-@keyframes dt-plate-b {
-  from {
-    opacity: 0;
-    transform: translateX(calc(40px * var(--motion-scale)));
-  }
-}
-
-.stage__platename {
-  min-width: 0;
-  max-width: 100%;
+  font-size: var(--ts-meta);
+  font-weight: 500;
+  color: var(--stage-dim);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.stage__platerole {
-  opacity: 0.78;
+/* A link that has gone quiet stops presenting itself as live. */
+.stage[data-link='lost'] .stage__ringwrap,
+.stage[data-link='lost'] .stage__chess {
+  opacity: 0.34;
+  filter: saturate(0.4);
 }
 
-/* A slab whose whole message is the name keeps no empty second line. */
-.stage__platerole:empty {
-  display: none;
-}
-
-/* --- Up next ------------------------------------------------------------- */
-
-.stage__next {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: max(6px, calc(12 * var(--u)));
-  color: var(--stage-ink);
-}
-
-.stage__nextlabel {
-  color: var(--stage-dim);
-}
-
-.stage__nextrole {
-  color: var(--stage-dim);
-}
-
-.stage__next[data-urgent] .stage__nextlabel,
-.stage__next[data-urgent] .stage__nextname {
-  color: var(--stage-ink);
-}
-
-/* --- Carets (M6): a triangle pointing at the core ----------------------- */
-
-.stage__caret,
-.stage__railcaret {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-  color: var(--stage-ink);
-}
-
-.stage__caret::before,
-.stage__caret::after,
-.stage__railcaret::before,
-.stage__railcaret::after {
-  content: '';
-  width: 0;
-  height: 0;
-  border-block: max(4px, calc(6 * var(--u))) solid transparent;
-}
-
-.stage__caret::before,
-.stage__caret::after,
-.stage__rail[data-side='A'] .stage__railcaret::before,
-.stage__rail[data-side='A'] .stage__railcaret::after {
-  border-inline-start: max(5px, calc(8 * var(--u))) solid currentColor;
-}
-
-.stage__rail[data-side='B'] .stage__railcaret::before,
-.stage__rail[data-side='B'] .stage__railcaret::after {
-  border-inline-end: max(5px, calc(8 * var(--u))) solid currentColor;
-}
-
-/* One caret that nudges; two static carets when motion is off (§13.7). */
-.stage__caret::after,
-.stage__railcaret::after {
-  display: none;
-}
-
-@keyframes dt-nudge {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(calc(4px * var(--motion-scale)));
-  }
-}
-
-.m-nudge {
-  animation: dt-nudge var(--d-nudge) var(--ease-nudge) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stage__caret::after,
-  .stage__railcaret::after {
-    display: block;
-  }
-}
-
-/* --- Rails: the roster, facing each other ------------------------------- */
-
-.stage__rail {
-  display: flex;
-  flex-direction: column;
-  gap: calc(8 * var(--u));
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.stage__rail[data-side='B'] {
-  text-align: end;
-}
-
-.stage__railhead {
-  color: var(--side-a);
-}
-
-.stage__rail[data-side='B'] .stage__railhead {
-  color: var(--side-b);
-}
-
-.stage__raillist {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.stage__railrow {
-  display: flex;
-  align-items: baseline;
-  gap: max(6px, calc(10 * var(--u)));
-  padding-block: calc(5 * var(--u));
-  border-top: 1px solid var(--stage-rule);
-  color: var(--stage-dim);
-  transition: color var(--d-base) var(--ease-out);
-}
-
-.stage__rail[data-side='B'] .stage__railrow {
-  flex-direction: row-reverse;
-}
-
-.stage__railrow[data-state='current'],
-.stage__railrow[data-state='next'] {
-  color: var(--stage-ink);
-}
-
-/* The identity marker is a rule on the outer edge — periphery, never the type. */
-.stage__rail[data-side='A'] .stage__railrow[data-state='current'] {
-  border-inline-start: 3px solid var(--side-a);
-  padding-inline-start: calc(6 * var(--u));
-}
-
-.stage__rail[data-side='B'] .stage__railrow[data-state='current'] {
-  border-inline-end: 3px solid var(--side-b);
-  padding-inline-end: calc(6 * var(--u));
-}
-
-.stage__railnum {
-  flex: none;
-  color: var(--stage-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.stage__railbody {
-  display: flex;
-  flex-direction: column;
-  gap: calc(1 * var(--u));
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.stage__railname {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stage__railmeta {
-  color: var(--stage-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stage__railcaret {
-  display: none;
-}
-
-.stage__railrow[data-state='next'] .stage__railcaret {
-  display: inline-flex;
-}
-
-/* --- Free debate: two clocks; the idle side stands down ----------------- */
+/* --- Free debate: two vertical fill bars, bottom-origin ------------------ */
 
 .stage__chess {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: max(16px, calc(48 * var(--u)));
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: max(24px, calc(120 * var(--u)));
   width: 100%;
+  min-width: 0;
+  transition: opacity var(--d-base) var(--ease-out);
 }
 
 .stage__chesside {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(10 * var(--u));
+  gap: max(6px, calc(14 * var(--u)));
   min-width: 0;
   opacity: 0.55;
-  filter: saturate(0.3);
-  transform: scale(0.82);
-  transition:
-    opacity var(--d-base) var(--ease-out),
-    filter var(--d-base) var(--ease-out),
-    transform var(--d-base) var(--ease-out);
+  transition: opacity var(--d-base) var(--ease-out);
 }
 
 .stage__chesside[data-live] {
   opacity: 1;
-  filter: none;
-  transform: none;
 }
 
-.stage__chesside .stage__plate {
-  width: 100%;
+.stage__sidename {
+  max-width: 100%;
+  font-size: var(--ts-role);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage__chesside[data-side='A'] .stage__sidename {
+  color: var(--side-a);
+}
+
+.stage__chesside[data-side='B'] .stage__sidename {
+  color: var(--side-b);
+}
+
+/* Line 1_0, type Filled, fillMethod Vertical, fillOrigin Bottom: 20 x 200 over a
+   26.3% white track. */
+.stage__vbar {
+  position: relative;
+  flex: none;
+  width: max(10px, calc(22 * var(--u)));
+  height: max(120px, calc(var(--ring-d) * 0.62));
+  background: var(--ring-track);
+  overflow: hidden;
+  transition: background-color var(--d-swell) var(--ease-out);
+}
+
+.stage__vfill {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom;
+  transform: scaleY(1);
+  background: var(--state-normal);
+  transition: background-color var(--d-swell) var(--ease-out);
+}
+
+.stage__vbar[data-band='warning'] .stage__vfill,
+.stage__vbar[data-band='final10'] .stage__vfill {
+  background: var(--state-warn);
+}
+
+.stage__vbar[data-band='over'] {
+  background: var(--ring-track-over);
+}
+
+.stage__vbar[data-band='over'] .stage__vfill {
+  background: var(--state-over);
 }
 
 .stage__bank {
+  font-size: var(--ts-meta);
   color: var(--stage-dim);
+  white-space: nowrap;
 }
 
-/* --- Title cards: standby, complete, idle -------------------------------- */
+/* --- Cards: standby, complete, waiting, link lost ------------------------ */
 
 .stage__card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(16 * var(--u));
+  gap: max(10px, calc(20 * var(--u)));
   max-width: 100%;
   text-align: center;
 }
 
 .stage__cardline {
-  font-size: max(40px, calc(104 * var(--u)));
+  font-size: var(--ts-card);
   font-weight: 700;
-  font-stretch: var(--wd-body);
-  line-height: 1.02;
+  line-height: 1.04;
   color: var(--stage-ink);
 }
 
-.stage__cardsub,
-.stage__score {
+.stage__cardsub {
+  font-size: var(--ts-meta);
   color: var(--stage-dim);
 }
 
-/* The second language, always present on the wall: a venue that runs a Chinese
-   round for English-speaking judges cannot toggle a projector. */
+/* The second language, always on the wall: a venue running a Chinese round for
+   English-speaking judges cannot toggle a projector. */
 .stage__alt {
   display: block;
-  margin-top: calc(6 * var(--u));
+  margin-top: max(4px, calc(8 * var(--u)));
   font-size: 0.42em;
   font-weight: 500;
   color: var(--stage-dim);
 }
 
-/* --- HOLD slab ----------------------------------------------------------- */
+/* --- HOLD ---------------------------------------------------------------- */
 
 .stage__hold {
   position: absolute;
@@ -551,7 +436,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: calc(24 * var(--u));
+  gap: max(12px, calc(28 * var(--u)));
   padding: var(--pad-y) var(--pad-x);
   background: var(--stage-hold);
   color: var(--stage-ink);
@@ -559,14 +444,13 @@
 }
 
 .stage__holdword {
-  font-size: max(44px, calc(120 * var(--u)));
+  font-size: max(34px, calc(116 * var(--u)));
   font-weight: 700;
-  font-stretch: var(--wd-body);
   line-height: 1;
 }
 
 .stage__holdclock {
-  font-size: max(36px, calc(96 * var(--u)));
+  font-size: max(28px, calc(88 * var(--u)));
   font-weight: 700;
   font-stretch: var(--wd-time);
   letter-spacing: -0.02em;
@@ -574,156 +458,175 @@
   color: var(--stage-dim);
 }
 
-/* --- Ribbon: the round, at a glance ------------------------------------- */
+/* --- Timeline: square pips, a tick each, over a white rail --------------- */
 
-.stage__ribbon {
+.stage__timeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-width: 0;
 }
 
-.stage .ribbon {
-  height: var(--ribbon-h);
-  background: var(--stage-rule);
+.stage__pips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--pip-gap);
+  max-width: 100%;
+  margin: 0 0 var(--tick);
+  padding: 0;
+  list-style: none;
 }
 
-.stage .ribbon__block {
-  background: var(--stage-hold);
-  color: var(--stage-dim);
+.stage__pip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--pip);
+  height: var(--pip);
+  background: var(--pip-idle);
+  color: var(--pip-ink);
+  font-size: calc(var(--pip) * 0.48);
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background-color var(--d-fade) linear,
+    opacity var(--d-fade) linear;
 }
 
-.stage .ribbon__block[data-state='current'] {
-  background: var(--stage-rule);
-  color: var(--stage-ink);
+/* The 10 x 3 tick under each button, rotated 90°, reaching down to the rail. */
+.stage__pip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: max(2px, calc(3 * var(--u)));
+  height: var(--tick);
+  transform: translateX(-50%);
+  background: inherit;
 }
 
-.stage .ribbon__label {
-  font-size: var(--ts-ribbon);
-  font-weight: 600;
+.stage__pip[data-state='done'] {
+  opacity: 0.42;
 }
 
-/* --- Status words: never colour alone ----------------------------------- */
+/* Color.green, set in code the moment the event becomes the current one. */
+.stage__pip[data-state='current'] {
+  background: var(--pip-current);
+  opacity: 1;
+}
 
-.stage__band,
+.stage__rail {
+  width: 100%;
+  height: var(--rail-h);
+  background: var(--pip-idle);
+}
+
+/* --- Status: never colour alone ----------------------------------------- */
+
+.stage__status,
 .stage__lost {
   position: absolute;
-  bottom: calc(var(--pad-y) + var(--ribbon-h) + max(4px, calc(8 * var(--u))));
+  /* Clear the timeline strip. Pinned to `--pad-y` alone these sat underneath it and the
+     rail drew straight through the word. */
+  bottom: calc(var(--pad-y) + var(--ribbon-h) + var(--gap));
   display: flex;
   align-items: center;
   gap: max(5px, calc(8 * var(--u)));
+  font-size: var(--ts-meta);
   color: var(--stage-dim);
   pointer-events: none;
 }
 
-.stage__band {
+.stage__status {
   inset-inline-start: var(--pad-x);
+}
+
+.stage__status:empty {
+  display: none;
 }
 
 .stage__lost {
   inset-inline-end: var(--pad-x);
-  /* Above the HOLD slab: a frozen wall that cannot say why is the failure this
-     chip exists to prevent. */
-  z-index: 3;
+  /* Above the HOLD slab: a frozen wall that cannot say why is the failure this line
+     exists to prevent. */
+  z-index: 4;
 }
 
 .stage__lostpip {
   width: max(6px, calc(10 * var(--u)));
   height: max(6px, calc(10 * var(--u)));
   border-radius: var(--r-pill);
-  background: var(--stage-dim);
+  background: var(--state-over);
 }
 
-.stage[data-variant='idle'] {
-  --ribbon-h: 0px;
-}
-
-/* An empty band word must not leave a ghost box against the ribbon. */
-.stage__band:empty {
-  display: none;
-}
-
-/* --- Under ~720px the rails have nothing legible left to give ------------ */
-
-/* A phone-width window is not a venue, but it must still be readable and must never
-   scroll sideways — so the display floors come down instead of the layout breaking. */
-@media (max-width: 520px) {
-  .stage {
-    --ts-clock: max(64px, calc(268 * var(--u)));
-    --ts-chess: max(44px, calc(168 * var(--u)));
-    --ts-name: max(24px, calc(96 * var(--u)));
-  }
-
-  .stage__chess {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .stage__cardline {
-    font-size: max(28px, calc(104 * var(--u)));
-  }
-
-  .stage__holdword {
-    font-size: max(32px, calc(120 * var(--u)));
-  }
-
-  .stage__holdclock {
-    font-size: max(26px, calc(96 * var(--u)));
-  }
-}
+/* --- Narrow: a phone-width window is not a venue, but it must not break --- */
 
 @media (max-width: 720px) {
-  .stage__body {
-    grid-template-columns: minmax(0, 1fr);
+  .stage {
+    --ring-d: min(46vh, 62vw);
   }
 
-  .stage__rail,
-  .stage__motion {
+  .stage__body {
+    gap: max(6px, calc(12 * var(--u)));
+  }
+
+  /* The face-off is the identity of this screen, so the figures shrink and the names
+     go, rather than a whole team disappearing. */
+  .stage {
+    --fig: clamp(36px, min(11vw, var(--fig-cap)), 96px);
+  }
+
+  .stage .udeb__name,
+  .stage__teamhead {
     display: none;
   }
 
-  .stage__top {
-    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
-  }
-
   .stage__chess {
-    gap: max(10px, calc(24 * var(--u)));
+    gap: max(16px, calc(60 * var(--u)));
   }
 }
 
-/* §13.8 — metadata stops being metadata: every dim figure comes up to full ink
-   rather than relying on a value step the room cannot resolve. */
+@media (max-width: 520px) {
+  .stage {
+    --ts-title: max(15px, calc(48 * var(--u)));
+    --ts-clock: max(28px, calc(var(--ring-d) * 0.2));
+    --ts-chess: max(22px, calc(var(--ring-d) * 0.15));
+    --ts-card: max(22px, calc(96 * var(--u)));
+    --pip: max(14px, calc(36 * var(--u)));
+  }
+
+  .stage__holdword {
+    font-size: max(26px, calc(116 * var(--u)));
+  }
+
+  .stage__holdclock {
+    font-size: max(20px, calc(88 * var(--u)));
+  }
+}
+
+/* Metadata stops being metadata: every dim figure comes up to full ink rather than
+   relying on a value step the room cannot resolve. */
 @media (prefers-contrast: more) {
-  .stage__railrow,
-  .stage__railnum,
-  .stage__railmeta,
-  .stage__topleft,
-  .stage__round,
-  .stage__role,
-  .stage__cue,
+  .stage__meta,
+  .stage__label,
+  .stage__ringnote,
   .stage__bank,
-  .stage__alt,
-  .stage__band,
-  .stage__lost,
-  .stage__nextlabel,
-  .stage__nextrole,
   .stage__cardsub,
-  .stage__score {
+  .stage__alt,
+  .stage__status,
+  .stage__lost,
+  .stage .udeb__name {
     color: var(--stage-ink);
   }
 
-  .stage__railrow {
-    border-top-color: var(--stage-dim);
-  }
-
-  .stage__cue::before,
-  .stage__lostpip {
-    background: var(--stage-ink);
-  }
-
-  .stage__cue::before {
-    border-bottom-color: var(--stage-ink);
+  .stage__chesside {
+    opacity: 0.8;
   }
 }
 
-/* Colour states and the warning swell are the cue, so they always remain; only
-   the movement goes (§13.7). The overtime frame holds solid from frame one. */
+/* Colour states and the flash are the cue, so they stay; only movement goes. */
 @media (prefers-reduced-motion: reduce) {
   .stage[data-band='over'] .stage__frame {
     animation: none;

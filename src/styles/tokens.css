@@ -1,55 +1,86 @@
 /* ============================================================================
-   TOKENS - spec 2.2 to 2.5. The whole palette, scale and motion vocabulary.
+   TOKENS - the Unity Debate Timer's own palette, measured out of the original
+   scene rather than re-invented. Values came from a batch-mode export of
+   SampleScene.unity + the Speaker/Timeline prefabs, so they are the literal
+   colours the desktop app renders.
 
-   PERIPHERY / CORE is the rule these tokens exist to enforce:
-   identity colour (--side-*) may only paint the outer frame - edge bars, rails,
-   nameplates. Clock-state colour (--state-*) may only paint the optical core -
-   digits, depletion bar, overtime fill. No element ever carries both.
+   PERIPHERY / CORE still holds: side identity colour paints the debater
+   figures, their nameplates and the rails; clock-state colour paints the ring
+   and the digits. Nothing carries both.
    ========================================================================== */
 
 :root {
   color-scheme: dark;
 
-  /* --- Console: structure (dark, the default) --------------------------- */
-  --bg-app: #0B0D10;        /* app ground; never #000 on an LCD, it reads crushed */
-  --bg-panel: #12161B;
-  --bg-sunken: #191F26;
-  --bg-raised: #202832;
-  --rule: #262F3A;          /* the only separator in the app */
-  --rule-strong: #3A4653;
-  --text-hi: #E8EDF3;
-  --text-mid: #AEB8C4;
-  --text-lo: #7C8794;
-  --text-inv: #0B0D10;
-  --focus: #7CC1FF;
-  --ok: #3FB268;
-  --danger: #E8503A;
-  --warn-ink: #FFD166;
+  /* --- Ground ----------------------------------------------------------- */
+  --bg-app: #0D0D0F;        /* the original clears to black; lifted a hair for LCDs */
+  --bg-panel: #161619;
+  --bg-sunken: #1D1D21;
+  --bg-raised: #26262B;
+  --rule: #2E2E34;
+  --rule-strong: #454550;
 
-  /* --- Stage: fixed, theme-independent ----------------------------------
-     A projector renders #000000 as no light; anything above it is a glowing
-     grey rectangle on the wall. The stage is always true black. */
+  /* --- Ink -------------------------------------------------------------- */
+  --text-hi: #FFFFFF;       /* the original sets pure white on every label */
+  --text-mid: #B9B9C0;
+  --text-lo: #777777;       /* the original's own muted grey */
+  --text-inv: #323232;      /* label colour on a lime/green button */
+  --focus: #BAFF62;
+
+  /* --- Accents: the app's signature lime, from the Menu / Reload buttons -- */
+  --lime: #BAFF62;          /* Menu, Reload Scene */
+  --lime-dim: #8FCB43;
+  --green: #6AEF8B;         /* the Next button */
+  --green-2: #66E686;
+  --ok: #5EFFA0;
+  --danger: #FF3A35;
+  --warn-ink: #FFD15E;
+
+  /* --- Stage: always true black; a projector renders #000 as no light ----- */
   --stage-bg: #000000;
   --stage-rule: #1B1B1F;
-  --stage-ink: #F5F3EC;                     /* 93% white: pure white blooms at 268px */
-  --stage-dim: #6E7278;
-  --stage-track: rgba(245, 243, 236, 0.16);
-  --stage-hold: #0E1114;
+  --stage-ink: #FFFFFF;
+  --stage-dim: #777777;
+  --stage-track: rgba(255, 255, 255, 0.2627);
+  --stage-hold: #0A0A0C;
 
-  /* --- State: core only -------------------------------------------------- */
-  --state-normal: #F5F3EC;  /* running, above every cue threshold */
-  --state-warn: #FFD166;    /* at or below the first warning cue */
-  --state-final: #FFB020;   /* last 10 seconds */
-  --state-over: #E8503A;    /* remaining <= 0 */
-  --state-live: #3FD07A;    /* the console running pip; never on the stage core */
+  /* --- Timer state: TimerController's serialized fields, exactly ---------
+     normalFGColor / warningFGColor / normalBGColor / timeoutBGColor. The ring
+     runs white, turns yellow at the warning, and its TRACK goes dark red once
+     the clock expires - the fill changes, but so does the ground behind it.
+     The --pj-* pair below is the SAME ramp, held immune to [data-theme]: the
+     stage runs on a projector where #000 is no light, so it re-pins the state
+     ramp from these rather than inheriting the daylight one. Nothing else may
+     redefine a --pj-* token. */
+  --pj-normal: #FEFEFE;
+  --pj-warn: #FDFF00;
+  --pj-over: #FF3A35;
+  --pj-live: #00FF10;
+  --pj-track: rgba(255, 255, 255, 0.2627);
+  --pj-track-over: rgba(149, 19, 19, 0.3137);
+  --pj-pip-idle: #FFFFFF;
+  --pj-pip-ink: #323232;
 
-  /* --- Identity: periphery only -----------------------------------------
-     Okabe-Ito amber / azure, dL 0.264, both >= 3:1 on black. The running app
-     overwrites --side-a / --side-b (and their auto-ink) from the config. */
-  --side-a: #E69F00;
-  --side-b: #0072B2;
-  --side-a-ink: #08080A;    /* auto-ink: dark when the slab luminance is >= 0.32 */
-  --side-b-ink: #F5F3EC;
+  --state-normal: var(--pj-normal);
+  --state-warn: var(--pj-warn);
+  --state-final: var(--pj-warn);   /* the original has one warning tier, not two */
+  --state-over: var(--pj-over);
+  --state-live: var(--pj-live);    /* Color.green - the live timeline pip */
+  --ring-track: var(--pj-track);
+  --ring-track-over: var(--pj-track-over);
+
+  /* --- Timeline strip ---------------------------------------------------- */
+  --pip-idle: var(--pj-pip-idle);
+  --pip-current: var(--pj-live);
+  --pip-ink: var(--pj-pip-ink);
+
+  /* --- Identity: the side colours, overwritten from the config at runtime -
+     The original ships #0000FF / #FF0000. Kept as the defaults so an imported
+     save.json looks like it did, with better pairs offered in the picker. */
+  --side-a: #0000FF;
+  --side-b: #FF0000;
+  --side-a-ink: #FFFFFF;
+  --side-b-ink: #FFFFFF;
 
   /* --- Type ------------------------------------------------------------- */
   --font-ui: "Archivo", "Helvetica Neue", Arial, "Liberation Sans", system-ui, sans-serif;
@@ -107,6 +138,11 @@
   --focus-offset: 2px;
 
   /* --- Motion: five animations, every one carries state ------------------ */
+  /* The original's own timings, from the .anim clips. */
+  --d-fade: 167ms;          /* Speak.anim / NextAppear.anim alpha ramps */
+  --d-bob: 1000ms;          /* NextFlash.anim, looping */
+  --d-flash: 1000ms;        /* flash.anim, one shot */
+
   --d-fast: 120ms;          /* M1 state chip / colour cross-fade */
   --d-base: 240ms;          /* M2 view + slab transitions */
   --d-swell: 400ms;         /* M3 warning swell, then a solid hold */
@@ -123,30 +159,40 @@
    and the state tokens deliberately do not change. ------------------------ */
 [data-theme="light"] {
   color-scheme: light;
-  --bg-app: #F4F1EA;
-  --bg-panel: #FBF9F4;
-  --bg-sunken: #EAE6DC;
+  --bg-app: #F2F2EE;
+  --bg-panel: #FAFAF7;
+  --bg-sunken: #E7E7E1;
   --bg-raised: #FFFFFF;
-  --rule: #D5CFC1;
-  --rule-strong: #B6AE9C;
-  --text-hi: #16150F;
-  --text-mid: #575349;
-  --text-lo: #8C877A;
-  --text-inv: #F4F1EA;
-  --focus: #1B62B5;
-  --ok: #2F5D3A;
-  --danger: #8C2F1E;
-  --warn-ink: #8A6100;
+  --rule: #D3D3CC;
+  --rule-strong: #B0B0A7;
+  --text-hi: #17171A;
+  --text-mid: #4E4E55;
+  --text-lo: #7E7E86;
+  --text-inv: #17171A;
+  --focus: #2F6B00;
+  --ok: #1B6E3D;
+  --danger: #9B2C1B;
+  --warn-ink: #7A5600;
 
-  /* State colours need a light variant of their own. The dark values are near-white and
-     hot amber, which sit at ~1.01:1 on this ground — the clock would be invisible. These
-     keep the neutral -> amber -> hot amber -> red progression while clearing 4.5:1.
-     The stage re-pins the dark values on its own root; it is never themed. */
-  --state-normal: #16150F;
-  --state-warn: #7A5600;
-  --state-final: #943D00;
+  --lime: #6F9B2E;
+  --lime-dim: #557726;
+  --green: #2C8F4E;
+  --green-2: #2C8F4E;
+
+  /* Daylight setup work only. The dark ramp is near-white and pure yellow,
+     which sit at ~1:1 on this ground; these hold the same progression and
+     clear 4.5:1. The stage re-pins the projector ramp on its own root. */
+  --state-normal: #17171A;
+  --state-warn: #6B5E00;
+  --state-final: #6B5E00;
   --state-over: #9B2C1B;
   --state-live: #1B6E3D;
+  --ring-track: rgba(23, 23, 26, 0.22);
+  --ring-track-over: rgba(155, 44, 27, 0.25);
+
+  --pip-idle: #FFFFFF;
+  --pip-current: #2C8F4E;
+  --pip-ink: #17171A;
 }
 
 /* Reduced motion keeps every colour state and every flash - those ARE the cue -
@@ -157,6 +203,7 @@
   :root {
     --motion-scale: 0;
     --d-base: var(--d-fast);
+    --d-fade: var(--d-fast);
     --d-swell: var(--d-fast);
     --d-nudge: 1ms;
   }

@@ -1,13 +1,15 @@
 /**
- * Band 1: what round this is, where in it we are, and how the room's other machinery is
- * doing. Everything here is chrome the operator must be able to check without stopping.
+ * The top band: the motion, centred and large, with the menu-ish actions at the corners.
  *
- * The audio state is permanently visible rather than buried: a muted or un-armed
- * AudioContext is the single most common reason a venue hears no bells, and finding that
- * out at the first speech is too late.
+ * That is the original's chrome exactly — `Topic` at (0, 193.5) in a 450x50 box, the `Menu
+ * Button` at (-349.7, 202.6) top-left and the `Reload` button at (333.4, 193.5) top-right.
+ * The motion is the biggest thing on the screen after the clock, because in the room it is
+ * the one piece of text an audience reads.
  *
- * The round readout ticks from the frame loop, so this component renders only when the
- * segment or the chrome state actually changes.
+ * The audio state stays permanently visible rather than buried: a muted or un-armed
+ * AudioContext is the commonest reason a venue hears no bells, and finding that out at the
+ * first speech is too late. The round readout ticks from the frame loop, so this component
+ * renders only when the segment or the chrome state actually changes.
  */
 
 import type { JSX } from 'react';
@@ -26,13 +28,12 @@ import './console.css';
 
 /**
  * Deadband before the bar claims a round is running early or late. The delta itself stays
- * exact; this only governs when it is worth saying so. A second is far too tight — the
- * ordinary dead time while a speaker walks up would light the chip amber before anyone
- * had spoken. Half a minute is the point at which a chair would actually adjust.
+ * exact; this only governs when it is worth saying so. Half a minute is the point at which
+ * a chair would actually adjust — a second would light amber while a speaker walked up.
  */
 const ON_SCHEDULE_MS = 30_000;
 
-export interface RunSheetBarProps {
+export interface TopBarProps {
   title: string;
   subtitle: string;
   /** 1-based for display; pass 0 before the round starts. */
@@ -55,7 +56,7 @@ function scheduleWord(deltaMs: number): 'ahead' | 'behind' | 'on' {
   return 'on';
 }
 
-export function RunSheetBar({
+export function TopBar({
   title,
   subtitle,
   segmentIndex,
@@ -69,7 +70,7 @@ export function RunSheetBar({
   stageBlocked,
   onStage,
   onEditor,
-}: RunSheetBarProps): JSX.Element {
+}: TopBarProps): JSX.Element {
   const { t } = useLang();
   const elapsedEl = useRef<HTMLSpanElement>(null);
   const deltaEl = useRef<HTMLSpanElement>(null);
@@ -82,8 +83,6 @@ export function RunSheetBar({
     let lastWord = '';
     return registerTick((n) => {
       const s = getSession();
-      // No forced hours: a 29-minute round reads `29:00`, and `formatTime` rolls over to
-      // `1:02:00` on its own once the round actually passes an hour.
       const elapsed = formatTime(roundElapsedMs(s.state, n));
       if (elapsed !== lastElapsed) {
         lastElapsed = elapsed;
@@ -111,90 +110,85 @@ export function RunSheetBar({
         : t('au.enable');
 
   return (
-    <header className="bar">
-      <div className="bar__id">
-        <h2 className="bar__title t-ctl">{title}</h2>
-        <span className="bar__sub t-cap">{subtitle}</span>
+    <header className="utop">
+      <div className="utop__side utop__side--left">
+        <button type="button" className="ubtn ubtn--lime" onClick={onEditor} aria-keyshortcuts="E">
+          <Icon name="edit" size={14} />
+          <span>{t('nav.editor')}</span>
+        </button>
       </div>
 
-      <p className="bar__seg t-cap">
-        {t('r.segmentOf', { i: segmentIndex, n: segmentCount })}
-      </p>
+      <div className="utop__mid">
+        <h1 className="utop__title">{title}</h1>
+        <p className="utop__meta">
+          <span className="utop__sub">{subtitle}</span>
+          <span className="utop__dot" aria-hidden="true">·</span>
+          <span>{t('r.segmentOf', { i: segmentIndex, n: segmentCount })}</span>
+          <span className="utop__dot" aria-hidden="true">·</span>
+          <span className="utop__round">
+            <span className="utop__roundlabel">{t('r.elapsed')}</span>
+            <span ref={elapsedEl} data-numeric="">
+              {formatTime(0)}
+            </span>
+            <span className="utop__slash" aria-hidden="true">/</span>
+            <span data-numeric="">{formatTime(scheduledMs)}</span>
+          </span>
+          <span ref={chipEl} className="utop__delta" data-schedule="on">
+            <span ref={deltaEl} data-numeric="">
+              {formatDelta(0)}
+            </span>
+            <span className="utop__deltaword" data-w="ahead">
+              {t('r.ahead')}
+            </span>
+            <span className="utop__deltaword" data-w="behind">
+              {t('r.behind')}
+            </span>
+            <span className="utop__deltaword" data-w="on">
+              {t('r.onSchedule')}
+            </span>
+          </span>
+        </p>
+      </div>
 
-      <p className="bar__round t-meta">
-        <span className="t-cap bar__roundlabel">{t('r.elapsed')}</span>
-        <span ref={elapsedEl} data-numeric="">
-          {formatTime(0)}
-        </span>
-        <span className="bar__slash" aria-hidden="true">
-          /
-        </span>
-        <span data-numeric="">{formatTime(scheduledMs)}</span>
-        <span ref={chipEl} className="bar__delta t-cap" data-schedule="on">
-          <span ref={deltaEl} data-numeric="">
-            {formatDelta(0)}
-          </span>
-          <span className="bar__deltaword" data-w="ahead">
-            {t('r.ahead')}
-          </span>
-          <span className="bar__deltaword" data-w="behind">
-            {t('r.behind')}
-          </span>
-          <span className="bar__deltaword" data-w="on">
-            {t('r.onSchedule')}
-          </span>
-        </span>
-      </p>
-
-      <div className="bar__tools">
+      <div className="utop__side utop__side--right">
         {remote === null ? null : (
-          <span className="bar__chip t-cap" data-tone="quiet">
+          <span className="utop__chip">
             {t('sg.remote')} <kbd className="keycap">{remote}</kbd>
           </span>
         )}
 
-        <button type="button" className="bar__btn t-cap" onClick={onLang} aria-label={t('kb.langToggle')}>
-          {lang === 'zh' ? '中文' : 'EN'}
-        </button>
-
         <button
           type="button"
-          className="bar__btn t-cap"
-          onClick={onEditor}
-          aria-keyshortcuts="E"
-        >
-          <Icon name="edit" size={14} />
-          {t('nav.editor')}
-        </button>
-
-        <button
-          type="button"
-          className="bar__btn t-cap"
+          className="ubtn"
           onClick={onStage}
           title={t('sg.sameBrowser')}
           aria-keyshortcuts="D"
         >
           <Icon name="stage" size={14} />
-          {t('nav.stage')}
-          <span className="bar__pip" data-live={stageOpen ? '' : undefined} aria-hidden="true" />
+          <span>{t('nav.stage')}</span>
+          <span className="utop__pip" data-live={stageOpen ? '' : undefined} aria-hidden="true" />
         </button>
 
         <button
           type="button"
-          className="app__audio"
+          className="ubtn"
           data-status={audio.status}
           onClick={onAudio}
           aria-keyshortcuts="M"
         >
           <Icon name={audio.muted || !audio.armed ? 'mute' : 'sound'} size={14} />
-          {audioLabel}
+          <span>{audioLabel}</span>
+        </button>
+
+        <button type="button" className="ubtn" onClick={onLang} aria-label={t('kb.langToggle')}>
+          {lang === 'zh' ? '中文' : 'EN'}
         </button>
       </div>
 
       {stageBlocked ? (
-        <p className="bar__blocked t-cap">
+        <p className="utop__blocked">
           <Icon name="alert" size={14} />
-          <a className="bar__link" href="#/stage" target="_blank" rel="noreferrer">
+          <a className="utop__link" href="#/stage" target="_blank" rel="noreferrer">
             {t('sg.blocked')}
           </a>
         </p>

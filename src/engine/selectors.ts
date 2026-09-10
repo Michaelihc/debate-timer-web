@@ -5,7 +5,7 @@
  * a "next speaker" arrow for an entire free-debate segment off a frozen value).
  */
 
-import type { L10n, Segment, SideId, Speaker } from '../domain/config';
+import type { Id, L10n, Segment, SideId, Speaker } from '../domain/config';
 import { onDeckAfter, segmentAt } from '../domain/plan';
 import { fillFraction } from '../lib/format';
 import type { Now } from './chronometer';
@@ -119,6 +119,25 @@ export function onDeck(s: RoundState, plan: RunPlan): Speaker | null {
 /** The participants a segment names, in roster order. Empty for prep and breaks. */
 export function segmentSpeakers(s: RoundState, plan: RunPlan): Speaker[] {
   return currentPlanSegment(s, plan)?.participants ?? [];
+}
+
+/**
+ * Speakers whose every turn in the run order is already behind the cursor — the roster
+ * figures that have finished and should stand down on the stage.
+ *
+ * The order is the operator's: this walks `plan.segments` verbatim, so a speaker who
+ * appears three times is done only after the third, one who never appears is never done,
+ * and nothing here reorders, dedupes or completes the sequence.
+ */
+export function spokenSpeakerIds(s: RoundState, plan: RunPlan): Set<Id> {
+  const done = new Set<Id>();
+  const pending = new Set<Id>();
+  for (const ps of plan.segments) {
+    const ids = ps.speaker ? [ps.speaker.id] : ps.participants.map((p) => p.id);
+    for (const id of ids) (ps.index < s.cursor ? done : pending).add(id);
+  }
+  for (const id of pending) done.delete(id);
+  return done;
 }
 
 /* --------------------------------------------------------------------- bands */

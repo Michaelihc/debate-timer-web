@@ -2,9 +2,19 @@
    SHARED PRIMITIVES — every rule here uses only tokens from tokens.css.
    No hex, no shadows, no radius beyond --r-1 / --r-pill, no px outside --s-*.
 
+   The button family is the original's: a LIGHT face carrying a #323232 label,
+   square corners, no border. Lime (--lime) is the app's signature accent and is
+   spent on the one action a screen is actually for; green (--green) is the Next
+   button's colour and stays with "go on to the next thing". Everything else is a
+   quiet dark face, so the lime never has to compete.
+
+   .ribbon is the original's timeline strip: white squares over a white rail, the
+   live one --pip-current. Its blocks are proportional rather than fixed 31x31,
+   which is the one thing this port adds — the picture IS the shape of the round.
+
    PERIPHERY / CORE is enforced structurally, not by discipline:
-   .digits, .dbar and .ribbon__fill read --state-*; only .ribbon__edge and the
-   rails read --side-*. Nothing here paints both on one element.
+   .digits and .dbar read --state-*; only .ribbon__edge and the rails read
+   --side-*. Nothing here paints both on one element.
    ========================================================================== */
 
 /* --- Utility ------------------------------------------------------------ */
@@ -52,7 +62,8 @@
   min-width: var(--row);
   padding: var(--s-3) var(--s-5);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  /* Square. The original has no rounded button anywhere. */
+  border-radius: var(--r-0);
   background: var(--bg-raised);
   color: var(--text-hi);
   font-size: var(--t-ctl);
@@ -70,21 +81,42 @@
   background: var(--bg-panel);
 }
 
+/* The Menu / Reload button: a lime slab with a dark label. */
 .btn--primary {
-  background: var(--text-hi);
+  background: var(--lime);
   color: var(--text-inv);
-  border-color: var(--text-hi);
+  border-color: var(--lime);
+  font-weight: 600;
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--text-mid);
-  border-color: var(--text-mid);
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.btn--primary:disabled {
+  background: var(--bg-raised);
+  border-color: var(--rule);
+  color: var(--text-lo);
+}
+
+/* The Next button's green, for "carry on" rather than "commit". */
+.btn--go {
+  background: var(--green);
+  color: var(--text-inv);
+  border-color: var(--green);
+  font-weight: 600;
+}
+
+.btn--go:hover:not(:disabled) {
+  background: var(--green-2);
+  border-color: var(--green-2);
 }
 
 .btn--danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: var(--text-inv);
+  color: var(--text-hi);
 }
 
 .btn--quiet {
@@ -94,6 +126,14 @@
 
 .btn--quiet:hover:not(:disabled) {
   border-color: var(--rule);
+}
+
+/* A keycap printed on a light face has to invert or it disappears. */
+.btn--primary .keycap,
+.btn--go .keycap {
+  border-color: color-mix(in srgb, var(--text-inv) 32%, transparent);
+  background: transparent;
+  color: var(--text-inv);
 }
 
 @media (pointer: coarse) {
@@ -284,35 +324,34 @@
   }
 }
 
-/* --- Ribbon ------------------------------------------------------------- */
+/* --- Ribbon: the original's timeline strip ------------------------------- */
 
+/* `Timeline` is a HorizontalLayoutGroup of white squares, spacing 2, sitting on a
+   648 x 10 white `Line`. Here the squares are proportional to their share of the
+   round instead of fixed 31.3 x 30.7, which is the only liberty taken: the rail,
+   the 2px gaps, the white faces, the #323232 labels and the Color.green current
+   block are the original's. */
 .ribbon {
+  position: relative;
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   width: 100%;
-  gap: 1px;
-  background: var(--rule);
+  /* HorizontalLayoutGroup, spacing 2. */
+  gap: var(--s-1);
+  padding-bottom: calc(var(--s-2) + var(--s-1));
+  background: none;
   overflow: hidden;
 }
 
-.ribbon--thumb {
-  height: var(--s-3);
-}
-
-/* A thumbnail sits on a card that is already --bg-panel, so blocks painted in the same
-   value disappear and only their 2px identity edges survive — the line reads as scattered
-   ticks instead of the shape of the round. Sinking the block body one step restores the
-   proportional widths, which is the entire point of showing a ribbon on the card. */
-.ribbon--thumb .ribbon__block {
-  background: var(--bg-sunken);
-}
-
-.ribbon--spine {
-  height: var(--s-4);
-}
-
-.ribbon--live {
-  height: var(--row);
+/* `Line` — the white rail the squares stand on. */
+.ribbon::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: var(--s-2);
+  background: var(--pip-idle);
+  opacity: 0.85;
+  pointer-events: none;
 }
 
 .ribbon__block {
@@ -324,19 +363,35 @@
   align-items: center;
   padding: 0;
   border: 0;
-  background: var(--bg-panel);
-  color: var(--text-mid);
+  border-radius: var(--r-0);
+  background: var(--pip-idle);
+  color: var(--pip-ink);
   overflow: hidden;
-  --block-edge: var(--rule-strong);
+  transition: background var(--d-fast) var(--ease-out), opacity var(--d-fast) var(--ease-out);
+  --block-edge: transparent;
 }
 
+.ribbon--thumb .ribbon__block {
+  height: var(--s-3);
+}
+
+.ribbon--spine .ribbon__block {
+  height: var(--s-6);
+}
+
+.ribbon--live .ribbon__block {
+  height: var(--row);
+}
+
+/* Color.green, set in code on whichever timeline button is the live event. */
 .ribbon__block[data-state='current'] {
-  background: var(--bg-raised);
-  color: var(--text-hi);
+  background: var(--pip-current);
 }
 
-.ribbon__block[data-state='future'] {
-  color: var(--text-lo);
+/* Spent squares recede without leaving the strip — the shape of the round has to
+   stay readable end to end. */
+.ribbon__block[data-state='done'] {
+  opacity: 0.4;
 }
 
 .ribbon--live .ribbon__block[data-selected] {
@@ -349,31 +404,29 @@
   outline-offset: calc(-1 * var(--focus-offset));
 }
 
-/* Identity colour lives here and nowhere else in this component. */
+/* Identity colour lives here and nowhere else in this component: the tick the
+   original draws under each timeline button, widened to the block. */
 .ribbon__edge {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--block-edge);
-}
-
-.ribbon__fill {
   position: absolute;
   inset: auto 0 0 0;
   height: 3px;
+  background: var(--block-edge);
+}
+
+/* Consumption, on a light face: ink at low alpha, not a second colour. */
+.ribbon__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
   width: 0;
-  background: var(--state-normal);
-  opacity: 0.55;
+  background: var(--pip-ink);
+  opacity: 0.18;
 }
 
-.ribbon--live .ribbon__fill {
-  height: 4px;
-}
-
+/* Overrun leaves the block. That is the point: a long speech is visibly outside
+   its own allotment rather than parked at a tidy zero. */
 .ribbon__spill {
   position: absolute;
-  inset: auto 0 0 auto;
-  height: 4px;
+  inset: 0 0 0 auto;
   width: 0;
   background: var(--state-over);
 }
@@ -381,11 +434,10 @@
 .ribbon__label {
   position: relative;
   padding-inline: var(--s-3) var(--s-2);
-  padding-left: calc(var(--s-3) + 2px);
   font-size: var(--t-cap);
-  font-weight: 600;
+  font-weight: 700;
   font-stretch: var(--wd-struct);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -417,6 +469,25 @@
 /* The current block always names itself, however narrow it is. */
 .ribbon__block[data-state='current'] .ribbon__label {
   display: block;
+}
+
+/* On the daylight ground a white face on off-white loses its own edges, and the
+   white rail disappears entirely. Both get drawn instead of assumed. */
+[data-theme='light'] .ribbon__block {
+  outline: 1px solid var(--rule);
+  outline-offset: -1px;
+}
+
+[data-theme='light'] .ribbon::after {
+  background: var(--rule-strong);
+  opacity: 1;
+}
+
+@media (prefers-contrast: more) {
+  .ribbon__block {
+    outline: 1px solid var(--pip-ink);
+    outline-offset: -1px;
+  }
 }
 
 /* --- TimeField ---------------------------------------------------------- */

@@ -1,6 +1,18 @@
 /* ============================================================================
    SETUP EDITOR — three panes, one page.
 
+   Same identity as the console it feeds: a near-black ground, square corners, and
+   lime spent on exactly one thing — APPLY, the only action on this screen that
+   changes the round the room is about to hear. Selection is lime too, because
+   selection here is the operator saying "this one", which is the same gesture.
+   Everything else stays a quiet dark face so the lime keeps meaning something.
+
+   This is a repalette. Every capability the editor had it still has: the roster,
+   the composer, drag-reorder, the colour picker, import/export, the validation
+   strip and the two behaviour settings. And it still says NOTHING about the run
+   order — repeats, omissions and out-of-sequence speakers are the operator's
+   sheet, and no rule in this file badges, tints or marks them.
+
    Tokens only: no hex, no box-shadows, no radius beyond --r-1 / --r-pill, no px
    outside the --s-* scale (the two exceptions are the 1px hairlines the whole
    design system is built from, and the 4px identity spine the spec specifies).
@@ -40,7 +52,7 @@
   width: 100%;
   padding: var(--s-2) var(--s-2);
   border: 1px solid transparent;
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: none;
   color: var(--text-hi);
 }
@@ -84,14 +96,21 @@
   min-height: var(--row);
   padding: var(--s-2) var(--s-3);
   border: 1px solid transparent;
-  border-radius: var(--r-1);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--r-0);
   background: none;
   color: var(--text-mid);
+  transition: color var(--d-fast) var(--ease-out),
+    border-color var(--d-fast) var(--ease-out);
+}
+
+.ed__tab:hover {
+  color: var(--text-hi);
 }
 
 .ed__tab[aria-selected='true'] {
   background: var(--bg-raised);
-  border-color: var(--rule-strong);
+  border-bottom-color: var(--lime);
   color: var(--text-hi);
 }
 
@@ -167,7 +186,7 @@
   min-width: 0;
   padding: var(--s-2);
   border: 1px solid transparent;
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   color: var(--text-hi);
 }
 
@@ -185,7 +204,11 @@
   height: 20px;
   flex: none;
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
+}
+
+.rosterblock__swatch:hover {
+  border-color: var(--lime);
 }
 
 .rosterblock__total {
@@ -389,6 +412,7 @@
   min-height: var(--row);
   padding-right: var(--s-3);
   border-top: var(--hair);
+  border-left: 2px solid transparent;
   background: var(--bg-panel);
 }
 
@@ -396,8 +420,13 @@
   background: var(--bg-sunken);
 }
 
+/* Selection is lime because selection is a choice, not a state of the round. It
+   sits on the outer edge, outboard of the identity spine, so the two can never be
+   confused — and the transparent border in the base rule keeps the row from
+   jumping 2px when it is picked. */
 .scard[data-selected] {
   background: var(--bg-raised);
+  border-left-color: var(--lime);
 }
 
 .scard[data-missing] {
@@ -558,9 +587,13 @@
   min-height: var(--row);
   padding: var(--s-3) var(--s-4);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: var(--bg-raised);
   color: var(--text-hi);
+}
+
+.composer__input:focus {
+  border-color: var(--lime);
 }
 
 .composer__input::placeholder {
@@ -696,7 +729,7 @@
   min-height: var(--row);
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: var(--bg-raised);
   color: var(--text-hi);
 }
@@ -808,9 +841,22 @@
   color: var(--text-mid);
 }
 
-.scp__pair[aria-pressed='true'] {
-  border-color: var(--text-hi);
+.scp__pair {
+  border-radius: var(--r-0);
+}
+
+.scp__pair:hover {
+  border-color: var(--rule-strong);
   color: var(--text-hi);
+}
+
+.scp__pair[aria-pressed='true'] {
+  border-color: var(--lime);
+  color: var(--text-hi);
+}
+
+.scp__pair[aria-pressed='true'] .scp__tick {
+  color: var(--lime);
 }
 
 .scp__duo {
@@ -873,7 +919,7 @@
   min-height: var(--row);
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: var(--bg-raised);
   color: var(--text-hi);
   text-transform: uppercase;
@@ -960,6 +1006,12 @@
   gap: var(--s-3);
   flex-wrap: wrap;
   color: var(--ok);
+}
+
+/* A chip is a fact, not a verdict: --rule-strong until validate.ts gives it a
+   severity. Nothing in the run order ever reaches this strip. */
+.vstrip__chip {
+  border-radius: var(--r-0);
 }
 
 .vstrip__summary[data-state='error'] {
@@ -1113,8 +1165,12 @@
   gap: var(--s-3);
   padding: var(--s-4);
   border: var(--hair);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: var(--bg-panel);
+}
+
+.presets__card .btn {
+  margin-top: auto;
 }
 
 .presets__ribbon {

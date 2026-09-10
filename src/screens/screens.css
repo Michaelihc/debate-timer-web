@@ -1,13 +1,18 @@
 /* ============================================================================
    SCREEN LAYOUTS — Launch (#/) and Summary (#/summary).
 
-   Tokens only: no hex, no shadows, no radius beyond --r-1 / --r-pill, no px
-   outside the --s-* scale.
+   Same identity as the console: a near-black ground, lime for the one action the
+   screen is for, square corners, no shadows, and the timeline strip drawn as the
+   original draws it. A preset card previews its roster with the same <Debater>
+   figures the console and the stage use, so what you pick on this screen is what
+   you will be looking at for the next forty minutes.
+
+   Tokens only: no hex, no radius beyond --r-1 / --r-pill, no px outside --s-*.
 
    PERIPHERY / CORE: neither screen carries a live clock, so no --state-* token
    appears here at all — an overrun in the box score is structural bad news and
-   takes --danger. Identity colour (--side-*) appears only as a leading edge tick
-   on a row or a panel. No element carries both.
+   takes --danger. Identity colour (--side-*) paints the debater figures and a
+   leading edge tick on a row or a panel. No element carries both.
    ========================================================================== */
 
 /* --- Shared screen chrome ----------------------------------------------- */
@@ -214,10 +219,11 @@
 .lc__chip {
   flex: none;
   padding-inline: var(--s-3);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--r-pill);
-  color: var(--text-lo);
+  border: 1px solid var(--lime);
+  border-radius: var(--r-0);
+  color: var(--lime);
   font-size: var(--t-cap);
+  font-weight: 600;
   line-height: 1.9;
   white-space: nowrap;
 }
@@ -225,6 +231,50 @@
 .lc__cardmeta {
   color: var(--text-mid);
   font-size: var(--t-meta);
+}
+
+/* --- Launch: the roster, previewed as figures --------------------------- */
+
+/* The two sides face each other exactly as they will on the console and the
+   stage: proposition outboard-left, opposition outboard-right, both looking in.
+   --side-* is set inline per card, because a preset carries its own colours and
+   the document root only knows the round that is loaded. */
+.lc__roster {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 52px;
+  padding-block: var(--s-2);
+  border-block: var(--hair);
+}
+
+.lc__side {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lc__side--b {
+  justify-content: flex-end;
+}
+
+.lc__roster .udeb {
+  --fig-h: 40px;
+  gap: 0;
+}
+
+.lc__more {
+  align-self: flex-end;
+  color: var(--text-lo);
+  font-size: var(--t-cap);
+  white-space: nowrap;
 }
 
 .lc__cardacts {
@@ -308,7 +358,7 @@
   min-height: 88px;
   padding: var(--s-3);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: var(--bg-sunken);
   color: var(--text-hi);
   font-family: var(--font-ui);
@@ -537,7 +587,7 @@
   min-height: 140px;
   padding: var(--s-3);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
+  border-radius: var(--r-0);
   background: var(--bg-sunken);
   color: var(--text-hi);
   font-family: var(--font-ui);
@@ -564,5 +614,17 @@
 
   .lc__import {
     padding: var(--s-4);
+  }
+}
+
+/* A 400px phone still shows the face-off; the figures just get smaller and the
+   two sides keep their outboard alignment rather than stacking. */
+@media (max-width: 400px) {
+  .lc__roster .udeb {
+    --fig-h: 32px;
+  }
+
+  .lc__roster {
+    min-height: 44px;
   }
 }

@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { plan } from '../domain/plan';
 import { PRESET_KEYS, instantiatePreset } from '../domain/presets';
 import { dispatch, loadRound } from '../engine/store';
+import { VETTED_PAIRS, checkPair } from '../lib/contrast';
 import Launch from './Launch';
 import Summary from './Summary';
 
@@ -33,6 +34,28 @@ describe('Launch', () => {
     // 4v4 · 9 segments · 42:30 — speaker count, structure and length, on the card.
     expect(screen.getByText(/4v4 · 9 segments · /)).toBeTruthy();
     expect(document.querySelectorAll('.lc__card .ribbon--thumb').length).toBeGreaterThan(0);
+  });
+
+  it('previews the roster as the figures the round will actually be run with', () => {
+    render(<Launch />);
+    const card = document.querySelector('.lc__card');
+    // Two sides, facing each other, one figure per speaker — the same <Debater> the
+    // console and the stage draw, so the card shows what the round looks like.
+    const sides = card?.querySelectorAll('.lc__roster .lc__side') ?? [];
+    expect(sides).toHaveLength(2);
+    expect(sides[0]?.querySelectorAll('.udeb--a')).toHaveLength(4);
+    expect(sides[1]?.querySelectorAll('.udeb--b')).toHaveLength(4);
+    // Nothing on the preview is a control: picking a format is the card's job.
+    expect(card?.querySelectorAll('.lc__roster button')).toHaveLength(0);
+  });
+
+  it('offers the original blue/red pair by name, flagged rather than withheld', () => {
+    // An imported save.json arrives carrying #0000FF / #FF0000, so the pair has to be
+    // reachable in the picker. It is measured like any other, never substituted.
+    const classic = VETTED_PAIRS.find((pair) => pair.a === '#0000FF' && pair.b === '#FF0000');
+    expect(classic).toBeDefined();
+    expect(classic?.labelA.zh).not.toBe('');
+    expect(checkPair('#0000FF', '#FF0000').reasons.length).toBeGreaterThan(0);
   });
 });
 

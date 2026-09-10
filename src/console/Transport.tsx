@@ -9,9 +9,9 @@
  * BACK is a first-class control sitting next to ADVANCE, not an item in a menu. Going
  * backwards is a normal thing to do at a debate.
  *
- * SWAP is HIDDEN — not disabled — whenever `canSwap()` is false, so the control and its
- * keybinding appear and disappear together and it can never render as a button that
- * silently does nothing.
+ * SWAP is not here. It lives between the two free-debate bars, where the original put it,
+ * and it is HIDDEN — not disabled — whenever `canSwap()` is false, so the control and its
+ * keybinding appear and disappear together.
  */
 
 import type { JSX, ReactNode } from 'react';
@@ -35,7 +35,6 @@ export interface TransportHandlers {
   prev: () => void;
   reset: () => void;
   hold: () => void;
-  swap: () => void;
   adjust: (deltaMs: number) => void;
   floor: (side: SideId) => void;
   undo: () => void;
@@ -47,8 +46,6 @@ export interface TransportProps {
   transport: TransportState;
   hold: boolean;
   chess: boolean;
-  /** `canSwap(state, plan)`. False hides the SWAP control outright. */
-  swap: boolean;
   /** Space is inert until a side is picked (`firstFloor: 'operator'`). */
   canStart: boolean;
   sideLabels: Record<SideId, string>;
@@ -121,7 +118,6 @@ export function Transport({
   transport,
   hold,
   chess,
-  swap,
   canStart,
   sideLabels,
   canPrev,
@@ -165,17 +161,6 @@ export function Transport({
               label={t('c.giveFloor', { side: sideLabels.A })}
               action="floorA"
             />
-            {/* HIDDEN, not disabled, whenever exactly one side is not running. */}
-            {swap ? (
-              <Key
-                onClick={on.swap}
-                icon="swap"
-                label={t('t.swap')}
-                action="swap"
-                hint={<Keycaps caps={[...capsOf('toggle'), ...capsOf('swap')]} />}
-                primary
-              />
-            ) : null}
             <Key
               onClick={() => on.floor('B')}
               icon="next"
@@ -187,7 +172,7 @@ export function Transport({
               icon={mainIcon}
               label={mainLabel}
               action="togglePause"
-              primary={!swap}
+              primary
               disabled={!canStart && !hold}
             />
           </>

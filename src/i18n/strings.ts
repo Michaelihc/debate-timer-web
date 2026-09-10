@@ -42,6 +42,7 @@ const EN = {
   'lc.clearRecent': 'Clear list',
   'lc.clearRecentConfirm': 'Clear the recent list? The rounds themselves are not deleted.',
   'lc.defaultFormat': 'Default',
+  'lc.plusMore': '+{n} more',
   'lc.noStorage':
     'Site storage is blocked, so recent rounds and resume are unavailable. A share link still carries a whole round.',
   'lc.about':
@@ -311,6 +312,16 @@ const EN = {
   'c.spoken': 'Spoken',
   'c.drawBank': 'Draw {side} prep bank',
   'c.giveFloor': 'Floor to {side}',
+  'c.roster': '{side} speakers',
+
+  // ── Timeline strip ───────────────────────────────────────────────────────────
+  // Single glyphs, the way the original labels a timeline square: `P` for a prep
+  // block, `F` for free debate, otherwise the speaker's own number.
+  'tl.title': 'Timeline',
+  'tl.prep': 'P',
+  'tl.free': 'F',
+  'tl.shared': 'S',
+  'tl.break': 'B',
 
   // ── Generic ──────────────────────────────────────────────────────────────────
   'ui.on': 'On',
@@ -438,6 +449,7 @@ const ZH: Record<StringKey, string> = {
   'lc.clearRecent': '清空列表',
   'lc.clearRecentConfirm': '清空最近列表？比赛本身不会被删除。',
   'lc.defaultFormat': '默认',
+  'lc.plusMore': '另外{n}位',
   'lc.noStorage': '浏览器存储被禁用，最近比赛和断点恢复不可用。分享链接仍然包含完整的比赛设置。',
   'lc.about':
     '一款为辩论赛准备的计时器。先选一个赛制，再按本场比赛改辩手、改顺序、改时长，然后在控制台计时，把投影窗口放到大屏上。所有数据只保存在本浏览器和地址栏里——一条链接就带着整套设置，不需要注册，也没有服务器。',
@@ -692,6 +704,13 @@ const ZH: Record<StringKey, string> = {
   'c.spoken': '已发言',
   'c.drawBank': '{side}使用准备时间',
   'c.giveFloor': '交给{side}',
+  'c.roster': '{side}辩手',
+
+  'tl.title': '流程条',
+  'tl.prep': '备',
+  'tl.free': '自',
+  'tl.shared': '共',
+  'tl.break': '休',
 
   'ui.on': '开',
   'ui.off': '关',

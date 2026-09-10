@@ -1,37 +1,44 @@
 /**
- * `#/stage` — the projector window. Read by a room, from fifteen metres, by people who
- * are not operating anything.
+ * `#/stage` — the projector window, in the Unity app's own layout.
+ *
+ * A near-black screen. The motion across the top. The two teams facing each other as rows
+ * of tinted person figures — proposition left, opposition right — the speaking one holding
+ * a speech bubble, the next one an arrow that bobs once its predecessor's clock expires, a
+ * clipboard on every figure during prep and a group icon during free debate. A large
+ * radial countdown ring in the middle with the time in its centre, and a strip of small
+ * square timeline pips over a white rail along the bottom.
  *
  * It is a FOLLOWER. `engine/channel.ts` opens the link, `engine/rebase.ts` re-bases every
- * epoch anchor the console sends into this document's own monotonic clock (§5.3 — a
- * `startedAtMono` from another document is meaningless, because `performance.timeOrigin`
- * is per-document), and from that rebased anchor this window derives its own 60fps
- * display. It never claims leadership: a two-leader flicker is worse than a frozen wall.
+ * epoch anchor the console sends into this document's own monotonic clock (`startedAtMono`
+ * from another document is meaningless, because `performance.timeOrigin` is per-document),
+ * and from that rebased anchor this window derives its own 60fps display. It never claims
+ * leadership: a two-leader flicker is worse than a frozen wall.
  *
  * Three rules shape every line below:
  *
  *   1. THE THEME DOES NOT APPLY. A projector renders `#000000` as *no light*; anything
- *      above it is a glowing grey rectangle on the wall. The stage is always true black.
- *   2. PERIPHERY / CORE. Identity colour touches the edge bars, the rails and the
- *      nameplate slabs, and nothing else. Clock-state colour touches the digits, the
- *      depletion bar and the overtime frame, and nothing else.
+ *      above it is a glowing grey rectangle on the wall. The stage is always true black,
+ *      and `stage.css` re-pins the projector state ramp on its own root.
+ *   2. PERIPHERY / CORE. Identity colour tints the debater figures and their names, and
+ *      nothing else. Clock-state colour paints the ring, the digits, the free-debate bars
+ *      and the overtime frame, and nothing else.
  *   3. ZERO CHROME. No buttons, no cursor after two seconds, no scrollbars, nothing the
  *      audience has to interpret as interactive, because nobody can click it anyway.
  *
  * Every number is read from `engine/selectors.ts`. Nothing here derives a clock.
  */
 
-import type { JSX, RefObject } from 'react';
+import type { CSSProperties, JSX, RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { L10n, Lang, SegmentKind, SideId, Speaker } from '../domain/config';
-import { plan as buildPlan } from '../domain/plan';
-import type { ClockId } from '../engine/state';
+import type { Id, Lang, SegmentKind, SideId, Speaker } from '../domain/config';
+import { chessClockId, plan as buildPlan } from '../domain/plan';
+import type { ClockId, SegmentPlan } from '../engine/state';
 import type { Now } from '../engine/chronometer';
-import { elapsedMs, now } from '../engine/chronometer';
+import { now } from '../engine/chronometer';
 import type { LinkStatus } from '../engine/channel';
 import { startFollower } from '../engine/channel';
-import { registerTick } from '../engine/loop';
+import { onCue, registerTick } from '../engine/loop';
 import type { Band, RoundView } from '../engine/selectors';
 import {
   bankRemaining,
@@ -39,27 +46,25 @@ import {
   currentPlanSegment,
   roundElapsedMs,
   roundView,
+  spokenSpeakerIds,
 } from '../engine/selectors';
 import { getSession, useRound } from '../engine/store';
-import type { SegmentPlan } from '../engine/state';
-import { chessClockId } from '../domain/plan';
 import { formatTime } from '../lib/format';
 import type { StringKey } from '../i18n/strings';
 import type { TFn } from '../i18n/useLang';
 import { translate, useLang } from '../i18n/useLang';
-import type { DepletionBarHandle, ProtectedWindow } from '../ui/DepletionBar';
-import { DepletionBar } from '../ui/DepletionBar';
 import type { DigitsHandle } from '../ui/Digits';
 import { Digits } from '../ui/Digits';
-import type { RibbonHandle } from '../ui/Ribbon';
-import { Ribbon } from '../ui/Ribbon';
-import { ribbonFromPlan } from '../ui/ribbonData';
+import type { DebaterOverlay, DebaterState } from '../ui/unity/Debater';
+import { Debater } from '../ui/unity/Debater';
+import { RING } from '../ui/unity/ringGeometry';
+import { RingTimer } from '../ui/unity/RingTimer';
 
 import '../styles/stage.css';
 
 const SIDES: readonly SideId[] = ['A', 'B'];
 
-/** How long the pointer must sit still before the cursor disappears (§3.5). */
+/** How long the pointer must sit still before the cursor disappears. */
 const CURSOR_IDLE_MS = 2000;
 
 const KIND_KEY: Record<SegmentKind, StringKey> = {
@@ -68,6 +73,18 @@ const KIND_KEY: Record<SegmentKind, StringKey> = {
   prep: 'k.prep',
   chess: 'k.free',
   break: 'k.break',
+};
+
+/**
+ * `AnimationController` shows the clipboard on every figure through prep and the group
+ * icon on every figure through free debate, regardless of whose turn it is.
+ */
+const OVERLAY: Record<SegmentKind, DebaterOverlay> = {
+  speech: 'none',
+  shared: 'none',
+  prep: 'prep',
+  chess: 'free',
+  break: 'none',
 };
 
 const BAND_KEY: Record<Band, StringKey | null> = {
@@ -101,17 +118,9 @@ function slotsOf(ps: SegmentPlan | null): Slots {
   return { primary: ps.primaryClockId, secondary: null };
 }
 
-/**
- * Protected time is symmetric around a speech: the opening window and the closing window,
- * both expressed in ms REMAINING, which is the axis the cue ladder already uses.
- */
-function protectedWindows(allottedMs: number, protectedMs: number): ProtectedWindow[] {
-  if (protectedMs <= 0 || allottedMs <= 0) return [];
-  const span = Math.min(protectedMs, allottedMs / 2);
-  return [
-    { fromMs: allottedMs, toMs: allottedMs - span },
-    { fromMs: span, toMs: 0 },
-  ];
+/** The ring's three fill colours; the original has one warning tier, not two. */
+function ringState(band: Band): 'normal' | 'warn' | 'over' {
+  return band === 'over' ? 'over' : band === 'normal' ? 'normal' : 'warn';
 }
 
 /* ------------------------------------------------------------------- screen */
@@ -130,14 +139,16 @@ export default function Stage(): JSX.Element {
   const [opened] = useState(() => typeof window !== 'undefined' && window.opener !== null);
 
   const root = useRef<HTMLDivElement>(null);
+  const flash = useRef<HTMLSpanElement>(null);
+  const ringWrap = useRef<HTMLDivElement>(null);
   const primaryDigits = useRef<DigitsHandle>(null);
   const secondaryDigits = useRef<DigitsHandle>(null);
-  const primaryBar = useRef<DepletionBarHandle>(null);
-  const secondaryBar = useRef<DepletionBarHandle>(null);
+  const barA = useRef<HTMLSpanElement>(null);
+  const barB = useRef<HTMLSpanElement>(null);
   const bankA = useRef<HTMLSpanElement>(null);
   const bankB = useRef<HTMLSpanElement>(null);
   const roundOut = useRef<HTMLSpanElement>(null);
-  const ribbon = useRef<RibbonHandle>(null);
+  const live = useRef<HTMLParagraphElement>(null);
 
   // The link, opened once for the life of the window. `startFollower` re-bases every
   // anchor it receives and folds the frame into the store; this screen only paints it.
@@ -157,25 +168,36 @@ export default function Stage(): JSX.Element {
   // The rAF loop writes through these refs, so nothing below re-renders from time.
   const slotsRef = useRef<Slots>(slots);
   slotsRef.current = slots;
-  const cursorRef = useRef(state.cursor);
-  cursorRef.current = state.cursor;
 
   useEffect(
     () =>
       registerTick((n) => {
         paintFrame(n, {
           slots: slotsRef.current,
-          cursor: cursorRef.current,
           root: root.current,
+          ringWrap: ringWrap.current,
           primaryDigits: primaryDigits.current,
           secondaryDigits: secondaryDigits.current,
-          primaryBar: primaryBar.current,
-          secondaryBar: secondaryBar.current,
+          barA: barA.current,
+          barB: barB.current,
           bankA: bankA.current,
           bankB: bankB.current,
           roundOut: roundOut.current,
-          ribbon: ribbon.current,
         });
+      }),
+    [],
+  );
+
+  // flash.anim — the one-shot red screen pulse the original plays on a warning cue. The
+  // room sees it; the operator's console plays its own.
+  useEffect(
+    () =>
+      onCue(() => {
+        const el = flash.current;
+        if (!el) return;
+        delete el.dataset['fire'];
+        void el.offsetWidth;
+        el.dataset['fire'] = '';
       }),
     [],
   );
@@ -205,7 +227,8 @@ export default function Stage(): JSX.Element {
   }, []);
 
   // Spoken boundaries the clock cannot infer. The digits own minutes and the last ten
-  // seconds; these two are the round-level events.
+  // seconds; these two are the round-level events, and they must survive a variant with
+  // no digits mounted at all.
   const say = useRef(t);
   say.current = t;
   const prevHold = useRef<boolean | null>(null);
@@ -213,7 +236,9 @@ export default function Stage(): JSX.Element {
     const was = prevHold.current;
     prevHold.current = view.hold;
     if (was === null || was === view.hold) return;
-    primaryDigits.current?.say(say.current(view.hold ? 'a11y.roundHeld' : 'a11y.roundReleased'));
+    if (live.current) {
+      live.current.textContent = say.current(view.hold ? 'a11y.roundHeld' : 'a11y.roundReleased');
+    }
   }, [view.hold]);
 
   const prevFloor = useRef<SideId | null | undefined>(undefined);
@@ -222,9 +247,11 @@ export default function Stage(): JSX.Element {
     prevFloor.current = view.floor;
     if (was === undefined || was === view.floor || view.floor === null) return;
     const side = config.sides.find((s) => s.id === view.floor);
-    primaryDigits.current?.say(
-      say.current('a11y.floorNow', { side: side ? l10n(side.label) : view.floor }),
-    );
+    if (live.current) {
+      live.current.textContent = say.current('a11y.floorNow', {
+        side: side ? l10n(side.label) : view.floor,
+      });
+    }
     // `l10n` is stable per language and only the floor is a real dependency here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.floor]);
@@ -239,128 +266,122 @@ export default function Stage(): JSX.Element {
         : (ps?.kind ?? 'idle');
 
   const following = linked || opened;
-  const showLost = link === 'lost' && following && variant !== 'idle';
+  const lost = link === 'lost' && following;
+  const showLost = lost && variant !== 'idle';
+
+  // Roster presentation, not engine state: the figure numbers, and which figures have
+  // already had every turn the run order gives them.
+  const numbers = useMemo(() => sideNumbers(config.speakers), [config.speakers]);
+  // The taller roster decides how tall a figure may be, so a six-speaker side shrinks its
+  // people rather than running off the bottom of the wall.
+  const rows = useMemo(() => rowsVar(config.speakers), [config.speakers]);
+  const spoken = useMemo(() => spokenSpeakerIds(state, runPlan), [state, runPlan]);
+  const speaking = useMemo(() => speakingIds(ps), [ps]);
+  const overlay = ps ? OVERLAY[ps.kind] : 'none';
+  const showHours = longRound(runPlan.totalMs);
 
   return (
     <div
       ref={root}
       className="stage"
+      style={rows}
       data-variant={variant}
       data-band={view.band}
       data-hold={view.hold ? '' : undefined}
+      data-link={lost ? 'lost' : undefined}
       data-cursor="shown"
       role="region"
       aria-label={t('a11y.stageRegion')}
     >
-      <span className="stage__edge" data-side="A" data-lit={lit(view, ps, 'A') ? '' : undefined} />
-      <span className="stage__edge" data-side="B" data-lit={lit(view, ps, 'B') ? '' : undefined} />
       <span className="stage__frame" aria-hidden="true" />
 
       <header className="stage__top">
-        <span className="stage__topleft s-rail-meta">
+        <span className="stage__meta" data-numeric="">
           {empty || view.phase !== 'in'
             ? t('app.name')
             : `${t('r.segmentOf', { i: view.cursor + 1, n: view.segmentCount })}${
                 ps ? ` · ${t(KIND_KEY[ps.kind])}` : ''
               }`}
         </span>
-        <span className="stage__motion s-context">{l10n(config.title)}</span>
-        <span className="stage__round s-rail-meta" data-numeric="">
+        {/* Topic — the one thing the original prints large at the top of the canvas. */}
+        <h2 className="stage__title">{l10n(config.title)}</h2>
+        <span className="stage__meta stage__meta--end" data-numeric="">
           {t('r.elapsed')}{' '}
-          <span ref={roundOut}>{formatTime(view.roundElapsedMs, { showHours: longRound(runPlan.totalMs) })}</span>
+          <span ref={roundOut}>{formatTime(view.roundElapsedMs, { showHours })}</span>
           {' / '}
-          {formatTime(runPlan.scheduledMs, { showHours: longRound(runPlan.totalMs) })}
+          {formatTime(runPlan.scheduledMs, { showHours })}
         </span>
       </header>
 
-      <span className="stage__rule" aria-hidden="true" />
-
       <div className="stage__body">
-        <Rail
+        <Team
           side="A"
-          speakers={config.speakers}
           label={l10n(config.sides[0].label)}
-          currentId={ps?.speaker?.id ?? null}
+          speakers={config.speakers}
+          numbers={numbers}
+          speaking={speaking}
+          spoken={spoken}
           nextId={view.onDeck?.id ?? null}
-          l10n={l10n}
+          urgent={view.onDeckUrgent}
+          overlay={overlay}
         />
 
         <div className="stage__core">
-          {variant === 'idle' ? (
-            <Idle t={t} lost={link === 'lost' && (linked || opened)} />
-          ) : variant === 'standby' ? (
-            <Standby />
-          ) : variant === 'complete' ? (
-            <Complete view={view} totalMs={runPlan.scheduledMs} />
+          {variant === 'idle' || variant === 'standby' || variant === 'complete' ? (
+            <Card
+              k={
+                variant === 'complete'
+                  ? 'st.complete'
+                  : variant === 'standby'
+                    ? 'st.preRound'
+                    : lost
+                      ? 'sg.linkLost'
+                      : 'sg.waiting'
+              }
+              sub={variant === 'idle' ? t('sg.sameBrowser') : null}
+            />
           ) : variant === 'chess' && ps ? (
             <Chess
               ps={ps}
               view={view}
               secondsOnly={secondsOnly}
+              t={t}
               sideLabels={[l10n(config.sides[0].label), l10n(config.sides[1].label)]}
-              out={{
-                primaryDigits,
-                secondaryDigits,
-                primaryBar,
-                secondaryBar,
-                bankA,
-                bankB,
-              }}
+              out={{ primaryDigits, secondaryDigits, barA, barB, bankA, bankB }}
             />
           ) : ps ? (
             <Single
               ps={ps}
               view={view}
               secondsOnly={secondsOnly}
-              l10n={l10n}
-              t={t}
-              sideLabel={(id) => l10n((id === 'A' ? config.sides[0] : config.sides[1]).label)}
+              label={l10n(ps.label)}
+              wrapOut={ringWrap}
               digitsOut={primaryDigits}
-              barOut={primaryBar}
             />
           ) : (
-            <Idle t={t} lost={link === 'lost' && (linked || opened)} />
+            <Card k={lost ? 'sg.linkLost' : 'sg.waiting'} sub={null} />
           )}
-
-          {view.onDeck && view.phase === 'in' ? (
-            <p className="stage__next s-next" data-urgent={view.onDeckUrgent ? '' : undefined}>
-              <span className="stage__caret m-nudge" aria-hidden="true" />
-              <span className="stage__nextlabel s-role">{t('st.upNext')}</span>
-              <span className="stage__nextname">{view.onDeck.name}</span>
-              <span className="stage__nextrole">
-                {l10n((view.onDeck.side === 'A' ? config.sides[0] : config.sides[1]).label)}
-                {view.onDeck.role ? ` · ${l10n(view.onDeck.role)}` : ''}
-              </span>
-            </p>
-          ) : null}
         </div>
 
-        <Rail
+        <Team
           side="B"
-          speakers={config.speakers}
           label={l10n(config.sides[1].label)}
-          currentId={ps?.speaker?.id ?? null}
+          speakers={config.speakers}
+          numbers={numbers}
+          speaking={speaking}
+          spoken={spoken}
           nextId={view.onDeck?.id ?? null}
-          l10n={l10n}
+          urgent={view.onDeckUrgent}
+          overlay={overlay}
         />
       </div>
 
-      {empty ? null : (
-        <footer className="stage__ribbon">
-          <Ribbon
-            ref={ribbon}
-            scale="live"
-            segments={ribbonFromPlan(runPlan, state, lang)}
-            cursor={view.cursor}
-            colors={{ A: config.sides[0].color, B: config.sides[1].color }}
-          />
-        </footer>
-      )}
+      <Timeline plan={runPlan} cursor={view.cursor} numbers={numbers} t={t} lang={lang} />
 
       {view.hold ? <Hold view={view} secondsOnly={secondsOnly} /> : null}
 
       {showLost ? (
-        <p className="stage__lost s-rail-meta" role="status">
+        <p className="stage__lost" role="status">
           <span className="stage__lostpip" aria-hidden="true" />
           {t('sg.linkLost')}
         </p>
@@ -368,7 +389,13 @@ export default function Stage(): JSX.Element {
 
       {/* Colour is never the only channel: the state always carries a word. Never an
           operator's word, though — nobody in the room can press Space. */}
-      <p className="stage__band s-rail-meta">{bandWord(view, t)}</p>
+      <p className="stage__status">{bandWord(view, t)}</p>
+
+      {/* flash.anim, mounted last so it sits over everything the room is watching. */}
+      <span ref={flash} className="u-flash" aria-hidden="true" />
+
+      {/* The boundaries the clock cannot infer, for anyone listening rather than looking. */}
+      <p ref={live} className="sr-only" aria-live="polite" aria-atomic="true" />
     </div>
   );
 }
@@ -377,16 +404,15 @@ export default function Stage(): JSX.Element {
 
 interface PaintTargets {
   slots: Slots;
-  cursor: number;
   root: HTMLElement | null;
+  ringWrap: HTMLElement | null;
   primaryDigits: DigitsHandle | null;
   secondaryDigits: DigitsHandle | null;
-  primaryBar: DepletionBarHandle | null;
-  secondaryBar: DepletionBarHandle | null;
+  barA: HTMLElement | null;
+  barB: HTMLElement | null;
   bankA: HTMLSpanElement | null;
   bankB: HTMLSpanElement | null;
   roundOut: HTMLSpanElement | null;
-  ribbon: RibbonHandle | null;
 }
 
 const lastText = new WeakMap<HTMLElement, string>();
@@ -395,6 +421,46 @@ function setText(el: HTMLElement | null, text: string): void {
   if (!el || lastText.get(el) === text) return;
   lastText.set(el, text);
   el.textContent = text;
+}
+
+interface RingParts {
+  ring: HTMLElement | null;
+  arc: SVGCircleElement | null;
+}
+
+// Resolved once per mounted ring rather than queried sixty times a second. The
+// `isConnected` check is what makes a variant change re-resolve instead of writing to a
+// detached node.
+const ringCache = new WeakMap<HTMLElement, RingParts>();
+
+function ringPartsOf(wrap: HTMLElement | null): RingParts | null {
+  if (!wrap) return null;
+  const cached = ringCache.get(wrap);
+  if (cached && cached.ring?.isConnected === true) return cached;
+  const parts: RingParts = {
+    ring: wrap.querySelector<HTMLElement>('.uring'),
+    arc: wrap.querySelector<SVGCircleElement>('.uring__arc'),
+  };
+  ringCache.set(wrap, parts);
+  return parts;
+}
+
+/** The ring empties clockwise from the top: a full ring is a full circle. */
+function writeRing(parts: RingParts | null, fill: number, band: Band): void {
+  if (!parts) return;
+  if (parts.arc) {
+    parts.arc.style.strokeDashoffset = String(RING.circumference * (1 - fill));
+  }
+  const state = ringState(band);
+  if (parts.ring && parts.ring.dataset['state'] !== state) parts.ring.dataset['state'] = state;
+}
+
+/** Vertical fill, bottom origin — `fillMethod: Vertical, fillOrigin: 0`. */
+function writeBar(bar: HTMLElement | null, fill: number, band: Band): void {
+  if (!bar) return;
+  if (bar.dataset['band'] !== band) bar.dataset['band'] = band;
+  const el = bar.firstElementChild;
+  if (el instanceof HTMLElement) el.style.transform = `scaleY(${fill})`;
 }
 
 /**
@@ -412,7 +478,8 @@ function paintFrame(n: Now, target: PaintTargets): void {
     if (v) {
       band = worse(band, v.band);
       target.primaryDigits?.write(v.remainingMs, { band: v.band, secondsOnly });
-      target.primaryBar?.write(v.remainingMs, v.band);
+      writeRing(ringPartsOf(target.ringWrap), v.fill, v.band);
+      writeBar(target.barA, v.fill, v.band);
     }
   }
 
@@ -422,7 +489,7 @@ function paintFrame(n: Now, target: PaintTargets): void {
     if (v) {
       band = worse(band, v.band);
       target.secondaryDigits?.write(v.remainingMs, { band: v.band, secondsOnly });
-      target.secondaryBar?.write(v.remainingMs, v.band);
+      writeBar(target.barB, v.fill, v.band);
     }
   }
 
@@ -433,122 +500,48 @@ function paintFrame(n: Now, target: PaintTargets): void {
 
   if (target.bankA) setText(target.bankA, formatTime(bankRemaining(state, runPlan, 'A', n)));
   if (target.bankB) setText(target.bankB, formatTime(bankRemaining(state, runPlan, 'B', n)));
-
-  // The live Ribbon block fills to what is ACTUALLY being consumed, this second.
-  const current = runPlan.segments[target.cursor];
-  if (current && target.ribbon) {
-    let used = 0;
-    for (const id of current.clockIds) used += elapsedMs(state, id, n);
-    target.ribbon.write(target.cursor, used);
-  }
 }
 
 /* ---------------------------------------------------------------- variants */
 
-/** Speech, shared clock, prep, break — one clock, one core. */
+/** Speech, shared clock, prep, break — one clock, one ring, the time in its centre. */
 function Single({
   ps,
   view,
   secondsOnly,
-  l10n,
-  t,
-  sideLabel,
+  label,
+  wrapOut,
   digitsOut,
-  barOut,
 }: {
   ps: SegmentPlan;
   view: RoundView;
   secondsOnly: boolean;
-  l10n: (text: L10n | undefined) => string;
-  t: TFn;
-  sideLabel: (id: SideId) => string;
+  label: string;
+  wrapOut: RefObject<HTMLDivElement | null>;
   digitsOut: RefObject<DigitsHandle | null>;
-  barOut: RefObject<DepletionBarHandle | null>;
 }): JSX.Element {
   const clock = view.primary;
   const allotted = clock?.allottedMs ?? ps.allottedMs;
-  // Both are structure, not time: memoised so a heartbeat re-render never churns the
-  // bar's hatches or its cue marks.
-  const windows = useMemo(
-    () => protectedWindows(allotted, ps.protectedMs),
-    [allotted, ps.protectedMs],
-  );
-  const markers = useMemo(
-    () =>
-      ps.cues
-        .filter((c) => c.atMs > 0 && c.atMs < allotted)
-        .slice(0, 4)
-        .map((c) => ({ at: (c.atMs / allotted) * 100, text: formatTime(c.atMs) })),
-    [ps.cues, allotted],
-  );
-
-  const speaker = ps.speaker;
-  const plates: { side: SideId; title: string; sub: string }[] = [];
-  if (speaker) {
-    // The role line above already names the phase; the slab names the person, so the
-    // two never print the same word twice at 96px.
-    const role = speaker.role ? l10n(speaker.role) : '';
-    plates.push({
-      side: speaker.side,
-      title: speaker.name,
-      sub: role === '' ? sideLabel(speaker.side) : `${sideLabel(speaker.side)} · ${role}`,
-    });
-  } else {
-    for (const side of ps.liveSides) {
-      const named = ps.participants.filter((p) => p.side === side);
-      plates.push({
-        side,
-        title: named.length > 0 ? named.map((p) => p.name).join(' · ') : sideLabel(side),
-        sub: named.length > 0 ? sideLabel(side) : l10n(ps.label),
-      });
-    }
-  }
-
   return (
     <>
-      <p className="stage__role s-role">{l10n(ps.label)}</p>
-
-      <Digits
-        key={ps.primaryClockId}
-        ref={digitsOut}
-        scale="stage"
-        secondsOnly={secondsOnly}
-        initialMs={clock?.remainingMs ?? allotted}
-        initialBand={clock?.band ?? 'normal'}
-        name={speaker?.name ?? l10n(ps.label)}
-      />
-
-      <div className="stage__barwrap">
-        <DepletionBar
-          key={ps.primaryClockId}
-          ref={barOut}
+      <p className="stage__label">{label}</p>
+      <div ref={wrapOut} className="stage__ringwrap">
+        <RingTimer
           variant="stage"
-          allottedMs={allotted}
-          cues={ps.cues}
-          protectedWindows={windows}
-          initialBand={clock?.band ?? 'normal'}
-        />
-        {markers.length > 0 ? (
-          <div className="stage__cues" aria-hidden="true">
-            {markers.map((m) => (
-              <span key={m.text} className="stage__cue s-rail-meta" style={{ left: `${m.at}%` }}>
-                {m.text}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {ps.protectedMs > 0 ? (
-          <p className="stage__protected s-rail-meta">{t('st.protected')}</p>
-        ) : null}
+          fraction={clock?.fill ?? 1}
+          state={ringState(clock?.band ?? 'normal')}
+        >
+          <Digits
+            key={ps.primaryClockId}
+            ref={digitsOut}
+            scale="stage"
+            secondsOnly={secondsOnly}
+            initialMs={clock?.remainingMs ?? allotted}
+            initialBand={clock?.band ?? 'normal'}
+            name={ps.speaker?.name ?? label}
+          />
+        </RingTimer>
       </div>
-
-      {plates.length > 0 ? (
-        <div className="stage__plates">
-          {plates.map((p) => (
-            <Plate key={`${p.side}-${p.title}`} side={p.side} title={p.title} sub={p.sub} />
-          ))}
-        </div>
-      ) : null}
     </>
   );
 }
@@ -556,48 +549,58 @@ function Single({
 interface ChessOutputs {
   primaryDigits: RefObject<DigitsHandle | null>;
   secondaryDigits: RefObject<DigitsHandle | null>;
-  primaryBar: RefObject<DepletionBarHandle | null>;
-  secondaryBar: RefObject<DepletionBarHandle | null>;
+  barA: RefObject<HTMLSpanElement | null>;
+  barB: RefObject<HTMLSpanElement | null>;
   bankA: RefObject<HTMLSpanElement | null>;
   bankB: RefObject<HTMLSpanElement | null>;
 }
 
-/** Free debate: two clocks. The idle side stays legible but visibly stands down. */
+/**
+ * Free debate: the original's two vertical bars, each filling from the bottom, with its
+ * side's time below it. The idle side stays legible but visibly stands down. No SWAP
+ * control here — the stage carries no controls at all.
+ */
 function Chess({
   ps,
   view,
   secondsOnly,
   sideLabels,
+  t,
   out,
 }: {
   ps: SegmentPlan;
   view: RoundView;
   secondsOnly: boolean;
   sideLabels: [string, string];
+  t: TFn;
   out: ChessOutputs;
 }): JSX.Element {
-  const { t } = useLang();
   const perSide = ps.segment.kind === 'chess' ? ps.segment.perSideMs : ps.allottedMs;
-
   return (
     <>
-      <p className="stage__role s-role">
+      <p className="stage__label">
         <Bi k="k.free" />
       </p>
-
       <div className="stage__chess">
         {SIDES.map((side, i) => {
           const clockId = chessClockId(ps.segId, side);
           const clock = view.clocks.find((c) => c.clockId === clockId) ?? null;
-          const live = view.floor === side;
+          const name = sideLabels[i] ?? side;
           return (
             <section
               key={side}
               className="stage__chesside"
               data-side={side}
-              data-live={live ? '' : undefined}
+              data-live={view.floor === side ? '' : undefined}
             >
-              <Plate side={side} title={sideLabels[i] ?? side} sub="" />
+              <span
+                ref={side === 'A' ? out.barA : out.barB}
+                className="stage__vbar"
+                data-band={clock?.band ?? 'normal'}
+                aria-hidden="true"
+              >
+                <span className="stage__vfill" />
+              </span>
               <Digits
                 key={clockId}
                 ref={side === 'A' ? out.primaryDigits : out.secondaryDigits}
@@ -605,19 +608,12 @@ function Chess({
                 secondsOnly={secondsOnly}
                 initialMs={clock?.remainingMs ?? perSide}
                 initialBand={clock?.band ?? 'normal'}
-                name={sideLabels[i] ?? side}
-                label={`${sideLabels[i] ?? side} · ${t('a11y.timerRegion')}`}
+                name={name}
+                label={`${name} · ${t('a11y.timerRegion')}`}
                 announce={side === 'A'}
               />
-              <DepletionBar
-                key={clockId}
-                ref={side === 'A' ? out.primaryBar : out.secondaryBar}
-                variant="stage"
-                allottedMs={perSide}
-                cues={ps.cues}
-                initialBand={clock?.band ?? 'normal'}
-              />
-              <p className="stage__bank s-rail-meta" data-numeric="">
+              <p className="stage__sidename">{name}</p>
+              <p className="stage__bank" data-numeric="">
                 {t('st.prepBank')}{' '}
                 <span ref={side === 'A' ? out.bankA : out.bankB}>
                   {formatTime(view.bank[side])}
@@ -631,51 +627,21 @@ function Chess({
   );
 }
 
-/** Pre-round title card. The rails already face each other; this is the announcement. */
-function Standby(): JSX.Element {
+/** Pre-round, end of round, waiting for a console, or a link that has gone quiet. */
+function Card({ k, sub }: { k: StringKey; sub: string | null }): JSX.Element {
   return (
     <div className="stage__card">
       <p className="stage__cardline">
-        <Bi k="st.preRound" />
+        <Bi k={k} />
       </p>
-    </div>
-  );
-}
-
-function Complete({ view, totalMs }: { view: RoundView; totalMs: number }): JSX.Element {
-  const { t } = useLang();
-  const showHours = longRound(totalMs);
-  return (
-    <div className="stage__card">
-      <p className="stage__cardline">
-        <Bi k="st.complete" />
-      </p>
-      <p className="stage__score s-next" data-numeric="">
-        {t('r.elapsed')} {formatTime(view.roundElapsedMs, { showHours })} · {t('r.scheduled')}{' '}
-        {formatTime(totalMs, { showHours })}
-      </p>
+      {sub === null ? null : <p className="stage__cardsub">{sub}</p>}
     </div>
   );
 }
 
 /**
- * Opened with nothing to show — a stage started before its console, or a leader that has
- * not answered yet. A legible idle card, never a crash and never a blank wall.
- */
-function Idle({ t, lost }: { t: TFn; lost: boolean }): JSX.Element {
-  return (
-    <div className="stage__card">
-      <p className="stage__cardline">
-        <Bi k={lost ? 'sg.linkLost' : 'sg.waiting'} />
-      </p>
-      <p className="stage__cardsub s-rail-meta">{t('sg.sameBrowser')}</p>
-    </div>
-  );
-}
-
-/**
- * §5.4 — the round is on HOLD. A full-stage slab, the word, and the frozen clock beneath
- * it, so a room that looks up mid-pause is told the pause is deliberate.
+ * The round is on HOLD. A full-stage slab, the word, and the frozen clock beneath it, so a
+ * room that looks up mid-pause is told the pause is deliberate.
  */
 function Hold({ view, secondsOnly }: { view: RoundView; secondsOnly: boolean }): JSX.Element {
   const frozen = view.primary?.remainingMs ?? view.clocks[0]?.remainingMs ?? 0;
@@ -693,57 +659,94 @@ function Hold({ view, secondsOnly }: { view: RoundView; secondsOnly: boolean }):
 
 /* ------------------------------------------------------------------- pieces */
 
-/** Identity colour lives here — a nameplate slab is periphery, never core. */
-function Plate({ side, title, sub }: { side: SideId; title: string; sub: string }): JSX.Element {
+/** One side's roster, as the figures the original draws facing the other team. */
+function Team({
+  side,
+  label,
+  speakers,
+  numbers,
+  speaking,
+  spoken,
+  nextId,
+  urgent,
+  overlay,
+}: {
+  side: SideId;
+  label: string;
+  speakers: readonly Speaker[];
+  numbers: ReadonlyMap<Id, number>;
+  speaking: ReadonlySet<Id>;
+  spoken: ReadonlySet<Id>;
+  nextId: Id | null;
+  urgent: boolean;
+  overlay: DebaterOverlay;
+}): JSX.Element {
+  const mine = speakers.filter((s) => s.side === side);
   return (
-    <div className="stage__plate" data-side={side}>
-      <span className="stage__platename s-name">{title}</span>
-      <span className="stage__platerole s-rail-meta">{sub}</span>
+    <div className="stage__team" data-side={side}>
+      <p className="stage__teamhead">{label}</p>
+      <div className="stage__figures">
+        {mine.map((sp, i) => {
+          const state: DebaterState = speaking.has(sp.id)
+            ? 'speaking'
+            : sp.id === nextId
+              ? 'next'
+              : spoken.has(sp.id)
+                ? 'done'
+                : 'idle';
+          return (
+            <Debater
+              key={sp.id}
+              side={side}
+              index={numbers.get(sp.id) ?? i + 1}
+              name={sp.name}
+              state={state}
+              overlay={overlay}
+              urgent={state === 'next' && urgent}
+              size="stage"
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function Rail({
-  side,
-  speakers,
-  label,
-  currentId,
-  nextId,
-  l10n,
+/**
+ * The timeline: one square pip per event in the run order, each with a tick down to the
+ * white rail, the current one green. The order is the operator's — this walks
+ * `plan.segments` verbatim and neither sorts, dedupes nor completes it.
+ */
+function Timeline({
+  plan,
+  cursor,
+  numbers,
+  t,
+  lang,
 }: {
-  side: SideId;
-  speakers: readonly Speaker[];
-  label: string;
-  currentId: string | null;
-  nextId: string | null;
-  l10n: (text: L10n | undefined) => string;
-}): JSX.Element {
-  const mine = speakers.filter((s) => s.side === side);
+  plan: { segments: readonly SegmentPlan[] };
+  cursor: number;
+  numbers: ReadonlyMap<Id, number>;
+  t: TFn;
+  lang: Lang;
+}): JSX.Element | null {
+  if (plan.segments.length === 0) return null;
   return (
-    <aside className="stage__rail" data-side={side}>
-      <p className="stage__railhead s-role">{label}</p>
-      <ol className="stage__raillist">
-        {mine.map((sp, i) => (
+    <div className="stage__timeline">
+      <ol className="stage__pips" aria-hidden="true">
+        {plan.segments.map((ps, i) => (
           <li
-            key={sp.id}
-            className="stage__railrow"
-            data-state={sp.id === currentId ? 'current' : sp.id === nextId ? 'next' : 'idle'}
+            key={ps.segId}
+            className="stage__pip"
+            lang={lang}
+            data-state={i === cursor ? 'current' : i < cursor ? 'done' : 'idle'}
           >
-            <span className="stage__railnum s-rail-meta" data-numeric="">
-              {i + 1}
-            </span>
-            <span className="stage__railbody">
-              <span className="stage__railname s-rail-name">{sp.name}</span>
-              <span className="stage__railmeta s-rail-meta" data-numeric="">
-                {sp.role ? `${l10n(sp.role)} · ` : ''}
-                {formatTime(sp.defaultMs)}
-              </span>
-            </span>
-            <span className="stage__railcaret m-nudge" aria-hidden="true" />
+            {pipLabel(ps, numbers, t)}
           </li>
         ))}
       </ol>
-    </aside>
+      <span className="stage__rail" aria-hidden="true" />
+    </div>
   );
 }
 
@@ -767,6 +770,48 @@ function Bi({ k }: { k: StringKey }): JSX.Element {
 
 /* -------------------------------------------------------------------- utils */
 
+/** `--rows` — how many figures the taller side has to stack. Never zero. */
+function rowsVar(speakers: readonly Speaker[]): CSSProperties {
+  let a = 0;
+  let b = 0;
+  for (const sp of speakers) {
+    if (sp.side === 'A') a += 1;
+    else b += 1;
+  }
+  return { '--rows': String(Math.max(1, a, b)) } as CSSProperties;
+}
+
+/** The figure numbers: each side counts from 1, in roster order. */
+function sideNumbers(speakers: readonly Speaker[]): Map<Id, number> {
+  const seen: Record<SideId, number> = { A: 0, B: 0 };
+  const out = new Map<Id, number>();
+  for (const sp of speakers) {
+    seen[sp.side] += 1;
+    out.set(sp.id, seen[sp.side]);
+  }
+  return out;
+}
+
+/** Who is holding the floor: the speech's speaker, or a shared clock's participants. */
+function speakingIds(ps: SegmentPlan | null): Set<Id> {
+  const out = new Set<Id>();
+  if (!ps) return out;
+  if (ps.speaker) out.add(ps.speaker.id);
+  else if (ps.kind === 'shared') for (const p of ps.participants) out.add(p.id);
+  return out;
+}
+
+/**
+ * `P` for prep, `F` for free debate, else the speaker's number — the original's own
+ * timeline-button label, taken from the translated phase word so it reads 备 / 自 in
+ * Chinese without a second string table.
+ */
+function pipLabel(ps: SegmentPlan, numbers: ReadonlyMap<Id, number>, t: TFn): string {
+  if (ps.kind === 'speech' && ps.speaker) return String(numbers.get(ps.speaker.id) ?? ps.index + 1);
+  if (ps.kind === 'speech') return String(ps.index + 1);
+  return Array.from(t(KIND_KEY[ps.kind]))[0] ?? String(ps.index + 1);
+}
+
 /**
  * The word beside the colour. HOLD and the cue bands outrank the transport, and `armed`
  * prints nothing at all: it is a fact about the operator's keyboard, not about the round.
@@ -781,15 +826,7 @@ function bandWord(view: RoundView, t: TFn): string {
   return '';
 }
 
-/** §5 — only a round total may roll over to H:MM:SS, and only above an hour. */
+/** Only a round total may roll over to H:MM:SS, and only above an hour. */
 function longRound(totalMs: number): boolean {
   return totalMs >= 3_600_000;
 }
-
-/** Which floor bar is lit. Speech lights its own side; chess and shared light the floor. */
-function lit(view: RoundView, ps: SegmentPlan | null, side: SideId): boolean {
-  if (view.hold || view.phase !== 'in' || !ps) return false;
-  if (ps.kind === 'chess') return view.floor === side;
-  return ps.liveSides.includes(side);
-}
-

@@ -1,579 +1,781 @@
-/* ============================================================================
-   THE CONSOLE — four bands, two rails, one core.
+/* ==========================================================================
+   THE OPERATOR CONSOLE — the Unity app's layout, on the web engine.
 
-   Tokens only: no hex, no box-shadows, no radius beyond --r-1 / --r-pill, no px
-   outside the --s-* scale (the 10px floor bar and the 4px identity tick are the
-   two figures the spec names by hand, in §3.2).
+   The original is authored against an 800x600 box with `match = 0`, so every
+   measurement below is a PROPORTION of that box rather than a pixel from it:
 
-   PERIPHERY / CORE is enforced by selector, not by discipline:
-     - `--side-*` appears only under .rail, .plate and .chess__plate;
-     - `--state-*` appears only under .core, .digits and .dbar.
-   Nothing in this file paints both on one element. The bank readout in overtime
-   uses --danger, the token for overrun figures on chrome, not --state-over.
+     Topic          (0, 193.5)      450 x 50      centred, top
+     Speakers Pro   (-300, 125)                   left row of figures
+     Speakers Con   (+300, 125)                   right row, mirrored
+     Count Down     (0, 44)         314.7 x 248.8 the radial ring, centre
+     Timeline       (15.7, -194.4)  650 x 60      squares 31.3 x 30.7, gap 2
+     Line (rail)    648 x 10 white, y = -16.7 inside Timeline
+     Next Button    (-368, 0) inside Timeline, 66.9 x 43.3
+
+   Every colour is a token. There is no hex in this file, and the palette in
+   tokens.css is the measured Unity palette, so "no hardcoded hex" and "looks
+   like the original" are the same requirement.
+
+   PERIPHERY / CORE. Identity colour (--side-a/b) paints the figures, the team
+   names and the floor bars. Clock-state colour (--state-*) paints the ring,
+   the digits and the free-debate fills. Nothing carries both.
    ========================================================================== */
 
-.console {
+.uconsole {
+  /* The ring is the screen. Everything else is sized off it. */
+  --uc-ring: clamp(168px, min(30vw, 34vh), 380px);
+  --uc-fig: clamp(52px, 9vh, 104px);
+  --uc-pip: 32px;
+
+  position: relative;
   display: grid;
-  /* 44 / 1fr / 64 / 40 — the 40px band has no token of its own, so it is built
-     out of two that do. */
-  grid-template-rows:
-    minmax(var(--row), auto)
-    minmax(0, 1fr)
-    var(--s-9)
-    minmax(calc(var(--s-9) - var(--s-6)), auto);
+  /* motion / the facing teams and the ring / timeline / transport / legend */
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   flex: 1 1 auto;
   min-height: 0;
   background: var(--bg-app);
+  overflow: hidden;
 }
 
-/* --- Band 1: the run-sheet bar ----------------------------------------- */
+/* ==========================================================================
+   Top band — the motion, centred and large, actions at the corners.
+   ========================================================================== */
 
-.bar {
+.utop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5) var(--s-3);
+}
+
+.utop__side {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.utop__side--right {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.utop__mid {
+  min-width: 0;
+  text-align: center;
+}
+
+/* Topic: 36pt in an 800-wide box, auto-sizing down to 8pt. */
+.utop__title {
+  margin: 0;
+  font-size: clamp(1.125rem, 3.2vw, 2.25rem);
+  font-weight: 600;
+  font-stretch: var(--wd-body);
+  line-height: 1.15;
+  color: var(--text-hi);
+  text-wrap: balance;
+}
+
+.utop__meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-4);
-  min-width: 0;
-  padding-inline: var(--s-4);
-  border-bottom: var(--hair);
-  background: var(--bg-panel);
-}
-
-.bar__id {
-  display: flex;
   align-items: baseline;
-  gap: var(--s-3);
-  min-width: 0;
-}
-
-.bar__title {
-  margin: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.bar__sub {
-  color: var(--text-lo);
-  white-space: nowrap;
-}
-
-.bar__seg,
-.bar__round {
-  display: flex;
-  align-items: baseline;
+  justify-content: center;
   gap: var(--s-2);
-  margin: 0;
-  color: var(--text-mid);
-  white-space: nowrap;
-}
-
-.bar__seg {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-meta);
   color: var(--text-lo);
 }
 
-.bar__roundlabel,
-.bar__slash {
-  color: var(--text-lo);
+.utop__dot,
+.utop__slash {
+  color: var(--rule-strong);
 }
 
-.bar__delta {
+.utop__round {
   display: inline-flex;
   align-items: baseline;
   gap: var(--s-2);
-  padding: 0 var(--s-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-pill);
-  color: var(--text-mid);
 }
 
-.bar__delta[data-schedule='behind'] {
+.utop__roundlabel {
+  font-size: var(--t-cap);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.utop__delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-size: var(--t-cap);
+  color: var(--text-lo);
+}
+
+.utop__delta[data-schedule='behind'] {
   color: var(--warn-ink);
-  border-color: var(--warn-ink);
 }
 
-.bar__delta[data-schedule='ahead'] {
+.utop__delta[data-schedule='ahead'] {
   color: var(--ok);
-  border-color: var(--ok);
 }
 
-/* One word per state, and only the true one is shown — colour is never alone. */
-.bar__deltaword {
+.utop__deltaword {
   display: none;
 }
 
-.bar__delta[data-schedule='on'] .bar__deltaword[data-w='on'],
-.bar__delta[data-schedule='ahead'] .bar__deltaword[data-w='ahead'],
-.bar__delta[data-schedule='behind'] .bar__deltaword[data-w='behind'] {
+.utop__delta[data-schedule='on'] .utop__deltaword[data-w='on'],
+.utop__delta[data-schedule='ahead'] .utop__deltaword[data-w='ahead'],
+.utop__delta[data-schedule='behind'] .utop__deltaword[data-w='behind'] {
   display: inline;
 }
 
-.bar__tools {
+.utop__blocked {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s-2);
-  margin-inline-start: auto;
+  margin: 0;
+  font-size: var(--t-cap);
+  color: var(--warn-ink);
 }
 
-.bar__btn,
-.bar__chip {
+.utop__link {
+  color: var(--warn-ink);
+}
+
+.utop__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  min-height: var(--s-6);
+  border: 1px solid var(--rule);
+  font-size: var(--t-cap);
+  color: var(--text-lo);
+}
+
+.utop__pip {
+  width: var(--s-3);
+  height: var(--s-3);
+  border-radius: var(--r-pill);
+  background: var(--rule-strong);
+}
+
+.utop__pip[data-live] {
+  background: var(--state-live);
+}
+
+/* ==========================================================================
+   Buttons — the original's language: a light face, a #323232 label, square
+   corners. `--lime` is the signature accent (Menu, Reload); `--green` is Next.
+   ========================================================================== */
+
+.ubtn {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
   min-height: var(--s-7);
-  padding: var(--s-1) var(--s-3);
+  padding: 0 var(--s-4);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
-  background: var(--bg-sunken);
+  border-radius: var(--r-0);
+  background: transparent;
   color: var(--text-mid);
+  font-family: inherit;
+  font-size: var(--t-cap);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
 }
 
-.bar__btn:hover {
-  color: var(--text-hi);
-  background: var(--bg-raised);
+.ubtn:hover {
+  border-color: var(--lime);
+  color: var(--lime);
 }
 
-.bar__chip {
-  border-radius: var(--r-pill);
-  color: var(--text-lo);
+.ubtn--lime {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--text-inv);
 }
 
-.bar__pip {
-  width: var(--s-3);
-  height: var(--s-3);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--r-pill);
+.ubtn--lime:hover {
+  background: var(--lime-dim);
+  border-color: var(--lime-dim);
+  color: var(--text-inv);
 }
 
-.bar__pip[data-live] {
-  background: var(--state-live);
-  border-color: var(--state-live);
+.ubtn[data-status='muted'],
+.ubtn[data-status='idle'] {
+  color: var(--warn-ink);
+  border-color: var(--warn-ink);
 }
 
-.bar__blocked {
+/* ==========================================================================
+   The main event — two teams facing each other across the ring.
+   ========================================================================== */
+
+.uconsole__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-4);
+  min-height: 0;
+  padding: 0 var(--s-5);
+}
+
+.uconsole__centre {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  flex-basis: 100%;
-  margin: 0;
-  padding-block: var(--s-2);
-  color: var(--warn-ink);
-}
-
-.bar__link {
-  color: inherit;
-  text-decoration: underline;
-}
-
-/* --- Band 2: rails + core ---------------------------------------------- */
-
-.console__body {
-  display: grid;
-  grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
-  min-height: 0;
-}
-
-.console__core {
-  position: relative;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  justify-content: center;
   min-width: 0;
-  min-height: 0;
-  border-inline: var(--hair);
 }
 
-/* --- Rails (periphery: identity colour lives here) ---------------------- */
+/* --- one team ------------------------------------------------------------ */
 
-.rail {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  background: var(--bg-panel);
-}
-
-.rail[data-side='A'] {
-  --side: var(--side-a);
-  --ink: var(--side-a-ink);
-}
-
-.rail[data-side='B'] {
-  --side: var(--side-b);
-  --ink: var(--side-b-ink);
-  flex-direction: row-reverse;
-}
-
-/* The outermost 10px column: full identity colour when that side has the floor. */
-.rail__floor {
-  flex: 0 0 10px;
-  background: var(--rule);
-}
-
-.rail__floor[data-floor='on'] {
-  background: var(--side);
-}
-
-.rail__floor[data-floor='half'] {
-  background: color-mix(in srgb, var(--side) 60%, transparent);
-}
-
-.rail__body {
+.uteam {
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
-  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--s-3);
   min-width: 0;
-  padding: var(--s-3) var(--s-3) var(--s-4);
-  overflow: hidden;
 }
 
-.rail__head {
+.uteam__name {
   margin: 0;
-  color: var(--text-mid);
+  font-size: var(--t-cap);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+  transition: color var(--d-base) var(--ease-out);
 }
 
-.rail[data-lit] .rail__head {
+.uteam[data-lit] .uteam__name {
   color: var(--text-hi);
 }
 
-.rail__floorword {
-  margin: 0;
-  color: var(--text-mid);
+/* The floor bar: the one place a side's identity colour appears as a field. */
+.uteam__floor {
+  width: min(100%, 220px);
+  height: var(--s-2);
+  background: var(--rule);
+  transition:
+    background var(--d-base) var(--ease-out),
+    opacity var(--d-base) var(--ease-out);
 }
 
-.rail__list {
+.uteam[data-side='A'] .uteam__floor[data-floor='on'],
+.uteam[data-side='A'] .uteam__floor[data-floor='half'] {
+  background: var(--side-a);
+}
+
+.uteam[data-side='B'] .uteam__floor[data-floor='on'],
+.uteam[data-side='B'] .uteam__floor[data-floor='half'] {
+  background: var(--side-b);
+}
+
+.uteam__floor[data-floor='half'] {
+  opacity: 0.45;
+}
+
+/* The gap is set off the figure, not off the space scale: the speech bubble and
+   the next arrow are positioned in the sprite's own units and hang outboard of
+   the figure they belong to, so the room between figures has to scale with it. */
+.uteam__figs {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--s-4) calc(var(--uc-fig) * 0.5);
   margin: 0;
-  padding: 0;
+  /* Headroom for the speech bubble, which sits above the head. */
+  padding: calc(var(--uc-fig) * 0.4) 0 0;
   list-style: none;
 }
 
-.rail__row {
-  display: flex;
-  min-height: var(--row);
+/* The con side is mirrored, so its first speaker sits at the outer edge too. */
+.uteam[data-side='B'] .uteam__figs {
+  flex-direction: row-reverse;
 }
 
-.rail__bank {
+.uteam__fig {
   display: flex;
+}
+
+/* `<Debater>` lays a figure and its name out as a row; a team row wants a column,
+   so the figures line up and the names sit under them. */
+.uteam .udeb {
+  --fig-h: var(--uc-fig);
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--s-2);
+  text-align: center;
+  /* The speech / thought bubble hangs 257% of the figure's width outboard, so the
+     row has to be spaced off the figure size, not off the spacing scale, or the
+     overlays collide with the next speaker. */
+  margin-inline: calc(var(--uc-fig) * 0.16);
+}
+
+.uteam .udeb__name {
+  max-width: 11ch;
+  font-size: var(--t-meta);
+}
+
+.uteam__bank {
+  display: flex;
+  align-items: baseline;
   gap: var(--s-3);
-  min-height: var(--row);
-  margin-top: auto;
-  padding: var(--s-2) var(--s-3);
+  min-height: var(--s-7);
+  padding: 0 var(--s-4);
   border: 1px solid var(--rule);
-  border-radius: var(--r-1);
-  background: var(--bg-sunken);
+  border-radius: var(--r-0);
+  background: transparent;
   color: var(--text-mid);
-  text-align: start;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
 }
 
-.rail__bank:hover {
-  color: var(--text-hi);
+.uteam__bank:hover {
   border-color: var(--rule-strong);
-}
-
-.rail__bank[data-drawing] {
-  border-color: var(--side);
   color: var(--text-hi);
 }
 
-/* An overdrawn bank is chrome, not core: --danger is the token for overrun
-   figures. The leading `+` carries the same fact without colour. */
-.rail__bank[data-over] .rail__banktime {
+.uteam__bank[data-drawing] {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.uteam__banklabel {
+  font-size: var(--t-cap);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.uteam__banktime {
+  font-size: var(--t-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.uteam__bank[data-over] .uteam__banktime {
   color: var(--danger);
 }
 
-/* --- Plates (periphery) -------------------------------------------------- */
+/* ==========================================================================
+   The core — the ring, and what it is counting.
+   ========================================================================== */
 
-.plate {
+.ucore {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.ucore__ring {
+  display: flex;
+}
+
+/* The ring's own size class caps at 380px; the console drives it from --uc-ring. */
+.ucore__ring .uring--console {
+  width: var(--uc-ring);
+}
+
+/* The time sits INSIDE the ring, so it is sized off the ring rather than the
+   viewport: 5 glyphs of a 0.2 * diameter face clear the 0.76 * diameter bore. */
+.ucore__ring .digits--console .digits__figure {
+  font-size: calc(var(--uc-ring) * 0.2);
+}
+
+.ucore[data-armed] .digits {
+  opacity: 0.72;
+}
+
+.ucore__static {
+  font-size: calc(var(--uc-ring) * 0.2);
+  font-weight: 700;
+  font-stretch: var(--wd-time);
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: var(--text-lo);
+}
+
+.ucore__caption {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--s-2);
   min-width: 0;
-}
-
-.plate--rail {
-  flex: 1 1 auto;
-  padding: var(--s-2) var(--s-3);
-  border-inline-start: var(--s-2) solid transparent;
-  color: var(--text-mid);
-}
-
-.plate--rail[data-mirror] {
-  flex-direction: row-reverse;
-  border-inline-start: 0;
-  border-inline-end: var(--s-2) solid transparent;
-  text-align: end;
-}
-
-.plate--rail[data-state='ondeck'],
-.plate--rail[data-state='spoken'] {
-  color: var(--text-hi);
-}
-
-.plate--rail[data-state='spoken'] {
-  color: var(--text-lo);
-}
-
-/* The row of whoever is on the clock inverts to solid identity colour with
-   auto-ink, plus a 4px tick on the rail's outer edge. A filled rectangle reads
-   at ten feet; the original's 20px speech-bubble icon did not. */
-.plate--rail[data-state='speaking'] {
-  background: var(--side);
-  color: var(--ink);
-  border-inline-start-color: var(--side);
-}
-
-.plate--rail[data-state='speaking'][data-mirror] {
-  border-inline-end-color: var(--side);
-}
-
-.plate__mark {
-  display: inline-flex;
-  flex: 0 0 var(--s-5);
-  justify-content: center;
-}
-
-.plate__ord {
-  flex: 0 0 auto;
-  min-width: 1.25em;
-  color: inherit;
-  opacity: 0.7;
-}
-
-.plate__name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: var(--t-row);
-  font-weight: 500;
-}
-
-.plate__time {
-  flex: 0 0 auto;
-}
-
-.plate--plate {
-  gap: var(--s-4);
-  padding: var(--s-3) var(--s-5);
-  border-radius: var(--r-0);
-  background: var(--side);
-  color: var(--ink);
-}
-
-.plate--plate[data-side='A'] {
-  --side: var(--side-a);
-  --ink: var(--side-a-ink);
-}
-
-.plate--plate[data-side='B'] {
-  --side: var(--side-b);
-  --ink: var(--side-b-ink);
-}
-
-.plate--plate .plate__name {
-  font-size: var(--t-name);
-  font-weight: 600;
-}
-
-.plate--plate .plate__role {
-  flex: 0 0 auto;
-  color: inherit;
-  opacity: 0.82;
-}
-
-/* --- Core (state colour lives here; identity colour never does) ---------- */
-
-.core {
-  display: grid;
-  align-content: center;
-  gap: var(--s-5);
-  min-width: 0;
-  min-height: 0;
-  padding: var(--s-5);
-}
-
-.core--card {
-  justify-items: center;
   text-align: center;
 }
 
-.core__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-4);
-  min-width: 0;
-}
-
-.core__label {
+.ucore__name {
   margin: 0;
-  color: var(--text-mid);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font-size: var(--t-name);
+  font-weight: 600;
+  color: var(--text-hi);
+  text-wrap: balance;
 }
 
-.core__status {
-  flex: 0 0 auto;
-  padding: 0 var(--s-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-pill);
-  color: var(--text-mid);
-}
-
-.core__status[data-transport='running'] {
-  color: var(--state-live);
-  border-color: var(--state-live);
-}
-
-.core__status[data-band='warning'] {
-  color: var(--state-warn);
-  border-color: var(--state-warn);
-}
-
-.core__status[data-band='final10'] {
-  color: var(--state-final);
-  border-color: var(--state-final);
-}
-
-.core__status[data-band='over'] {
-  color: var(--state-over);
-  border-color: var(--state-over);
-}
-
-.core__clock {
+.ucore__label {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: center;
-  min-width: 0;
+  gap: var(--s-3);
+  margin: 0;
+  font-size: var(--t-cap);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mid);
 }
 
-/* ARMED is loud: the digits sit back, the bar is full and static, and the state
-   word beside the label says so in so many words. */
-.core[data-armed] .digits {
+.ucore__status {
+  color: var(--text-lo);
+}
+
+.ucore__status[data-transport='running'] {
+  color: var(--state-live);
+}
+
+.ucore__status[data-band='warning'],
+.ucore__status[data-band='final10'] {
+  color: var(--state-warn);
+}
+
+.ucore__status[data-band='over'] {
+  color: var(--state-over);
+}
+
+.ucore__prompt {
+  margin: 0;
+  font-size: var(--t-ctl);
+  color: var(--lime);
+}
+
+.ucore__next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--s-3);
+  margin: 0;
+  font-size: var(--t-ctl);
+  color: var(--text-mid);
+}
+
+.ucore__nextlabel {
+  font-size: var(--t-cap);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+
+.ucore__nextname {
+  color: var(--text-hi);
+}
+
+.ucore__nextrole,
+.ucore__next [data-numeric] {
+  font-size: var(--t-meta);
+  color: var(--text-lo);
+}
+
+.ucore__next[data-urgent] .ucore__nextname {
+  color: var(--lime);
+}
+
+/* ==========================================================================
+   Free debate — the original's two vertical bars, `Line 1_0` filled from the
+   bottom, 20 x 200 at reference scale, with the Swap control between them.
+   ========================================================================== */
+
+.ucore--chess {
+  gap: var(--s-5);
+}
+
+.uchess {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(var(--s-4), 4vw, var(--s-9));
+}
+
+.ubar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.ubar__name {
+  font-size: var(--t-cap);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+
+.ubar[data-side='A'][data-live] .ubar__name {
+  color: var(--side-a);
+}
+
+.ubar[data-side='B'][data-live] .ubar__name {
+  color: var(--side-b);
+}
+
+/* 20 x 200 at 800x600 → a bar one tenth as wide as it is tall. */
+.ubar__track {
+  position: relative;
+  display: block;
+  width: calc(var(--uc-ring) * 0.1);
+  height: var(--uc-ring);
+  background: var(--ring-track);
+  overflow: hidden;
+}
+
+/* fillOrigin: Bottom. */
+.ubar__fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: var(--state-normal);
+  transition: background var(--d-swell) var(--ease-out);
+}
+
+.ubar[data-ring='warn'] .ubar__fill {
+  background: var(--state-warn);
+}
+
+.ubar[data-ring='over'] .ubar__track {
+  background: var(--ring-track-over);
+}
+
+.ubar[data-ring='over'] .ubar__fill {
+  background: var(--state-over);
+}
+
+/* The idle side says so three ways: smaller, dimmer, and labelled in words. */
+.ubar:not([data-live]) .ubar__track,
+.ubar:not([data-live]) .ubar__digits {
+  opacity: 0.55;
+}
+
+.ubar__digits .digits__figure {
+  font-size: calc(var(--uc-ring) * 0.14);
+}
+
+.ubar__word {
+  font-size: var(--t-cap);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-lo);
+}
+
+.uchess__mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(var(--uc-ring) * 0.28);
+  min-height: calc(var(--uc-ring) * 0.4);
+}
+
+.uchess__swap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--green);
+  border-radius: var(--r-0);
+  background: transparent;
+  color: var(--green);
+  font-family: inherit;
+  font-size: var(--t-cap);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
+}
+
+.uchess__swap:hover {
+  background: var(--green);
+  color: var(--text-inv);
+}
+
+/* The `Swap Icon` sprite, tinted the way Unity tints an Image. */
+.uchess__swapicon {
+  width: calc(var(--uc-ring) * 0.16);
+  height: calc(var(--uc-ring) * 0.15);
+  background-color: currentColor;
+  mask: url('../assets/icons/swap.png') center / contain no-repeat;
+}
+
+/* ==========================================================================
+   The timeline strip — squares over a white rail, Next at the left end.
+   ========================================================================== */
+
+.tline {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5) var(--s-4);
+}
+
+/* Next Button: 66.9 x 43.3, `--green` fill, a #323232 double chevron. */
+.tline__next {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+  min-height: calc(var(--uc-pip) + var(--s-3));
+  padding: 0 var(--s-4);
+  border: 0;
+  border-radius: var(--r-0);
+  background: var(--green);
+  color: var(--text-inv);
+  font-family: inherit;
+  font-size: var(--t-cap);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out);
+}
+
+.tline__next:hover:not(:disabled) {
+  background: var(--green-2);
+}
+
+.tline__next:disabled {
+  background: var(--bg-raised);
+  color: var(--text-lo);
+  cursor: default;
+}
+
+.tline__chev {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Two chevrons, overlapped into the original's double arrow. */
+.tline__chev > :last-child {
+  margin-inline-start: -0.5em;
+}
+
+.tline__strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.tline__pips {
+  display: flex;
+  align-items: flex-end;
+  /* HorizontalLayoutGroup, spacing 2. */
+  gap: var(--s-1);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+/* 31.3 x 30.7 — a square, white face, #323232 label. */
+.tline__pip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--uc-pip);
+  height: var(--uc-pip);
+  background: var(--pip-idle);
+  color: var(--pip-ink);
+  border-radius: var(--r-0);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    opacity var(--d-fast) var(--ease-out);
+}
+
+.tline__pip[data-state='done'] {
   opacity: 0.4;
 }
 
-.core__plates {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--s-3);
+.tline__pip[data-state='current'] {
+  background: var(--pip-current);
 }
 
-.core__neutral,
-.core__motion,
-.core__hint {
-  margin: 0;
-  color: var(--text-mid);
+.tline__pip[data-selected] {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
-.core__motion {
-  color: var(--text-hi);
+/* Consumption, painted by the frame loop — the live square fills from the bottom. */
+.tline__fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background: var(--pip-ink);
+  opacity: 0.16;
+  pointer-events: none;
 }
 
-.core__ondeck {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--s-3);
-  margin: 0;
-  color: var(--text-mid);
+.tline__mark {
+  position: relative;
+  font-size: var(--t-meta);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.core__ondecklabel {
-  color: var(--text-lo);
+/* The 10 x 3 tick below the square, carrying that segment's identity colour. */
+.tline__tick {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 10px;
+  height: 3px;
+  margin-inline-start: -5px;
+  background: var(--pip-edge, transparent);
 }
 
-.core__ondeckname {
-  color: var(--text-hi);
-  font-weight: 600;
+/* `Line`: 648 x 10 white, under the squares. */
+.tline__rail {
+  display: block;
+  height: var(--s-2);
+  background: var(--pip-idle);
+  opacity: 0.85;
 }
 
-.core__ondeck[data-urgent] .core__ondeckname {
-  color: var(--state-over);
-}
-
-/* --- Chess core ---------------------------------------------------------- */
-
-.core--chess {
-  align-content: center;
-}
-
-.chess {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-6);
-  min-width: 0;
-}
-
-.chess__side {
-  display: grid;
-  gap: var(--s-3);
-  min-width: 0;
-  transform-origin: top center;
-  transition: opacity var(--d-fast) var(--ease-out);
-}
-
-/* The idle side says it three ways at once: smaller, desaturated, and in words. */
-.chess__side[data-idle] {
-  transform: scale(0.82);
-  filter: saturate(0.3);
-  opacity: 0.7;
-}
-
-.chess__plate {
-  margin: 0;
-  padding: var(--s-2) var(--s-3);
-  text-align: center;
-}
-
-.chess__plate[data-side='A'] {
-  background: var(--side-a);
-  color: var(--side-a-ink);
-}
-
-.chess__plate[data-side='B'] {
-  background: var(--side-b);
-  color: var(--side-b-ink);
-}
-
-.chess__digits {
-  display: flex;
-  justify-content: center;
-}
-
-.chess__digits .digits--console .digits__figure {
-  font-size: calc(var(--t-clock) * 0.6);
-}
-
-.chess__word {
-  margin: 0;
-  color: var(--text-lo);
-  text-align: center;
-}
-
-.chess__floor {
-  margin: 0;
-  color: var(--text-mid);
-  text-align: center;
-}
-
-/* --- Transport ----------------------------------------------------------- */
+/* ==========================================================================
+   Transport — the original's buttons: light faces, dark labels, square corners.
+   ========================================================================== */
 
 .transport {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-4);
-  padding: var(--s-3) var(--s-4);
-  border-top: var(--hair);
-  background: var(--bg-panel);
+  gap: var(--s-3);
+  padding: 0 var(--s-5) var(--s-3);
 }
 
 .transport__main,
@@ -592,116 +794,130 @@
 .tbtn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: var(--s-2);
-  min-height: var(--row);
-  min-width: var(--row);
-  padding: var(--s-2) var(--s-4);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--r-1);
-  background: var(--bg-raised);
-  color: var(--text-hi);
+  min-height: var(--s-8);
+  padding: 0 var(--s-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-0);
+  background: var(--pip-idle);
+  color: var(--pip-ink);
+  font-family: inherit;
   font-size: var(--t-ctl);
-  font-weight: 500;
-  white-space: nowrap;
-  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    opacity var(--d-fast) var(--ease-out);
 }
 
 .tbtn:hover:not(:disabled) {
-  background: var(--bg-sunken);
+  background: var(--lime);
 }
 
 .tbtn:disabled {
-  color: var(--text-lo);
-  border-color: var(--rule);
-  background: var(--bg-panel);
+  opacity: 0.35;
+  cursor: default;
 }
 
 .tbtn--primary {
-  background: var(--text-hi);
-  border-color: var(--text-hi);
+  background: var(--lime);
   color: var(--text-inv);
 }
 
 .tbtn--primary:hover:not(:disabled) {
-  background: var(--text-mid);
-  border-color: var(--text-mid);
-}
-
-.tbtn--primary .keycap {
-  background: transparent;
-  color: var(--text-inv);
-  border-color: color-mix(in srgb, var(--text-inv) 40%, transparent);
+  background: var(--green);
 }
 
 .tbtn__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.holdbtn.tbtn--hold {
-  gap: var(--s-2);
   white-space: nowrap;
 }
 
-/* --- Undo chip ----------------------------------------------------------- */
+/* Keycaps sit on a light face here, so they invert. */
+.tbtn .keycap {
+  border-color: color-mix(in srgb, var(--pip-ink) 30%, transparent);
+  background: transparent;
+  color: var(--pip-ink);
+}
+
+/* The aux row is the same family, one step quieter and smaller. */
+.transport__aux .tbtn {
+  min-height: var(--s-7);
+  font-size: var(--t-cap);
+  background: var(--bg-raised);
+  color: var(--text-hi);
+}
+
+.transport__aux .tbtn:hover:not(:disabled) {
+  background: var(--lime);
+  color: var(--text-inv);
+}
+
+.transport__aux .tbtn .keycap {
+  border-color: var(--rule-strong);
+  color: var(--text-mid);
+}
+
+.holdbtn.tbtn--hold {
+  min-height: var(--s-7);
+  border-radius: var(--r-0);
+  background: var(--bg-raised);
+  font-size: var(--t-cap);
+}
+
+/* ==========================================================================
+   Undo chip — feedback after an advance, never a confirmation dialog.
+   ========================================================================== */
 
 .undochip {
-  /* An absolutely positioned grid child only honours `grid-row` once one inset is
-     non-auto; with all four auto it falls back to its static position, which put the
-     chip on top of the transport row. Pinning `bottom` makes row 1 the containing
-     block, so the chip floats just above the controls instead of covering them. */
   position: absolute;
-  grid-row: 1;
-  inset-inline: 0;
-  bottom: var(--s-3);
-  z-index: 2;
-  width: fit-content;
-  margin-inline: auto;
+  left: 50%;
+  bottom: calc(var(--s-10) + var(--s-6));
+  z-index: 6;
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--r-pill);
-  background: var(--bg-raised);
-  color: var(--text-mid);
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  border: 1px solid var(--lime);
+  border-radius: var(--r-0);
+  background: var(--bg-panel);
+  transform: translateX(-50%);
+}
+
+.undochip__text {
+  font-size: var(--t-meta);
+  color: var(--text-hi);
 }
 
 .undochip__btn {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
-  min-height: var(--s-7);
+  min-height: var(--s-6);
   padding: 0 var(--s-3);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--r-pill);
-  color: var(--text-hi);
+  border: 0;
+  border-radius: var(--r-0);
+  background: var(--lime);
+  color: var(--text-inv);
+  font-family: inherit;
+  font-size: var(--t-cap);
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .undochip__btn:hover {
-  background: var(--bg-sunken);
+  background: var(--green);
 }
 
-/* --- Band 3: the Ribbon -------------------------------------------------- */
-
-.console__ribbon {
-  display: flex;
-  align-items: center;
-  padding: var(--s-2) var(--s-4);
-  border-top: var(--hair);
-  background: var(--bg-panel);
-}
-
-/* --- Band 4: the permanent keycap legend --------------------------------- */
+/* ==========================================================================
+   Keycap legend — permanently visible, context-sensitive, never a lie.
+   ========================================================================== */
 
 .keylegend {
   display: flex;
   align-items: center;
-  min-height: calc(var(--s-9) - var(--s-6));
-  padding: var(--s-2) var(--s-4);
-  border-top: var(--hair);
-  background: var(--bg-app);
+  min-height: var(--s-7);
+  padding: var(--s-2) var(--s-5) var(--s-3);
   overflow: hidden;
 }
 
@@ -722,10 +938,13 @@
 }
 
 .keylegend__text {
+  font-size: var(--t-cap);
   color: var(--text-lo);
 }
 
-/* --- M6: the on-deck caret nudge ---------------------------------------- */
+/* ==========================================================================
+   M6 — the on-deck caret nudge, kept for anything outside the Unity figures.
+   ========================================================================== */
 
 @keyframes dt-nudge {
   0%,
@@ -741,44 +960,62 @@
   animation: dt-nudge var(--d-nudge) var(--ease-nudge) infinite;
 }
 
-/* --- Responsive ----------------------------------------------------------
-   1180px: the rails narrow. 900px: they collapse to their floor bars and the
-   transport becomes a row of large targets — deliberately reduced, not a
-   cramped port. Nothing scrolls sideways at any width. ------------------- */
+/* ==========================================================================
+   Responsive. The three-column facing layout survives to 720px; below that the
+   ring takes the full width and the two teams face each other under it. There
+   is no horizontal scroll at any width — only the pip strip scrolls, alone.
+   ========================================================================== */
 
-@media (max-width: 1180px) {
-  .console__body {
-    grid-template-columns: 200px minmax(0, 1fr) 200px;
+@media (max-width: 1080px) {
+  .uconsole {
+    --uc-fig: clamp(48px, 8vh, 76px);
   }
 
-  .plate__time {
-    display: none;
+  .uteam .udeb__name {
+    max-width: 8ch;
+    font-size: var(--t-cap);
   }
 }
 
-@media (max-width: 900px) {
-  .console {
-    grid-template-rows: auto minmax(0, 1fr) var(--s-9);
+@media (max-width: 720px) {
+  .uconsole {
+    --uc-ring: clamp(150px, 46vw, 260px);
+    --uc-fig: clamp(40px, 7vh, 64px);
+    --uc-pip: 28px;
+    /* Below this width the bands stop competing for a fixed viewport and the
+       console scrolls as one column instead. */
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    overflow-y: auto;
   }
 
-  .console__body {
-    grid-template-columns: 10px minmax(0, 1fr) 10px;
+  .uconsole__stage {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-content: start;
+    gap: var(--s-4) var(--s-3);
+    padding: 0 var(--s-4);
   }
 
-  .rail__body {
-    display: none;
+  .uconsole__centre {
+    grid-column: 1 / -1;
+    grid-row: 1;
   }
 
-  .rail__floor {
-    flex: 1 1 auto;
+  .utop {
+    padding: var(--s-3) var(--s-4);
+  }
+
+  .utop__meta {
+    justify-content: center;
+  }
+
+  .tline,
+  .transport {
+    padding-inline: var(--s-4);
   }
 
   .keylegend {
     display: none;
-  }
-
-  .transport {
-    gap: var(--s-2);
   }
 
   .transport__aux {
@@ -788,6 +1025,7 @@
   .tbtn,
   .transport .holdbtn {
     flex: 1 1 auto;
+    justify-content: center;
     min-height: 56px;
   }
 
@@ -795,18 +1033,25 @@
     display: none;
   }
 
-  .chess {
-    gap: var(--s-3);
+  .undochip {
+    left: var(--s-4);
+    right: var(--s-4);
+    bottom: var(--s-4);
+    transform: none;
+    justify-content: space-between;
   }
 }
 
-@media (max-width: 640px) {
-  .bar__seg,
-  .bar__sub {
+@media (max-width: 460px) {
+  .utop__side--left,
+  .utop__sub,
+  .utop__round,
+  .tline__nextlabel,
+  .ucore__nextrole {
     display: none;
   }
 
-  .core__ondeckrole {
+  .uteam .udeb__name {
     display: none;
   }
 }
@@ -819,8 +1064,8 @@
 }
 
 @media (prefers-contrast: more) {
-  .plate--rail[data-state='ondeck'] {
-    outline: 1px solid var(--rule-strong);
-    outline-offset: calc(-1 * var(--s-1));
+  .tline__pip {
+    outline: 1px solid var(--pip-ink);
+    outline-offset: -1px;
   }
 }
