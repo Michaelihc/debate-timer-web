@@ -302,6 +302,14 @@ export default function Stage(): JSX.Element {
             : `${t('r.segmentOf', { i: view.cursor + 1, n: view.segmentCount })}${
                 ps ? ` · ${t(KIND_KEY[ps.kind])}` : ''
               }`}
+          {bandWord(view, t) ? (
+            <>
+              {' · '}
+              <span className="stage__statusword" data-band={view.band}>
+                {bandWord(view, t)}
+              </span>
+            </>
+          ) : null}
         </span>
         {/* Topic — the one thing the original prints large at the top of the canvas. */}
         <h2 className="stage__title">{l10n(config.title)}</h2>
@@ -387,9 +395,6 @@ export default function Stage(): JSX.Element {
         </p>
       ) : null}
 
-      {/* Colour is never the only channel: the state always carries a word. Never an
-          operator's word, though — nobody in the room can press Space. */}
-      <p className="stage__status">{bandWord(view, t)}</p>
 
       {/* flash.anim, mounted last so it sits over everything the room is watching. */}
       <span ref={flash} className="u-flash" aria-hidden="true" />

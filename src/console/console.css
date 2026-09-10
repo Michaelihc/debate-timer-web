@@ -29,8 +29,9 @@
 
   position: relative;
   display: grid;
-  /* motion / the facing teams and the ring / timeline / transport / legend */
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  /* motion / the facing teams and the ring / the pip strip. Nothing else: the
+     original's bottom band is a Next button, the pips and a rail, full stop. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
   flex: 1 1 auto;
   min-height: 0;
   background: var(--bg-app);
@@ -223,17 +224,21 @@
 
 .uconsole__stage {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--s-5);
   min-height: 0;
-  padding: 0 var(--s-5);
+  padding: 0 var(--s-6);
 }
 
+/* The ring and, directly under it, the transport — the original puts Pause and
+   Reset here rather than in a band along the bottom. */
 .uconsole__centre {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--s-5);
   min-width: 0;
 }
 
@@ -288,43 +293,39 @@
 /* The gap is set off the figure, not off the space scale: the speech bubble and
    the next arrow are positioned in the sprite's own units and hang outboard of
    the figure they belong to, so the room between figures has to scale with it. */
+/* `Speakers Pro` carries a VerticalLayoutGroup, and its children land 69.8 apart
+   on a 67.8-tall figure — a column, nearly touching. Rendering the real scene is
+   what settled this; the anchor rect alone did not. The gap here is a little more
+   generous than 2/67.8 so the speech bubble has somewhere to go. */
 .uteam__figs {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: center;
-  gap: var(--s-4) calc(var(--uc-fig) * 0.5);
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--uc-fig) * 0.46);
   margin: 0;
-  /* Headroom for the speech bubble, which sits above the head. */
-  padding: calc(var(--uc-fig) * 0.4) 0 0;
+  padding: calc(var(--uc-fig) * 0.34) 0 0;
   list-style: none;
 }
 
 /* The con side is mirrored, so its first speaker sits at the outer edge too. */
 .uteam[data-side='B'] .uteam__figs {
-  flex-direction: row-reverse;
+  align-items: stretch;
 }
 
 .uteam__fig {
   display: flex;
 }
 
-/* `<Debater>` lays a figure and its name out as a row; a team row wants a column,
-   so the figures line up and the names sit under them. */
+/* A column of [figure][name] rows, name inboard, so the outboard slot stays free
+   for the next arrow and the prep clipboard. */
 .uteam .udeb {
   --fig-h: var(--uc-fig);
-  flex-direction: column;
   align-items: center;
-  gap: var(--s-2);
-  text-align: center;
-  /* The speech / thought bubble hangs 257% of the figure's width outboard, so the
-     row has to be spaced off the figure size, not off the spacing scale, or the
-     overlays collide with the next speaker. */
-  margin-inline: calc(var(--uc-fig) * 0.16);
+  gap: var(--s-3);
 }
 
 .uteam .udeb__name {
-  max-width: 11ch;
+  max-width: 9ch;
   font-size: var(--t-meta);
 }
 
@@ -770,12 +771,14 @@
    Transport — the original's buttons: light faces, dark labels, square corners.
    ========================================================================== */
 
+/* Under the ring, as in the original: a stacked pair of rows rather than a band
+   spanning the window. The primary pair is loud; everything else recedes. */
 .transport {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
   gap: var(--s-3);
-  padding: 0 var(--s-5) var(--s-3);
+  padding: 0;
 }
 
 .transport__main,
@@ -787,8 +790,9 @@
   min-width: 0;
 }
 
+.transport__main,
 .transport__aux {
-  margin-inline-start: auto;
+  justify-content: center;
 }
 
 .tbtn {
@@ -811,7 +815,7 @@
 }
 
 .tbtn:hover:not(:disabled) {
-  background: var(--lime);
+  background: var(--green-2);
 }
 
 .tbtn:disabled {
@@ -820,12 +824,17 @@
 }
 
 .tbtn--primary {
-  background: var(--lime);
+  background: var(--btn-run);
   color: var(--text-inv);
 }
 
 .tbtn--primary:hover:not(:disabled) {
-  background: var(--green);
+  background: color-mix(in srgb, var(--btn-run) 82%, white);
+}
+
+.tbtn--hold {
+  background: var(--btn-reset);
+  color: var(--text-inv);
 }
 
 .tbtn__label {
@@ -841,15 +850,25 @@
 
 /* The aux row is the same family, one step quieter and smaller. */
 .transport__aux .tbtn {
-  min-height: var(--s-7);
+  min-height: var(--s-6);
+  padding: 0 var(--s-3);
   font-size: var(--t-cap);
-  background: var(--bg-raised);
-  color: var(--text-hi);
+  font-weight: 500;
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--text-lo);
 }
 
 .transport__aux .tbtn:hover:not(:disabled) {
-  background: var(--lime);
-  color: var(--text-inv);
+  background: var(--bg-raised);
+  border-color: var(--rule-strong);
+  color: var(--text-hi);
+}
+
+.transport__aux .tbtn--hold {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--btn-reset) 55%, transparent);
+  color: var(--btn-reset);
 }
 
 .transport__aux .tbtn .keycap {

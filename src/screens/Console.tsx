@@ -43,7 +43,6 @@ import '../ui/unity/unity.css';
 
 import type { ChessSideView } from '../console/ChessBars';
 import { ChessBars } from '../console/ChessBars';
-import { KeyLegend } from '../console/KeyLegend';
 import { RingCore } from '../console/RingCore';
 import type { FloorLevel } from '../console/Teams';
 import { TeamColumn } from '../console/Teams';
@@ -526,7 +525,34 @@ export default function Console(): JSX.Element {
           onDrawBank={() => dispatch({ t: 'BANK_DRAW', side: 'A' })}
         />
 
-        <div className="uconsole__centre">{core}</div>
+        <div className="uconsole__centre">
+          {core}
+
+          <Transport
+        phase={view.phase}
+        transport={view.transport}
+        hold={view.hold}
+        chess={isChess}
+        canStart={canStart}
+        sideLabels={sideLabels}
+        canPrev={state.cursor > 0}
+        canUndo={view.canUndo}
+        canRedo={view.canRedo}
+        resetProgress={resetProgress}
+        on={{
+          toggle: () => dispatch({ t: 'TOGGLE' }),
+          togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
+          advance: () => doAdvance(),
+          prev: () => dispatch({ t: 'PREV' }),
+          reset: () => dispatch({ t: 'RESET_SEGMENT' }),
+          hold: () => dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' }),
+          adjust,
+          floor: (side) => dispatch({ t: 'GIVE_FLOOR', side }),
+          undo: () => undo(),
+          redo: () => redo(),
+        }}
+          />
+        </div>
 
         <TeamColumn
           side="B"
@@ -559,32 +585,7 @@ export default function Console(): JSX.Element {
         colors={{ A: config.sides[0].color, B: config.sides[1].color }}
       />
 
-      <Transport
-        phase={view.phase}
-        transport={view.transport}
-        hold={view.hold}
-        chess={isChess}
-        canStart={canStart}
-        sideLabels={sideLabels}
-        canPrev={state.cursor > 0}
-        canUndo={view.canUndo}
-        canRedo={view.canRedo}
-        resetProgress={resetProgress}
-        on={{
-          toggle: () => dispatch({ t: 'TOGGLE' }),
-          togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
-          advance: () => doAdvance(),
-          prev: () => dispatch({ t: 'PREV' }),
-          reset: () => dispatch({ t: 'RESET_SEGMENT' }),
-          hold: () => dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' }),
-          adjust,
-          floor: (side) => dispatch({ t: 'GIVE_FLOOR', side }),
-          undo: () => undo(),
-          redo: () => redo(),
-        }}
-      />
 
-      <KeyLegend chess={isChess} swap={swapAllowed} />
 
       <UndoChip
         name={advancedTo}

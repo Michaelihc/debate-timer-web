@@ -201,7 +201,9 @@
 .stage__figures {
   display: flex;
   flex-direction: column;
-  gap: max(6px, calc(16 * var(--u)));
+  gap: max(14px, calc(var(--fig) * 0.42));
+  /* Headroom for the first bubble, which would otherwise sit on the team name. */
+  padding-block-start: calc(var(--fig) * 0.5);
   min-width: 0;
   min-height: 0;
 }
@@ -525,12 +527,12 @@
 
 /* --- Status: never colour alone ----------------------------------------- */
 
-.stage__status,
 .stage__lost {
   position: absolute;
-  /* Clear the timeline strip. Pinned to `--pad-y` alone these sat underneath it and the
+  /* Clear the timeline strip: pinned to `--pad-y` alone these sat under it and the
      rail drew straight through the word. */
-  bottom: calc(var(--pad-y) + var(--ribbon-h) + var(--gap));
+  top: auto;
+  bottom: max(64px, calc(var(--pad-y) + 88 * var(--u)));
   display: flex;
   align-items: center;
   gap: max(5px, calc(8 * var(--u)));
@@ -539,12 +541,20 @@
   pointer-events: none;
 }
 
-.stage__status {
-  inset-inline-start: var(--pad-x);
+/* Colour is never the only channel: the state always carries a word, inline with the
+   segment counter. Never an operator's word, though — nobody in the room can press
+   Space. */
+.stage__statusword {
+  color: var(--stage-ink);
 }
 
-.stage__status:empty {
-  display: none;
+.stage__statusword[data-band='warning'],
+.stage__statusword[data-band='final10'] {
+  color: var(--state-warn);
+}
+
+.stage__statusword[data-band='over'] {
+  color: var(--state-over);
 }
 
 .stage__lost {

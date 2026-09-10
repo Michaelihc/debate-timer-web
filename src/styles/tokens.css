@@ -32,6 +32,10 @@
   --lime-dim: #8FCB43;
   --green: #6AEF8B;         /* the Next button */
   --green-2: #66E686;
+  /* Straight off the rendered scene: the transport pair under the ring is a blue
+     Pause and a coral Reset. Lime is reserved for Menu / Reload, green for Next. */
+  --btn-run: #5E95FF;
+  --btn-reset: #FF625E;
   --ok: #5EFFA0;
   --danger: #FF3A35;
   --warn-ink: #FFD15E;
@@ -174,6 +178,8 @@
   --danger: #9B2C1B;
   --warn-ink: #7A5600;
 
+  --btn-run: #2C5FA8;
+  --btn-reset: #A33B36;
   --lime: #6F9B2E;
   --lime-dim: #557726;
   --green: #2C8F4E;
