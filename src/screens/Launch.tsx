@@ -1,16 +1,18 @@
 /**
  * LAUNCH `#/` — cold URL to a running round in well under a minute.
  *
- * The order of the page is the order of the operator's urgency:
+ * The header says, before anything is chosen, that nothing leaves this browser. Below it,
+ * the order of the page is the order of the operator's urgency:
  *   1. an interrupted live round (< 8h) — losing your place mid-round is the one
- *      failure this app may never commit, so the offer sits above everything,
+ *      failure this app may never commit, so the offer sits above everything — and
+ *      beside it any editor changes a closed tab never applied,
  *   2. the seven formats, each showing its roster as figures and its Ribbon as the
  *      timeline strip, so the SHAPE of the round — who is in the room, and how the
- *      time is divided — is legible before you commit to it,
+ *      time is divided — is legible before you commit to it. Only the default format's
+ *      Run now is lime,
  *   3. rounds this browser has run before,
  *   4. a paste-or-drop field for a share link, a `.debate.json`, or a legacy Unity
- *      `save.json`,
- *   5. a plain description of what this is.
+ *      `save.json`.
  *
  * A format is a starting point and nothing more: opening one never locks the roster,
  * the order or the times, and nothing on this screen compares a round back against
@@ -387,7 +389,8 @@ export default function Launch(): JSX.Element {
           <span id="lc-title" className="scr__brandname t-name">
             {t('app.name')}
           </span>
-          <span className="scr__brandsub">{t('app.tagline')}</span>
+          {/* What a first-time visitor wants settled before choosing anything. */}
+          <span className="scr__brandsub">{t('lc.trust')}</span>
         </div>
         <div className="scr__tools">
           <button type="button" className="btn btn--quiet" onClick={toggleLang}>
@@ -614,15 +617,6 @@ export default function Launch(): JSX.Element {
               )}
             </div>
           </section>
-
-          <section className="scr__sec" aria-labelledby="lc-about">
-            <div className="scr__sechead">
-              <h2 id="lc-about" className="scr__sectitle t-row">
-                {t('app.name')}
-              </h2>
-            </div>
-            <p className="scr__note">{t('lc.about')}</p>
-          </section>
         </div>
       </div>
 
@@ -831,9 +825,11 @@ function PresetCard({ meta, onRun, onEdit }: PresetCardProps): JSX.Element {
           <Icon name="edit" />
           {t('pr.editIt')}
         </button>
+        {/* Lime for the format the operator runs. Seven lime buttons in a grid all
+            competed for the same glance. */}
         <button
           type="button"
-          className="btn btn--primary"
+          className={isDefault ? 'btn btn--primary' : 'btn'}
           onClick={() => onRun(instantiateConfig(meta.config))}
         >
           {t('pr.runNow')}

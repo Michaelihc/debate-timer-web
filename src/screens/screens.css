@@ -658,6 +658,43 @@
   }
 }
 
+/* The keyboard legend is for a keyboard: not offered on a touch screen or a phone. */
+@media (hover: none) and (pointer: coarse), (max-width: 480px) {
+  .scr__keyhint {
+    display: none;
+  }
+}
+
+/* A phone keeps the header to one row. The brand gives way and wraps its subline; the
+   tools keep their words, a size smaller. */
+@media (max-width: 480px) {
+  .scr__bar {
+    flex-wrap: nowrap;
+    gap: var(--s-3);
+    padding-block: var(--s-3);
+  }
+
+  .scr__brand {
+    flex: 1 1 auto;
+  }
+
+  .scr__brandname {
+    font-size: var(--t-row);
+  }
+
+  .scr__tools {
+    flex: none;
+    flex-wrap: nowrap;
+    gap: var(--s-1);
+  }
+
+  .scr__tools .btn {
+    min-width: 0;
+    padding-inline: var(--s-3);
+    font-size: var(--t-meta);
+  }
+}
+
 /* A 400px phone still shows the face-off; the figures just get smaller and the
    two sides keep their outboard alignment rather than stacking. */
 @media (max-width: 400px) {

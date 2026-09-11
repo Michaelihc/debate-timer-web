@@ -29,6 +29,16 @@ describe('Launch', () => {
     expect(cards[0]?.textContent).toContain('Chinese Academic 4v4');
   });
 
+  it('spends lime on the default format alone, and says up top that nothing leaves the browser', () => {
+    render(<Launch />);
+    const primaries = document.querySelectorAll('.lc__card .btn--primary');
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]?.closest('.lc__card')?.hasAttribute('data-default')).toBe(true);
+    expect(document.querySelector('.scr__bar')?.textContent).toContain(
+      'Stays in this browser. No account needed.',
+    );
+  });
+
   it('states the shape of a format before it is chosen', () => {
     render(<Launch />);
     // 4v4 · 10 segments · 34:00 — speaker count, structure and length, on the card.

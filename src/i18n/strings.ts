@@ -12,7 +12,6 @@ export type { Lang };
 const EN = {
   // ── App shell ────────────────────────────────────────────────────────────────
   'app.name': 'Debate Timer',
-  'app.tagline': 'Projector-ready timing for competitive debate',
   'nav.launch': 'Rounds',
   'nav.console': 'Console',
   'nav.editor': 'Edit round',
@@ -47,8 +46,7 @@ const EN = {
   'lc.plusMore': '+{n} more',
   'lc.noStorage':
     'Site storage is blocked, so recent rounds and resume are unavailable. A share link still carries a whole round.',
-  'lc.about':
-    'A timer for competitive debate. Pick a format, change the speakers, the order and the times to match your tournament, then run the round from the console and put it full screen on the projector. Everything stays in this browser and in the address bar. A link carries the whole setup, so there is no account and no server.',
+  'lc.trust': 'Stays in this browser. No account needed.',
   'lc.presetNote': 'Every format is a starting point: open one and edit the roster, the order and the times.',
   'lc.draft': 'Unapplied changes to “{title}”',
   'lc.continueEditing': 'Continue editing',
@@ -450,7 +448,6 @@ export type StringKey = keyof typeof EN;
 /** Typed as an exact record of EN's keys: a missing or stray zh key fails the build. */
 const ZH: Record<StringKey, string> = {
   'app.name': '辩论计时器',
-  'app.tagline': '为辩论赛准备的投影计时器',
   'nav.launch': '比赛',
   'nav.console': '控制台',
   'nav.editor': '编辑比赛',
@@ -482,8 +479,7 @@ const ZH: Record<StringKey, string> = {
   'lc.defaultFormat': '默认',
   'lc.plusMore': '另外{n}位',
   'lc.noStorage': '浏览器存储被禁用，最近比赛和断点恢复不可用。分享链接仍然包含完整的比赛设置。',
-  'lc.about':
-    '一款为辩论赛准备的计时器。先选一个赛制，再按本场比赛改辩手、改顺序、改时长，然后在控制台计时，把控制台全屏投到大屏上。所有数据只保存在本浏览器和地址栏里。一条链接就能带上整套设置，不需要注册，也没有服务器。',
+  'lc.trust': '数据只存在本浏览器，无需注册。',
   'lc.presetNote': '每个赛制都只是起点：打开后可自由修改辩手、顺序和时长。',
   'lc.draft': '“{title}”有未应用的更改',
   'lc.continueEditing': '继续编辑',
