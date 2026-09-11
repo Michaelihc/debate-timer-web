@@ -591,3 +591,17 @@ describe('the commit button', () => {
     expect(localStorage.getItem(KEYS.draft)).toBeNull();
   });
 });
+
+describe('the run sheet with long names', () => {
+  it('prints a name as typed, with the whole of it in the chip title', () => {
+    render(<Editor />);
+    fireEvent.change(screen.getByLabelText('Proposition · Speaker 1'), {
+      target: { value: 'Michael Zhao Longname' },
+    });
+    const chip = rows()[1]?.querySelector('.step__chip');
+    expect(chip?.textContent).toBe('Michael Zhao Longname');
+    expect(chip).toHaveAttribute('title', 'Michael Zhao Longname');
+    // Capitals are a label device; a name is not a label.
+    expect(chip?.classList.contains('t-cap')).toBe(false);
+  });
+});

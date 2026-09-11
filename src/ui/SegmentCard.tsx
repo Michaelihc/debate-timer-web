@@ -239,9 +239,11 @@ export function SegmentCard({
                 <Icon name="alert" /> {t('ed.speakerDeleted')}
               </span>
             ) : who === null ? null : who.color === null ? (
-              <span className="step__chip step__chip--both t-cap">{who.text}</span>
+              <span className="step__chip step__chip--both" title={who.text}>
+                {who.text}
+              </span>
             ) : (
-              <span className="step__chip t-cap" style={speakerChipStyle(who.color)}>
+              <span className="step__chip" style={speakerChipStyle(who.color)} title={who.text}>
                 {who.text}
               </span>
             )}
