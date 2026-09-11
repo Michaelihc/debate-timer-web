@@ -113,6 +113,28 @@ test('nothing is printed beside the figures, and no speaker name under the ring'
   expect(el('.ucore__next').textContent ?? '').toMatch(/\d:\d\d/);
 });
 
+test('before the round the ring holds the first segment’s time, and Start arms it there', () => {
+  const { segments, totalMs } = getSession().plan;
+  // The preset opens on its 5:00 prep phase, in a 34:00 round.
+  expect(segments[0]?.allottedMs).toBe(300_000);
+  expect(totalMs).toBe(2_040_000);
+  render(<Console />);
+
+  expect(el('.ucore__ring').textContent).toContain('5:00');
+  expect(el('.ucore__ring').textContent).not.toContain('34:00');
+  const caption = el('.ucore__caption').textContent ?? '';
+  expect(caption).toContain('Begins shortly');
+  // "Up next" names the segment; its length is already the big number in the ring.
+  expect(el('.ucore__next').textContent).toContain('Preparation');
+  expect(caption).not.toMatch(/\d:\d\d/);
+
+  // The first press arms segment 1 (the owner's rule), and the ring reads the same time.
+  key({ key: ' ' });
+  expect(getSession().state.cursor).toBe(0);
+  expect(getSession().state.run).toBeNull();
+  expect(el('.ucore__ring').textContent).toContain('5:00');
+});
+
 test('every control stays live past zero', () => {
   act(() => {
     dispatch({ t: 'LOAD', cursor: 1 });

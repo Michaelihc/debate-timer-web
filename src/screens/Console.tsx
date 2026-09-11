@@ -347,13 +347,14 @@ export default function Console(): JSX.Element {
         : '';
 
   // The next segment by its own label and length. Who gives it is on the figures already:
-  // their arrow says so.
+  // their arrow says so. Before the round that length is already the time in the ring, so
+  // the line names the segment alone rather than printing the same number twice.
   const upNext =
     nextPs === null ? null : (
       <p className="ucore__next" data-urgent={expired ? '' : undefined}>
         <span className="ucore__nextlabel">{t('st.upNext')}</span>
         <span className="ucore__nextrole">{l10n(nextPs.label)}</span>
-        <span data-numeric="">{formatTime(nextPs.allottedMs)}</span>
+        {mode === 'pre' ? null : <span data-numeric="">{formatTime(nextPs.allottedMs)}</span>}
       </p>
     );
 
@@ -394,15 +395,21 @@ export default function Console(): JSX.Element {
       </RingCore>
     );
   } else {
-    // Pre-round and end-of-round: the ring still holds the screen, showing the round's
-    // scheduled length rather than going blank.
+    // Before the round the ring already holds the first segment's time, dimmed and still:
+    // that is the clock Start puts up, so the first press does not make the ring jump. At
+    // the end of the round there is nothing left to count, and the empty ring reads 0:00.
     const pre = mode === 'pre';
+    const first = pre && nextPs ? clockView(state, plan, nextPs.primaryClockId, now()) : null;
     core = (
       <div className="ucore ucore--idle">
         <div className="ucore__ring">
-          <RingTimer fraction={pre ? 1 : 0} state="normal" label={t('a11y.timerRegion')}>
+          <RingTimer
+            fraction={pre ? (first?.fill ?? 1) : 0}
+            state="normal"
+            label={t('a11y.timerRegion')}
+          >
             <span className="ucore__static" data-numeric="">
-              {formatTime(plan.totalMs)}
+              {formatTime(first?.remainingMs ?? 0, { secondsOnly })}
             </span>
           </RingTimer>
         </div>
