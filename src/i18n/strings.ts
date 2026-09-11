@@ -80,6 +80,7 @@ const EN = {
   't.mute': 'Mute',
   't.unmute': 'Unmute',
   't.fullscreen': 'Fullscreen',
+  't.exitFullscreen': 'Exit fullscreen',
 
   // ── Live state ───────────────────────────────────────────────────────────────
   'st.armed': 'Ready, press Space to start',
@@ -504,6 +505,7 @@ const ZH: Record<StringKey, string> = {
   't.mute': '静音',
   't.unmute': '取消静音',
   't.fullscreen': '全屏',
+  't.exitFullscreen': '退出全屏',
 
   'st.armed': '就绪，按空格开始',
   'st.running': '计时中',

@@ -18,12 +18,15 @@
  * AudioContext is the commonest reason a venue hears no bells, and finding that out at the
  * first speech is too late. The round readout ticks from the frame loop, so this component
  * renders only when the segment or the chrome state actually changes.
+ *
+ * The console is what goes on the projector, so fullscreen is a button in the same corner
+ * as well as the `F` key. Where the page cannot go fullscreen at all, there is no button.
  */
 
 import type { JSX } from 'react';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Lang } from '../domain/config';
-import { getLastRemoteKey, subscribeRemote } from '../app/hotkeys';
+import { ariaShortcut, getLastRemoteKey, shortcutText, subscribeRemote } from '../app/hotkeys';
 import { registerTick } from '../engine/loop';
 import { roundElapsedMs } from '../engine/selectors';
 import type { AudioState } from '../engine/sound';
@@ -44,6 +47,10 @@ export interface TopBarProps {
   onLang: () => void;
   audio: AudioState;
   onAudio: () => void;
+  /** Whether the document is fullscreen right now. */
+  fullscreen: boolean;
+  /** Omitted where the page cannot go fullscreen at all, which hides the button. */
+  onFullscreen?: (() => void) | undefined;
   onEditor: () => void;
   /** Back to the launch screen. The round keeps its place. */
   onHome: () => void;
@@ -58,6 +65,8 @@ export function TopBar({
   onLang,
   audio,
   onAudio,
+  fullscreen,
+  onFullscreen,
   onEditor,
   onHome,
 }: TopBarProps): JSX.Element {
@@ -81,6 +90,9 @@ export function TopBar({
       : audio.status === 'muted'
         ? t('au.muted')
         : t('au.enable');
+
+  // Named for what a press does now, so the projector operator knows which way it goes.
+  const fullscreenLabel = fullscreen ? t('t.exitFullscreen') : t('t.fullscreen');
 
   return (
     <header className="utop">
@@ -131,6 +143,19 @@ export function TopBar({
         <button type="button" className="ubtn" onClick={onLang} aria-label={t('kb.langToggle')}>
           {lang === 'zh' ? '中文' : 'EN'}
         </button>
+
+        {onFullscreen === undefined ? null : (
+          <button
+            type="button"
+            className="ubtn ubtn--icon"
+            onClick={onFullscreen}
+            aria-label={fullscreenLabel}
+            title={`${fullscreenLabel} · ${shortcutText('fullscreen')}`}
+            aria-keyshortcuts={ariaShortcut('fullscreen')}
+          >
+            <Icon name={fullscreen ? 'minimize' : 'maximize'} size={14} />
+          </button>
+        )}
       </div>
     </header>
   );

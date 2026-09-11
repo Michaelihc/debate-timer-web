@@ -164,6 +164,13 @@
   color: var(--text-inv);
 }
 
+/* An icon and nothing else (fullscreen): square, the height of its neighbours. */
+.ubtn--icon {
+  justify-content: center;
+  min-width: var(--s-7);
+  padding: 0;
+}
+
 /* Sound that is muted, or not yet switched on (after a reload nothing may play until the
    operator's first click or key), is the one chip that must be noticed before a bell is
    missed. */

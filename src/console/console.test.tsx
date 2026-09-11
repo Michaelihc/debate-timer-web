@@ -8,7 +8,7 @@
  */
 
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { openConfig } from '../app/boot';
 import { bindingsFor } from '../app/hotkeys';
@@ -549,6 +549,51 @@ test('in free debate Space pauses and resumes the side with the floor, as the bu
   key({ key: 'ArrowRight' });
   expect(getSession().state.floor).toBe('B');
   expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'B'));
+});
+
+test('fullscreen is a button in the top bar as well as F, and it follows the real state', async () => {
+  // jsdom has no Fullscreen API, which is also what a phone without one looks like.
+  render(<Console />);
+  expect(within(el('.utop')).queryByRole('button', { name: /fullscreen/i })).toBeNull();
+  cleanup();
+
+  let element: Element | null = null;
+  const changed = (next: Element | null): void => {
+    element = next;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  };
+  Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, get: () => true });
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element });
+  const request = vi.fn(async () => {
+    changed(document.documentElement);
+  });
+  document.documentElement.requestFullscreen = request;
+  document.exitFullscreen = vi.fn(async () => {
+    changed(null);
+  });
+  try {
+    render(<Console />);
+    const enter = within(el('.utop')).getByRole('button', { name: 'Fullscreen' });
+    expect(enter).toHaveAttribute('aria-keyshortcuts', 'F');
+    expect(enter.getAttribute('title')).toBe('Fullscreen · F');
+
+    await act(async () => {
+      fireEvent.click(enter);
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(within(el('.utop')).getByRole('button', { name: 'Exit fullscreen' })).toBeTruthy();
+
+    // Leaving with Esc goes through the browser, not the button, and still shows.
+    act(() => {
+      changed(null);
+    });
+    expect(within(el('.utop')).getByRole('button', { name: 'Fullscreen' })).toBeTruthy();
+  } finally {
+    for (const prop of ['fullscreenEnabled', 'fullscreenElement', 'exitFullscreen']) {
+      Reflect.deleteProperty(document, prop);
+    }
+    Reflect.deleteProperty(document.documentElement, 'requestFullscreen');
+  }
 });
 
 test('the keyboard legend speaks the interface language, one row per binding', () => {

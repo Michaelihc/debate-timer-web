@@ -28,6 +28,7 @@ import type { JSX } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { armAudioNow, useAudio } from '../app/boot';
+import { fullscreenSupported, toggleFullscreen, useFullscreen } from '../app/fullscreen';
 import { useHotkeys } from '../app/hotkeys';
 import { ROUTES, navigate } from '../app/router';
 import type { Id, SideId, SpeakerCfg } from '../domain/config';
@@ -93,6 +94,7 @@ export default function Console(): JSX.Element {
   const { t, l10n, lang, toggleLang } = useLang();
   const session = useRound();
   const audio = useAudio();
+  const fullscreen = useFullscreen();
   const { state, plan, config } = session;
 
   const timelineRef = useRef<TimelineHandle>(null);
@@ -449,6 +451,8 @@ export default function Console(): JSX.Element {
           if (!audio.armed) void armAudioNow();
           else toggleMuted();
         }}
+        fullscreen={fullscreen}
+        onFullscreen={fullscreenSupported() ? toggleFullscreen : undefined}
         onEditor={() => navigate(ROUTES.edit)}
         onHome={() => navigate(ROUTES.launch)}
       />

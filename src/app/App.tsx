@@ -47,6 +47,7 @@ import {
   useLegendOpen,
   useTheme,
 } from './boot';
+import { toggleFullscreen } from './fullscreen';
 import type { HotkeyContext } from './hotkeys';
 import { setContextResolver, useHotkeys } from './hotkeys';
 import type { RouteName } from './router';
@@ -67,11 +68,6 @@ const HEADING: Record<RouteName, 'nav.launch' | 'nav.console' | 'nav.editor' | '
   summary: 'nav.summary',
   share: 'nav.launch',
 };
-
-function toggleFullscreen(): void {
-  if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-  else void document.documentElement.requestFullscreen().catch(() => undefined);
-}
 
 export default function App(): JSX.Element {
   const route = useRoute();
