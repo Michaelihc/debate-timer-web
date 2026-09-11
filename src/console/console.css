@@ -776,6 +776,18 @@
   opacity: 0.85;
 }
 
+/* Daylight: the pips are white squares on a near-white ground and the white rail
+   vanishes with them. An inset edge keeps both legible, and leaves the focus ring
+   (the outline) alone. */
+[data-theme='light'] .tline__pip {
+  border: 1px solid var(--rule-strong);
+}
+
+[data-theme='light'] .tline__rail {
+  background: var(--rule-strong);
+  opacity: 1;
+}
+
 /* ==========================================================================
    Timer controls — under the ring, and nothing but the timer.
    ========================================================================== */
