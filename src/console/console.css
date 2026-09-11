@@ -645,6 +645,8 @@
   align-items: center;
   gap: var(--s-2);
   min-width: 0;
+  /* Room for a picked square's focus ring, which a scroller would otherwise clip. */
+  padding: calc(var(--focus-offset) * 2);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -698,7 +700,12 @@
   background: var(--pip-current);
 }
 
-.tline__pip[data-selected] {
+/* The keyboard's pick. Focusing a square picks it, so while the keyboard is on the strip
+   this is its focus ring. Once focus has left, the ring stays only where the pick differs
+   from the current square, so Enter never loads a square nobody can see picked. Before the
+   round, and whenever the pick is the current square, nothing sits on the projector. */
+.tline__pip:focus-visible,
+.uconsole:not([data-mode='pre']) .tline__pip[data-selected]:not([data-state='current']) {
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
 }

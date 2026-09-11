@@ -122,6 +122,7 @@ const EN = {
   'r.onSchedule': 'on schedule',
   'r.remaining': 'remaining',
   'r.segmentOf': 'Segment {i} of {n}',
+  'r.segmentCount': '{n} segments',
 
   // ── Editor ───────────────────────────────────────────────────────────────────
   'ed.roster': 'Roster',
@@ -544,6 +545,7 @@ const ZH: Record<StringKey, string> = {
   'r.onSchedule': '与预计一致',
   'r.remaining': '剩余',
   'r.segmentOf': '环节 {i}/{n}',
+  'r.segmentCount': '共 {n} 个环节',
 
   'ed.roster': '名单',
   'ed.runsheet': '流程',

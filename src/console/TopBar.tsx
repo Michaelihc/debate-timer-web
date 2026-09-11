@@ -109,7 +109,11 @@ export function TopBar({
       <div className="utop__mid">
         <h1 className="utop__title">{title}</h1>
         <p className="utop__meta">
-          <span>{t('r.segmentOf', { i: segmentIndex, n: segmentCount })}</span>
+          <span>
+            {segmentIndex === 0
+              ? t('r.segmentCount', { n: segmentCount })
+              : t('r.segmentOf', { i: segmentIndex, n: segmentCount })}
+          </span>
           <span className="utop__dot" aria-hidden="true">·</span>
           <span className="utop__round">
             <span className="utop__roundlabel">{t('r.elapsed')}</span>
