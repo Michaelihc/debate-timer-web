@@ -20,7 +20,7 @@ import {
   subscribeAudio,
 } from './sound';
 import type { Session } from './store';
-import { applyCueEvents, dispatch, getSession, isFollower, subscribe } from './store';
+import { applyCueEvents, dispatch, getSession, subscribe } from './store';
 
 export type TickWriter = (n: Now) => void;
 export type CueListener = (event: CueEvent) => void;
@@ -80,7 +80,7 @@ function frame(): void {
   const s = getSession();
 
   const gap = detectSleep(s.state, n);
-  if (gap && !isFollower()) dispatch(sleepHoldCommand(gap));
+  if (gap) dispatch(sleepHoldCommand(gap));
 
   const events = evaluateCues(s.state, s.plan, n);
   if (events.length > 0) fireCues(events);
@@ -90,7 +90,7 @@ function frame(): void {
   // Re-read: latching a cue above replaced the session, and the snapshot should
   // carry the cues that have already fired.
   const after = getSession();
-  if (after.state.run && !isFollower() && n.mono - lastSnapshotMono >= SNAPSHOT_INTERVAL_MS) {
+  if (after.state.run && n.mono - lastSnapshotMono >= SNAPSHOT_INTERVAL_MS) {
     lastSnapshotMono = n.mono;
     writeLive(after.config, after.state);
   }
@@ -156,7 +156,7 @@ function onStoreChange(): void {
 function onWake(): void {
   const s = getSession();
   const gap = detectSleep(s.state, now());
-  if (gap && !isFollower()) dispatch(sleepHoldCommand(gap));
+  if (gap) dispatch(sleepHoldCommand(gap));
   paintSoon();
 }
 

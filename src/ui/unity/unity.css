@@ -35,10 +35,6 @@
   width: min(46vh, 380px);
 }
 
-.uring--stage {
-  width: min(62vh, 58vw);
-}
-
 .uring__svg {
   position: absolute;
   inset: 0;
@@ -108,10 +104,6 @@
   /* The con side faces inward. A layout decision, not a -1 scale. */
   flex-direction: row-reverse;
   text-align: right;
-}
-
-.udeb--stage {
-  --fig-h: clamp(72px, calc(150 * var(--u)), 190px);
 }
 
 .udeb__stack {
@@ -348,17 +340,4 @@
     animation: none;
     opacity: 0.3;
   }
-}
-
-/* The stage uses the same three slots as the console; only the figure scales up.
-   The blanket prep / free-debate overlays are shown here as well — the room reads
-   them fine at this size, which is the call the user made. */
-
-/* A projector eats contrast, so an unlit figure stays more present than on an LCD. */
-.udeb--stage[data-state='idle'] .udeb__figure {
-  opacity: 0.82;
-}
-
-.udeb--stage[data-state='done'] .udeb__figure {
-  opacity: 0.42;
 }

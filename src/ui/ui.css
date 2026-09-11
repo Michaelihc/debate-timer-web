@@ -13,7 +13,7 @@
    which is the one thing this port adds — the picture IS the shape of the round.
 
    PERIPHERY / CORE is enforced structurally, not by discipline:
-   .digits and .dbar read --state-*; only .ribbon__edge and the rails read
+   .digits reads --state-*; only .ribbon__edge and the rails read
    --side-*. Nothing here paints both on one element.
    ========================================================================== */
 
@@ -200,16 +200,6 @@
   font-size: var(--t-clock);
 }
 
-.digits--stage .digits__figure {
-  font-size: var(--ts-clock);
-  line-height: 0.9;
-}
-
-.digits--chess .digits__figure {
-  font-size: var(--ts-chess);
-  line-height: 0.95;
-}
-
 .digits__sign {
   font-size: 0.62em;
   padding-right: 0.06em;
@@ -233,95 +223,6 @@
 
 .digits__sec.m-blip {
   animation: dt-blip var(--d-blip) var(--ease-out);
-}
-
-/* --- Depletion bar ------------------------------------------------------ */
-
-.dbar {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  height: 14px;
-  --dbar-ink: var(--state-normal);
-}
-
-.dbar[data-band='warning'] {
-  --dbar-ink: var(--state-warn);
-}
-
-.dbar[data-band='final10'] {
-  --dbar-ink: var(--state-final);
-}
-
-.dbar[data-band='over'] {
-  --dbar-ink: var(--state-over);
-}
-
-.dbar__track {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  background: var(--stage-track);
-  overflow: hidden;
-}
-
-.dbar__fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 100%;
-  background: var(--dbar-ink);
-  transition: background-color var(--d-fast) var(--ease-out);
-}
-
-/* Overrun leaves the block. That is the point: a long speech is visibly outside
-   its own allotment rather than parked at a tidy zero. */
-.dbar__spill {
-  flex: 0 0 auto;
-  width: 0;
-  background: var(--state-over);
-}
-
-.dbar__tick {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--bg-app);
-  opacity: 0.85;
-}
-
-.dbar__grat {
-  position: absolute;
-  top: 35%;
-  bottom: 0;
-  width: 1px;
-  background: var(--bg-app);
-  opacity: 0.5;
-}
-
-.dbar__hatch {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--stage-track) 0 3px,
-    transparent 3px 8px
-  );
-  outline: 1px solid var(--stage-track);
-  outline-offset: -1px;
-}
-
-.dbar--stage {
-  height: 20px;
-}
-
-@media (prefers-contrast: more) {
-  .dbar {
-    height: 20px;
-  }
 }
 
 /* --- Ribbon: the original's timeline strip ------------------------------- */
@@ -603,10 +504,6 @@
   justify-content: center;
   padding: var(--s-5);
   background: color-mix(in srgb, var(--bg-app) 82%, transparent);
-}
-
-.overlay--dim {
-  background: color-mix(in srgb, var(--stage-bg) 80%, transparent);
 }
 
 .overlay__panel {

@@ -296,7 +296,6 @@ function readPrefsSafe(): Prefs {
       theme: 'dark',
       muted: false,
       volume: 0.8,
-      stageBounds: null,
       lastRemoteKey: null,
     };
   }

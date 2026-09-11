@@ -1,10 +1,10 @@
 /**
  * The timeline strip — the original's bottom band, rebuilt.
  *
- * `Timeline` is 650x60 at the 800x600 reference, holding a `HorizontalLayoutGroup` of
- * 31.3x30.7 squares with 2px spacing, each a white face with a `#323232` label and a small
- * tick mark below it, sitting above a 648x10 white rail. The current event's square turns
- * `Color.green`. The `Next Button` lives at the strip's left end.
+ * `Timeline` is 650x60 at the 800x600 reference: white squares with `#323232` labels spread
+ * along a 648x10 white rail, the current event's square turned `Color.green`, and the `Next
+ * Button` at the strip's left end. Opposition speeches read as negative numbers, and an arrow
+ * runs between consecutive squares so the direction of the round reads at a glance.
  *
  * Everything the console's Ribbon could do, this does: a click SELECTS, a second click (or
  * Enter) LOADS, arrow-key focus walks the strip, and the live square fills to what has
@@ -14,8 +14,7 @@
  */
 
 import type { JSX, KeyboardEvent as ReactKeyboardEvent, Ref } from 'react';
-import { useImperativeHandle, useRef } from 'react';
-import type { SideId } from '../domain/config';
+import { Fragment, useImperativeHandle, useRef } from 'react';
 import { useLang } from '../i18n/useLang';
 import { clamp01 } from '../lib/clamp';
 import { formatTime } from '../lib/format';
@@ -40,7 +39,6 @@ export interface TimelineProps {
   /** The green double-chevron at the strip's left end. */
   onNext: () => void;
   nextDisabled: boolean;
-  colors: Partial<Record<SideId, string>>;
   ref?: Ref<TimelineHandle>;
 }
 
@@ -52,7 +50,6 @@ export function Timeline({
   onLoad,
   onNext,
   nextDisabled,
-  colors,
   ref,
 }: TimelineProps): JSX.Element {
   const { t } = useLang();
@@ -115,43 +112,49 @@ export function Timeline({
         >
           {pips.map((pip, i) => {
             const state = i < cursor ? 'done' : i === cursor ? 'current' : 'future';
-            const edge = pip.side === null ? undefined : colors[pip.side];
             return (
-              <div
-                key={`${pip.segId}-${i}`}
-                className="tline__pip"
-                data-kind={pip.kind}
-                data-state={state}
-                data-selected={i === selected ? '' : undefined}
-                style={edge === undefined ? undefined : { ['--pip-edge' as string]: edge }}
-                role="option"
-                aria-selected={i === selected}
-                aria-current={i === cursor ? 'step' : undefined}
-                aria-label={`${i + 1}. ${pip.label} ${formatTime(pip.allottedMs)}`}
-                title={`${pip.label} · ${formatTime(pip.allottedMs)}`}
-                tabIndex={0}
-                onClick={() => {
-                  activate(i);
-                }}
-                onFocus={() => {
-                  onSelect(i);
-                }}
-                onKeyDown={(e) => {
-                  onKeyDown(e, i);
-                }}
-              >
-                <span
-                  ref={(el) => {
-                    fills.current[i] = el;
+              <Fragment key={`${pip.segId}-${i}`}>
+                {i === 0 ? null : (
+                  // The arrow INTO square i. Once the round has reached i it is behind us.
+                  <span
+                    className="tline__arrow"
+                    data-state={i <= cursor ? 'done' : 'future'}
+                    aria-hidden="true"
+                  />
+                )}
+                <div
+                  className="tline__pip"
+                  data-kind={pip.kind}
+                  data-state={state}
+                  data-selected={i === selected ? '' : undefined}
+                  role="option"
+                  aria-selected={i === selected}
+                  aria-current={i === cursor ? 'step' : undefined}
+                  aria-label={`${i + 1}. ${pip.label} ${formatTime(pip.allottedMs)}`}
+                  title={`${pip.label} · ${formatTime(pip.allottedMs)}`}
+                  tabIndex={0}
+                  onClick={() => {
+                    activate(i);
                   }}
-                  className="tline__fill"
-                  aria-hidden="true"
-                />
-                <span className="tline__mark" aria-hidden="true">
-                  {pip.mark}
-                </span>
-                <span className="tline__tick" aria-hidden="true" />
-              </div>
+                  onFocus={() => {
+                    onSelect(i);
+                  }}
+                  onKeyDown={(e) => {
+                    onKeyDown(e, i);
+                  }}
+                >
+                  <span
+                    ref={(el) => {
+                      fills.current[i] = el;
+                    }}
+                    className="tline__fill"
+                    aria-hidden="true"
+                  />
+                  <span className="tline__mark" aria-hidden="true">
+                    {pip.mark}
+                  </span>
+                </div>
+              </Fragment>
             );
           })}
         </div>

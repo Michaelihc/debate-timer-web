@@ -1,14 +1,14 @@
 import type { RoundConfig } from '../config';
 import { SCHEMA_VERSION } from '../config';
-import { COLOR_A, COLOR_B, CUES_SHORT, FREE_DEBATE, rulesStd, side } from './common';
+import { COLOR_A, COLOR_B, CUES_SHORT, FREE_DEBATE, PREP, rulesStd, side } from './common';
 
 /**
  * The default preset: the format the operator actually runs.
  *
- * Free debate sits between the rebuttals and the closing summaries so the summary
- * speakers can answer it, and Pro closes last. Prep is a 1:00 bank per side drawn
- * on demand, not a scheduled slot — the shipped Unity order scheduled two prep
- * blocks and ran free debate dead last.
+ * It opens on a scheduled 5:00 preparation phase, as the Unity app's default and the
+ * operator's own save file both do — every figure holds a clipboard while it runs.
+ * Free debate sits between the rebuttals and the closing summaries, and Pro closes
+ * last. The 1:00 per-side banks are extra, drawn on demand with Q / W.
  *
  * This order is a starting point, not a rule. Reorder, repeat or drop any speaker.
  */
@@ -32,6 +32,7 @@ export const chinese4v4: RoundConfig = {
     { id: 'b4', side: 'B', name: '反四', role: { en: 'Closing Summary', zh: '总结陈词' }, defaultMs: 240_000 },
   ],
   segments: [
+    { id: 's0', kind: 'prep', label: PREP, side: 'both', allottedMs: 300_000 },
     { id: 's1', kind: 'speech', speakerId: 'a1', allottedMs: null },
     { id: 's2', kind: 'speech', speakerId: 'b1', allottedMs: null },
     {

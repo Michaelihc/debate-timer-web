@@ -1,7 +1,7 @@
 # Debate Timer
 
-A timer for running competitive debate rounds, in the browser. An operator console for the person
-running the round, and a separate chrome-free window to put on the projector.
+A timer for running competitive debate rounds, in the browser. Run the round from one screen and put
+it full screen (`F`) on the projector.
 
 No backend, no accounts, no install. It is a static page — open it and run a round.
 
@@ -14,15 +14,15 @@ which was built in Unity as a Windows desktop app.
 
 ## What it does
 
-- **Two surfaces.** The console is the operator's instrument — rails, transport, timeline, keyboard.
-  Press `D` and the stage opens in a second window with no chrome at all, sized for a projector and
-  readable from the back of the room. They stay in sync over `BroadcastChannel`.
+- **The Unity layout.** The two teams face each other as tinted figures, a countdown ring sits
+  between them, and the timeline runs along the bottom — the screen the desktop app drew.
 - **A real setup editor.** Build the roster and the running order visually — add speakers, set times,
   drag segments around, pick side colours. The old app made you hand-edit raw JSON.
 - **Seven format presets.** Chinese Academic 4v4 (default), British Parliamentary, World Schools,
   Lincoln-Douglas, Policy/CX, Public Forum, and Blank. Every one is a starting point you can edit.
 - **Free-debate chess clock** for 自由辩论, with per-side clocks and a swap control.
-- **Prep banks** drawn on demand mid-round, not scheduled slots.
+- **A preparation phase**, with every figure holding a clipboard, plus per-side prep banks drawn
+  mid-round with `Q` / `W`.
 - **Bilingual.** English and 简体中文 throughout, switchable mid-round with `L`. Nothing is baked in
   at segment-entry time, so the whole round re-labels instantly.
 - **Share a round as a link.** The entire configuration is compressed into the URL.
@@ -70,7 +70,6 @@ The whole round can be run without looking at the keyboard. `?` shows this legen
 | `R` | Hold to reset the segment |
 | `⏎` | Load the segment under the cursor |
 | `⌘ Z` / `⌘ ⇧ Z` | Undo · Redo |
-| `D` | Open the stage window |
 | `E` | Open the editor |
 | `L` | EN ⇄ 中文 |
 | `M` | Mute cues |
@@ -102,7 +101,7 @@ The behavioural rewrites, beyond the new UI:
 ```bash
 npm install
 npm run dev        # vite dev server
-npm run test       # vitest — 346 tests
+npm run test       # vitest — 337 tests
 npm run typecheck  # tsc -b
 npm run lint       # oxlint
 npm run build      # production build

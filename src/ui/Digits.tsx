@@ -49,8 +49,6 @@ export interface DigitsProps {
   initialBand?: Band;
   secondsOnly?: boolean;
   showHours?: boolean;
-  /** Type scale. `console` uses `--t-clock`; `stage` and `chess` use the stage scale. */
-  scale?: 'console' | 'stage' | 'chess';
   /** Who the time belongs to — read out in the announcements. */
   name?: string;
   /** `aria-label` on the `role="timer"`. Defaults to `a11y.timerRegion`. */
@@ -77,7 +75,6 @@ export function Digits({
   initialBand = 'normal',
   secondsOnly = false,
   showHours = false,
-  scale = 'console',
   name = '',
   label,
   announce = true,
@@ -187,8 +184,8 @@ export function Digits({
       ref={root}
       className={
         className === undefined
-          ? `digits digits--${scale}`
-          : `digits digits--${scale} ${className}`
+          ? `digits digits--console`
+          : `digits digits--console ${className}`
       }
       data-numeric=""
       role="timer"

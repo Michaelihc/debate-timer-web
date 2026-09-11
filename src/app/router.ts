@@ -4,7 +4,6 @@
  *   #/                       launch
  *   #/console                the operator console (the default working screen)
  *   #/edit                   the setup editor
- *   #/stage                  the projector surface
  *   #/summary                the box score
  *   #/r/<codec>.<payload>    a shared round — `boot.ts` decodes it, loads it and
  *                            replaces the hash with #/console
@@ -21,7 +20,7 @@
 import { useSyncExternalStore } from 'react';
 import { isSelfWritten, parseShareToken, writeHash } from '../lib/urlState';
 
-export type RouteName = 'launch' | 'console' | 'edit' | 'stage' | 'summary' | 'share';
+export type RouteName = 'launch' | 'console' | 'edit' | 'summary' | 'share';
 
 export interface Route {
   name: RouteName;
@@ -35,7 +34,6 @@ export const ROUTES: Readonly<Record<Exclude<RouteName, 'share'>, string>> = {
   launch: '#/',
   console: '#/console',
   edit: '#/edit',
-  stage: '#/stage',
   summary: '#/summary',
 };
 
@@ -51,8 +49,6 @@ function screenOf(path: string): Exclude<RouteName, 'share'> {
       return 'console';
     case '/edit':
       return 'edit';
-    case '/stage':
-      return 'stage';
     case '/summary':
       return 'summary';
     default:

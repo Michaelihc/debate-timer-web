@@ -19,7 +19,6 @@ export type IconName =
   | 'minus'
   | 'undo'
   | 'redo'
-  | 'stage'
   | 'sound'
   | 'mute'
   | 'keyboard'
@@ -47,7 +46,6 @@ export const PATHS: Record<IconName, string> = {
   minus: 'M3.5 8h9',
   undo: 'M6 4 2.75 7.25 6 10.5M2.75 7.25H10a3.25 3.25 0 0 1 0 6.5H6.5',
   redo: 'M10 4l3.25 3.25L10 10.5M13.25 7.25H6a3.25 3.25 0 0 0 0 6.5h3.5',
-  stage: 'M2.5 3.25h11v7.25h-11zM8 10.5V13M5.5 13h5',
   sound: 'M3 6.25h2.5L9 3.5v9L5.5 9.75H3zM11.5 6a3 3 0 0 1 0 4',
   mute: 'M3 6.25h2.5L9 3.5v9L5.5 9.75H3zM11.5 6.25l3 3.5M14.5 6.25l-3 3.5',
   keyboard:

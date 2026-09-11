@@ -91,68 +91,6 @@ time,
   line-height: 1;
 }
 
-/* --- Stage scale -------------------------------------------------------- */
-.s-clock {
-  font-size: var(--ts-clock);
-  font-weight: 700;
-  font-stretch: var(--wd-time);
-  letter-spacing: -0.02em;
-  line-height: 0.9;
-}
-
-.s-chess {
-  font-size: var(--ts-chess);
-  font-weight: 700;
-  font-stretch: var(--wd-time);
-  letter-spacing: -0.02em;
-  line-height: 0.95;
-}
-
-.s-name {
-  font-size: var(--ts-name);
-  font-weight: 700;
-  font-stretch: var(--wd-body);
-  line-height: 1.05;
-}
-
-.s-role {
-  font-size: var(--ts-role);
-  font-weight: 600;
-  font-stretch: var(--wd-struct);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-}
-
-.s-next {
-  font-size: var(--ts-next);
-  font-weight: 500;
-  font-stretch: var(--wd-body);
-}
-
-.s-rail-name {
-  font-size: var(--ts-rail-name);
-  font-weight: 500;
-  font-stretch: var(--wd-body);
-}
-
-.s-rail-meta {
-  font-size: var(--ts-rail-meta);
-  font-weight: 500;
-  font-stretch: var(--wd-struct);
-}
-
-.s-ribbon {
-  font-size: var(--ts-ribbon);
-  font-weight: 600;
-  font-stretch: var(--wd-struct);
-}
-
-.s-context {
-  font-size: var(--ts-context);
-  font-weight: 400;
-  font-stretch: var(--wd-body);
-}
-
 /* --- CJK ----------------------------------------------------------------
    Swap the stack, and never uppercase or letterspace Chinese: both are Latin
    devices that wreck Han glyph rhythm. Noto Sans SC has no width axis either,

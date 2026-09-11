@@ -28,7 +28,7 @@ export interface CueSpec {
   /** Remaining-time threshold in ms. `0` is expiry. */
   atMs: number;
   tone: CueTone;
-  /** Optional stage caption, e.g. { en: 'POIs open', zh: '可提问' }. */
+  /** Optional caption, e.g. { en: 'POIs open', zh: '可提问' }. */
   label?: L10n;
 }
 

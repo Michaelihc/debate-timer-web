@@ -34,8 +34,6 @@ export interface OverlayProps {
   labelledBy?: string;
   describedBy?: string;
   size?: 'sm' | 'md' | 'lg' | 'full';
-  /** Dim the surface behind to 20% — the stage legend does this. */
-  dim?: boolean;
   /** Default true. */
   closeOnBackdrop?: boolean;
   /** Default true; a legend that closes on any key sets it and handles its own keys. */
@@ -52,7 +50,6 @@ export function Overlay({
   labelledBy,
   describedBy,
   size = 'md',
-  dim = false,
   closeOnBackdrop = true,
   showClose = true,
   initialFocus,
@@ -127,7 +124,7 @@ export function Overlay({
 
   return createPortal(
     <div
-      className={dim ? 'overlay overlay--dim' : 'overlay'}
+      className="overlay"
       onPointerDown={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) onClose();
       }}

@@ -4,7 +4,8 @@
  * The original's `Timeline` is a `HorizontalLayoutGroup` of 31x30 squares, one per event,
  * labelled `P` for a prep block, `F` for free debate, and otherwise the SPEAKER'S NUMBER —
  * not the segment index. That number is the speaker's position in their own side's roster,
- * so this module resolves it once from the config rather than making a component guess.
+ * negative for the opposition (`1, -1, 2, -2`), which is the original's own speaker-ID
+ * encoding. This module resolves it once from the config rather than making a component guess.
  *
  * The run order is the operator's: this walks `plan.segments` in the order given and
  * sorts, dedupes and flags nothing. A repeat draws twice; an omission draws not at all.
@@ -22,9 +23,9 @@ export interface Pip {
   /** Position in the run order. */
   index: number;
   kind: SegmentKind;
-  /** Identity colour on the pip's tick mark only — never on its face. */
+  /** Which side has the floor. A speech's mark carries it as a sign. */
   side: SideId | null;
-  /** The glyph inside the square: `P`, `F`, else the speaker's roster number. */
+  /** The glyph inside the square: `P`, `F`, else the roster number, negative for side B. */
   mark: string;
   /** The full segment name, for the accessible label and the tooltip. */
   label: string;
@@ -54,14 +55,19 @@ export function rosterOrdinals(speakers: readonly SpeakerCfg[]): Record<Id, numb
   return out;
 }
 
+/** U+2212, not a hyphen: it is a negative number, and at 13px it has to read as one. */
+export const MINUS = '\u2212';
+
 export function pipsFromPlan(plan: RunPlan, lang: Lang, t: TFn): Pip[] {
   const ordinals = rosterOrdinals(plan.config.speakers);
   return plan.segments.map((ps) => {
     const speaker = ps.speaker;
     const mark =
-      ps.kind === 'speech'
-        ? String(speaker === null ? ps.index + 1 : (ordinals[speaker.id] ?? ps.index + 1))
-        : t(MARK_KEY[ps.kind]);
+      ps.kind !== 'speech'
+        ? t(MARK_KEY[ps.kind])
+        : speaker === null
+          ? String(ps.index + 1)
+          : `${speaker.side === 'B' ? MINUS : ''}${ordinals[speaker.id] ?? ps.index + 1}`;
     return {
       segId: ps.segId,
       index: ps.index,

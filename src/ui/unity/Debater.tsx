@@ -33,7 +33,6 @@ export interface DebaterProps {
   overlay?: DebaterOverlay;
   /** True once the current speaker's clock has run out — drives the arrow's 1s bob. */
   urgent?: boolean;
-  size?: 'rail' | 'stage';
   onSelect?: () => void;
 }
 
@@ -44,13 +43,12 @@ export function Debater({
   state,
   overlay = 'none',
   urgent = false,
-  size = 'rail',
   onSelect,
 }: DebaterProps) {
   const Tag = onSelect ? 'button' : 'div';
   return (
     <Tag
-      className={`udeb udeb--${size} udeb--${side === 'A' ? 'a' : 'b'}`}
+      className={`udeb udeb--${side === 'A' ? 'a' : 'b'}`}
       data-state={state}
       data-overlay={overlay}
       data-urgent={urgent ? '' : undefined}

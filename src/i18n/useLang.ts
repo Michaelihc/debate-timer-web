@@ -47,7 +47,7 @@ function syncDocument(lang: Lang): void {
 }
 syncDocument(current);
 
-// A language toggle in the console must retranslate the stage window too; both documents
+// A language toggle in one tab must retranslate any other open tab of the app too; they
 // share one origin, so the storage event is the cheapest link that already exists.
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {

@@ -132,21 +132,6 @@
   display: inline;
 }
 
-.utop__blocked {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
-  margin: 0;
-  font-size: var(--t-cap);
-  color: var(--warn-ink);
-}
-
-.utop__link {
-  color: var(--warn-ink);
-}
-
 .utop__chip {
   display: inline-flex;
   align-items: center;
@@ -156,17 +141,6 @@
   border: 1px solid var(--rule);
   font-size: var(--t-cap);
   color: var(--text-lo);
-}
-
-.utop__pip {
-  width: var(--s-3);
-  height: var(--s-3);
-  border-radius: var(--r-pill);
-  background: var(--rule-strong);
-}
-
-.utop__pip[data-live] {
-  background: var(--state-live);
 }
 
 /* ==========================================================================
@@ -222,7 +196,7 @@
    The main event — two teams facing each other across the ring.
    ========================================================================== */
 
-.uconsole__stage {
+.uconsole__main {
   display: grid;
   grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
   align-items: center;
@@ -685,11 +659,12 @@
   flex: 1 1 auto;
 }
 
+/* Spread along the whole rail, as the rendered scene lays them out: the arrows between
+   squares take up the slack. Past the point where they fit, the strip scrolls. */
 .tline__pips {
   display: flex;
-  align-items: flex-end;
-  /* HorizontalLayoutGroup, spacing 2. */
-  gap: var(--s-1);
+  align-items: center;
+  gap: var(--s-2);
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -748,15 +723,43 @@
   line-height: 1;
 }
 
-/* The 10 x 3 tick below the square, carrying that segment's identity colour. */
-.tline__tick {
+/* The arrow between squares: a rule with a head, drawn in CSS so it stretches with the
+   strip. It carries sequence only — whose turn it is lives in the sign on the mark. */
+.tline__arrow {
+  position: relative;
+  flex: 1 1 0;
+  min-width: var(--s-5);
+  height: var(--s-4);
+  color: var(--text-mid);
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+
+.tline__arrow::before {
+  content: '';
   position: absolute;
-  left: 50%;
-  bottom: 2px;
-  width: 10px;
-  height: 3px;
-  margin-inline-start: -5px;
-  background: var(--pip-edge, transparent);
+  top: 50%;
+  left: 0;
+  right: var(--s-1);
+  height: var(--s-1);
+  margin-top: calc(var(--s-1) / -2);
+  background: currentColor;
+}
+
+.tline__arrow::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: var(--s-1);
+  width: var(--s-3);
+  height: var(--s-3);
+  margin-top: calc(var(--s-3) / -2);
+  border-top: var(--s-1) solid currentColor;
+  border-right: var(--s-1) solid currentColor;
+  transform: rotate(45deg);
+}
+
+.tline__arrow[data-state='done'] {
+  opacity: 0.4;
 }
 
 /* `Line`: 648 x 10 white, under the squares. */
@@ -1008,7 +1011,7 @@
     overflow-y: auto;
   }
 
-  .uconsole__stage {
+  .uconsole__main {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
     gap: var(--s-4) var(--s-3);
@@ -1031,10 +1034,6 @@
   .tline,
   .transport {
     padding-inline: var(--s-4);
-  }
-
-  .keylegend {
-    display: none;
   }
 
   .transport__aux {

@@ -29,7 +29,6 @@ import { useHotkeys } from '../app/hotkeys';
 import { ROUTES, navigate } from '../app/router';
 import type { Id, SideId, SpeakerCfg } from '../domain/config';
 import { chessClockId } from '../domain/plan';
-import { startLeader } from '../engine/channel';
 import { elapsedMs, now } from '../engine/chronometer';
 import { onCue, registerTick } from '../engine/loop';
 import { canSwap, clockView, roundView } from '../engine/selectors';
@@ -71,9 +70,6 @@ export default function Console(): JSX.Element {
   const [selected, setSelected] = useState(0);
   const [advancedTo, setAdvancedTo] = useState<string | null>(null);
   const [resetProgress, setResetProgress] = useState(0);
-  const [stageOpen, setStageOpen] = useState(false);
-  const [stageBlocked, setStageBlocked] = useState(false);
-  const stageWin = useRef<Window | null>(null);
 
   // One `roundView` per discrete change. The ticking numbers never come through here —
   // they are written straight to the DOM by the band components' frame writers.
@@ -164,30 +160,7 @@ export default function Console(): JSX.Element {
     dispatch({ t: 'LOAD', cursor: index });
   }, []);
 
-  const openStage = useCallback(() => {
-    const open = stageWin.current;
-    if (open && !open.closed) {
-      open.focus();
-      return;
-    }
-    const url = new URL(window.location.href);
-    url.hash = ROUTES.stage;
-    const win = window.open(url.toString(), 'debate-timer-stage', 'width=1280,height=720');
-    if (!win) {
-      setStageBlocked(true);
-      setStageOpen(false);
-      return;
-    }
-    stageWin.current = win;
-    setStageBlocked(false);
-    setStageOpen(true);
-  }, []);
-
   /* -------------------------------------------------------------------- effects */
-
-  // The console is the leader of the console-stage link, always. The stage never claims
-  // leadership: a two-leader flicker is worse than a frozen room display.
-  useEffect(() => startLeader(), []);
 
   // flash.anim — the original's one-shot screen pulse on a warning cue. Re-firing restarts
   // the animation, which is what the forced reflow between the two writes buys.
@@ -204,20 +177,6 @@ export default function Console(): JSX.Element {
       }),
     [],
   );
-
-  // Polled only for the pip, and only while a window of ours is open.
-  useEffect(() => {
-    if (!stageOpen) return undefined;
-    const id = window.setInterval(() => {
-      if (stageWin.current?.closed === true) {
-        stageWin.current = null;
-        setStageOpen(false);
-      }
-    }, 1000);
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [stageOpen]);
 
   useEffect(() => {
     setSelected(Math.max(0, Math.min(state.cursor, plan.segments.length - 1)));
@@ -286,7 +245,6 @@ export default function Console(): JSX.Element {
       undo: () => undo(),
       redo: () => redo(),
       loadCursored: () => loadAt(selected),
-      stageWindow: openStage,
       editor: () => navigate(ROUTES.edit),
       escape: view.bankDraw === null ? undefined : () => dispatch({ t: 'BANK_END' }),
     },
@@ -500,13 +458,10 @@ export default function Console(): JSX.Element {
           if (!audio.armed) void armAudioNow();
           else toggleMuted();
         }}
-        stageOpen={stageOpen}
-        stageBlocked={stageBlocked}
-        onStage={openStage}
         onEditor={() => navigate(ROUTES.edit)}
       />
 
-      <div className="uconsole__stage">
+      <div className="uconsole__main">
         <TeamColumn
           side="A"
           label={sideLabels.A}
@@ -582,7 +537,6 @@ export default function Console(): JSX.Element {
         onLoad={loadAt}
         onNext={() => doAdvance()}
         nextDisabled={view.phase === 'complete'}
-        colors={{ A: config.sides[0].color, B: config.sides[1].color }}
       />
 
 

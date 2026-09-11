@@ -22,8 +22,6 @@ export interface KeyLegendOverlayProps {
   context?: HotkeyContext;
   /** True inside a free-debate segment: the chess-only rows stop being greyed. */
   chess?: boolean;
-  /** Dim the surface behind to 20% — the stage does. */
-  dim?: boolean;
 }
 
 export function Keycaps({ caps }: { caps: string[] }): JSX.Element {
@@ -38,7 +36,7 @@ export function Keycaps({ caps }: { caps: string[] }): JSX.Element {
   );
 }
 
-/** The keycaps for one action, for a button tooltip or the permanent band-4 legend. */
+/** The keycaps for one action, for a button tooltip. */
 export function ActionKeys({ action }: { action: Parameters<typeof capsOf>[0] }): JSX.Element {
   return <Keycaps caps={capsOf(action)} />;
 }
@@ -65,14 +63,13 @@ export function KeyLegendOverlay({
   onClose,
   context = 'console',
   chess = false,
-  dim = false,
 }: KeyLegendOverlayProps): JSX.Element | null {
   const { t } = useLang();
   const transport = bindingsForGroup(context, 'transport');
   const navigation = bindingsForGroup(context, 'navigation');
 
   return (
-    <Overlay open={open} onClose={onClose} title={t('kb.title')} size="lg" dim={dim}>
+    <Overlay open={open} onClose={onClose} title={t('kb.title')} size="lg">
       <div className="legend">
         {transport.length === 0 ? null : (
           <section className="legend__group">

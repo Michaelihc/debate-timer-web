@@ -112,7 +112,6 @@ export function RingCore({
             initialMs={remainingMs}
             initialBand={band}
             secondsOnly={secondsOnly}
-            scale="console"
             name={name}
             announce={announce}
           />

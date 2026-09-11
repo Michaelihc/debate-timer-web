@@ -35,7 +35,7 @@ describe('Editor', () => {
     render(<Editor />);
     expect(screen.getByRole('region', { name: 'Roster' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Inspector' })).toBeInTheDocument();
-    expect(cards()).toHaveLength(9);
+    expect(cards()).toHaveLength(10);
   });
 
   it('appends a repeated speaker and says nothing about it', () => {
@@ -45,7 +45,7 @@ describe('Editor', () => {
       fireEvent.change(composer, { target: { value: 'p1' } });
       fireEvent.keyDown(composer, { key: 'Enter' });
     }
-    expect(cards()).toHaveLength(11);
+    expect(cards()).toHaveLength(12);
     // Still READY: repetition is data, not a defect.
     expect(screen.getByText('Ready')).toBeInTheDocument();
     expect(screen.queryByText(/duplicate speaker|unused|out of order|unusual/i)).toBeNull();
@@ -72,7 +72,7 @@ describe('Editor', () => {
     const label = first.querySelector('.scard__label')?.textContent;
     fireEvent.keyDown(first, { key: 'ArrowDown', altKey: true });
     expect(cards()[1]?.querySelector('.scard__label')?.textContent).toBe(label);
-    expect(screen.getByText('Moved to position 2 of 9')).toBeInTheDocument();
+    expect(screen.getByText('Moved to position 2 of 10')).toBeInTheDocument();
   });
 
   it('creates the next roster row from Enter in a name field', () => {
@@ -89,9 +89,9 @@ describe('Editor', () => {
     const composer = screen.getByRole('combobox', { name: 'Add segment' });
     fireEvent.change(composer, { target: { value: 'free' } });
     fireEvent.keyDown(composer, { key: 'Enter' });
-    expect(cards()).toHaveLength(10);
+    expect(cards()).toHaveLength(11);
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(cards()).toHaveLength(9);
+    expect(cards()).toHaveLength(10);
   });
 
   it('presents ADVANCE and free-debate exclusivity as neutral settings', () => {

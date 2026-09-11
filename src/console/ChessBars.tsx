@@ -117,7 +117,6 @@ function SideBar({
         initialMs={remaining}
         initialBand={band}
         secondsOnly={secondsOnly}
-        scale="console"
         name={entry.label}
         announce={announce}
         className="ubar__digits"

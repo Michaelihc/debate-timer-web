@@ -33,5 +33,7 @@ export function side(id: SideId, en: string, zh: string, color: Hex, prepBankMs 
 
 export const CX: L10n = { en: 'Cross-Examination', zh: '质询' };
 export const FREE_DEBATE: L10n = { en: 'Free Debate', zh: '自由辩论' };
+/** The Unity app's own label for the prep phase (MenuController: 准备时间). */
+export const PREP: L10n = { en: 'Preparation Time', zh: '准备时间' };
 export const COLOR_A: Hex = '#E69F00';
 export const COLOR_B: Hex = '#0072B2';

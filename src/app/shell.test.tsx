@@ -1,6 +1,6 @@
 /**
  * The contracts four screens are written against. Every assertion here is a promise the
- * shell makes to Launch, Console, Editor, Stage and Summary.
+ * shell makes to Launch, Console, Editor and Summary.
  */
 
 import { createRef, useState } from 'react';

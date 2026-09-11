@@ -27,9 +27,8 @@ function hex8(n: number): string {
 }
 
 /**
- * 16 hex chars. Two independently seeded 32-bit lanes, because this value gates
- * whether a stage window trusts a frame — a chance collision would silently pair
- * a stage with the wrong round.
+ * 16 hex chars. Two independently seeded 32-bit lanes, because this value is a round's
+ * identity — a chance collision would silently treat two different rounds as one.
  */
 export function fnv1aHex(text: string): string {
   return hex8(lane(text, FNV_OFFSET)) + hex8(lane(text, FNV_PRIME));

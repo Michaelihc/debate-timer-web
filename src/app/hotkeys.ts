@@ -24,7 +24,7 @@ import type { StringKey } from '../i18n/strings';
 
 export const HOLD_MS = 600;
 
-export type HotkeyContext = 'launch' | 'console' | 'editor' | 'stage' | 'summary';
+export type HotkeyContext = 'launch' | 'console' | 'editor' | 'summary';
 
 export type HotkeyAction =
   // transport
@@ -52,7 +52,6 @@ export type HotkeyAction =
   | 'redo'
   // navigation & chrome
   | 'loadCursored'
-  | 'stageWindow'
   | 'fullscreen'
   | 'langToggle'
   | 'mute'
@@ -97,7 +96,7 @@ export interface KeyBinding {
 const C = (key: string, mods: Omit<Chord, 'key'> = {}): Chord => ({ key, ...mods });
 
 const CONSOLE_ONLY: HotkeyContext[] = ['console'];
-const EVERYWHERE: HotkeyContext[] = ['launch', 'console', 'editor', 'stage', 'summary'];
+const EVERYWHERE: HotkeyContext[] = ['launch', 'console', 'editor', 'summary'];
 
 /**
  * The single source of truth for both the listener and the legend. Order is the order the
@@ -292,14 +291,6 @@ export const KEYMAP: readonly KeyBinding[] = [
     caps: ['⏎'],
     label: 'kb.loadPip',
     contexts: CONSOLE_ONLY,
-  },
-  {
-    action: 'stageWindow',
-    group: 'navigation',
-    chords: [C('d')],
-    caps: ['D'],
-    label: 'kb.stageWindow',
-    contexts: ['launch', 'console', 'editor', 'summary'],
   },
   {
     action: 'fullscreen',

@@ -52,7 +52,7 @@ test('every route mounts a screen, with a round loaded', async () => {
   await loadRound();
   await mount();
 
-  for (const hash of ['#/', '#/console', '#/edit', '#/summary', '#/stage']) {
+  for (const hash of ['#/', '#/console', '#/edit', '#/summary']) {
     await goto(hash);
     // `main` is the shell's screen slot; a screen that threw would unmount it.
     expect(screen.getAllByRole('main').length).toBeGreaterThan(0);
@@ -70,11 +70,15 @@ test('the console mounts before a round has ever been opened', async () => {
   expect(screen.getAllByRole('main').length).toBeGreaterThan(0);
 });
 
-test('the editor and the stage mount cold, without the console having run first', async () => {
+test('the editor mounts cold, without the console having run first', async () => {
   await loadRound();
   await mount();
   await goto('#/edit');
   expect(screen.getAllByRole('main').length).toBeGreaterThan(0);
+});
+
+test('an old #/stage bookmark still lands on a screen rather than a blank page', async () => {
+  await mount();
   await goto('#/stage');
   expect(screen.getAllByRole('main').length).toBeGreaterThan(0);
 });
@@ -84,7 +88,7 @@ test('a full round trip through every screen and back leaves the round intact', 
   const before = getSession().plan.segments.map((s) => s.segId);
   await mount();
 
-  for (const hash of ['#/console', '#/edit', '#/stage', '#/summary', '#/console', '#/']) {
+  for (const hash of ['#/console', '#/edit', '#/summary', '#/console', '#/']) {
     await goto(hash);
   }
 
@@ -96,7 +100,7 @@ test('the document keeps exactly one theme, language and side-colour pair across
   await loadRound();
   await mount();
 
-  for (const hash of ['#/console', '#/edit', '#/stage', '#/']) {
+  for (const hash of ['#/console', '#/edit', '#/']) {
     await goto(hash);
     expect(document.documentElement.dataset['theme']).toMatch(/dark|light/);
     expect(document.documentElement.lang).toMatch(/en|zh/);

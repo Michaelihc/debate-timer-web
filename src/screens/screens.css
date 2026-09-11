@@ -4,7 +4,7 @@
    Same identity as the console: a near-black ground, lime for the one action the
    screen is for, square corners, no shadows, and the timeline strip drawn as the
    original draws it. A preset card previews its roster with the same <Debater>
-   figures the console and the stage use, so what you pick on this screen is what
+   figures the console uses, so what you pick on this screen is what
    you will be looking at for the next forty minutes.
 
    Tokens only: no hex, no radius beyond --r-1 / --r-pill, no px outside --s-*.
@@ -235,8 +235,8 @@
 
 /* --- Launch: the roster, previewed as figures --------------------------- */
 
-/* The two sides face each other exactly as they will on the console and the
-   stage: proposition outboard-left, opposition outboard-right, both looking in.
+/* The two sides face each other exactly as they will on the console:
+   proposition outboard-left, opposition outboard-right, both looking in.
    --side-* is set inline per card, because a preset carries its own colours and
    the document root only knows the round that is loaded. */
 .lc__roster {

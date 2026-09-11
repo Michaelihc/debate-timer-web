@@ -15,8 +15,8 @@ import { now } from './chronometer';
 import type { CueEvent } from './cues';
 import { markFired } from './cues';
 import { writeApplied, writeLive } from './persist';
-import type { SnapshotState, StageFrame } from './rebase';
-import { applyStageFrame, fromSnapshot } from './rebase';
+import type { SnapshotState } from './rebase';
+import { fromSnapshot } from './rebase';
 import { reduce } from './reducer';
 import type { Command, RoundState, RunPlan } from './state';
 import { initialState } from './state';
@@ -52,7 +52,6 @@ let session: Session = (() => {
   return sessionOf(plan, initialState(plan));
 })();
 
-let follower = false;
 let persistEnabled = true;
 
 const listeners = new Set<() => void>();
@@ -84,22 +83,12 @@ export function getConfig(): RoundConfig {
   return session.config;
 }
 
-export function isFollower(): boolean {
-  return follower;
-}
-
-/** A follower window mirrors the leader: it never dispatches, never persists and
- *  never claims leadership (§12.3). */
-export function setFollower(on: boolean): void {
-  follower = on;
-}
-
 export function setPersistEnabled(on: boolean): void {
   persistEnabled = on;
 }
 
 function persist(): void {
-  if (!persistEnabled || follower) return;
+  if (!persistEnabled) return;
   writeLive(session.config, session.state);
 }
 
@@ -112,7 +101,6 @@ function commit(next: Session, options?: { persist?: boolean }): void {
 // ------------------------------------------------------------------- commands
 
 export function dispatch(cmd: Command, n: Now = now()): void {
-  if (follower) return;
   const prev = session.state;
   const next = reduce(prev, cmd, { plan: session.plan, now: n });
   if (next === prev) return;
@@ -154,14 +142,14 @@ export function applyCueEvents(events: readonly CueEvent[]): void {
 
 /** Load a plan and start a fresh round. */
 export function loadRound(plan: RunPlan, opts?: { markApplied?: boolean }): void {
-  if (opts?.markApplied !== false && !follower) writeApplied(plan.config);
+  if (opts?.markApplied !== false) writeApplied(plan.config);
   commit(sessionOf(plan, initialState(plan)));
 }
 
 /** Swap the plan under a live round (an editor apply). The caller reconciles the
  *  clocks by stable id first — `reconcileState()` in state.ts does exactly that. */
 export function replacePlan(plan: RunPlan, state: RoundState): void {
-  if (!follower) writeApplied(plan.config);
+  writeApplied(plan.config);
   commit(sessionOf(plan, state));
 }
 
@@ -169,19 +157,6 @@ export function replacePlan(plan: RunPlan, state: RoundState): void {
  *  monotonic clock (§5.3), so the segment resumes at its exact remaining time. */
 export function hydrate(plan: RunPlan, snapshot: SnapshotState, n: Now = now()): void {
   commit(sessionOf(plan, fromSnapshot(snapshot, n)), { persist: false });
-}
-
-// ------------------------------------------------------------------- follower
-
-/** Follower-only: adopt the leader's frame. Bypasses the reducer, the undo stack
- *  and persistence — a mirror has no history of its own. */
-export function applyFrame(frame: StageFrame, n: Now = now()): void {
-  commit(sessionOf(session.plan, applyStageFrame(session.state, frame, n)), { persist: false });
-}
-
-/** Follower-only: adopt the leader's plan after a configHash mismatch. */
-export function adoptPlan(plan: RunPlan): void {
-  commit(sessionOf(plan, session.state), { persist: false });
 }
 
 // ------------------------------------------------------------------ React glue

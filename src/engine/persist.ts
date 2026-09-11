@@ -26,15 +26,7 @@ export interface Prefs {
   theme: 'dark' | 'light';
   muted: boolean;
   volume: number;
-  stageBounds: StageBounds | null;
   lastRemoteKey: string | null;
-}
-
-export interface StageBounds {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
 }
 
 export interface LibraryEntry {
@@ -69,7 +61,6 @@ const DEFAULT_PREFS: Prefs = {
   theme: 'dark',
   muted: false,
   volume: 0.8,
-  stageBounds: null,
   lastRemoteKey: null,
 };
 
@@ -195,9 +186,6 @@ export function readPrefs(): Prefs {
       typeof volume === 'number' && Number.isFinite(volume)
         ? Math.min(1, Math.max(0, volume))
         : DEFAULT_PREFS.volume,
-    stageBounds: isRecord(stored.stageBounds)
-      ? (stored.stageBounds as unknown as StageBounds)
-      : null,
     lastRemoteKey: typeof stored.lastRemoteKey === 'string' ? stored.lastRemoteKey : null,
   };
 }

@@ -24,12 +24,10 @@ export interface RingTimerProps {
   state: 'normal' | 'warn' | 'over';
   /** Rendered inside the ring — the time itself. */
   children?: React.ReactNode;
-  /** `stage` drops the console's size cap so the ring can fill a projector. */
-  variant?: 'console' | 'stage';
   label?: string;
 }
 
-export function RingTimer({ fraction, state, children, variant = 'console', label }: RingTimerProps) {
+export function RingTimer({ fraction, state, children, label }: RingTimerProps) {
   const arc = useRef<SVGCircleElement>(null);
 
   // Written straight to the DOM: the rAF loop updates this every frame and must not
@@ -39,7 +37,7 @@ export function RingTimer({ fraction, state, children, variant = 'console', labe
   }, [fraction]);
 
   return (
-    <div className={`uring uring--${variant}`} data-state={state}>
+    <div className="uring uring--console" data-state={state}>
       <svg className="uring__svg" viewBox={`0 0 ${VIEW} ${VIEW}`} aria-hidden="true" focusable="false">
         <circle className="uring__track" cx={VIEW / 2} cy={VIEW / 2} r={R} strokeWidth={VIEW * STROKE_RATIO} />
         <circle

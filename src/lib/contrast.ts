@@ -24,7 +24,7 @@ export const DELTA_L_BLOCK = 0.1;
 export const DELTA_L_WARN = 0.18;
 /** Simulated dichromatic separation below this reads as one colour to a dichromat. */
 export const CVD_DELTA_E_BLOCK = 12;
-/** A side colour dimmer than this against the stage black is illegible at range. */
+/** A side colour dimmer than this against a projector's black is illegible at range. */
 export const MIN_CONTRAST_ON_BLACK = 3;
 /** Hue of `--state-warn`; identity colours inside this arc get confused with it. */
 export const WARN_HUE = 43;
@@ -98,7 +98,7 @@ export function contrastRatio(a: Color, b: Color): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** The figure that matters for the stage, whose ground is always true black. */
+/** The figure that matters on a projector, where the ground reads as true black. */
 export function contrastOnBlack(color: Color): number {
   return (relativeLuminance(color) + 0.05) / 0.05;
 }

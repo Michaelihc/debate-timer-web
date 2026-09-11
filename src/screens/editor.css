@@ -963,7 +963,7 @@
   flex: 1 1 0;
   height: var(--s-4);
   border: var(--hair);
-  background: var(--stage-bg);
+  background: var(--pj-ground);
 }
 
 .scp__cvd-strip > span {

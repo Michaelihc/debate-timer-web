@@ -38,6 +38,11 @@ function chessIndex(): number {
   return getSession().plan.segments.findIndex((s) => s.kind === 'chess');
 }
 
+/** The first speech. The preset opens on a prep phase, so index 0 is nobody's turn. */
+function firstSpeechIndex(): number {
+  return getSession().plan.segments.findIndex((s) => s.kind === 'speech');
+}
+
 beforeEach(() => {
   openChinese();
 });
@@ -47,12 +52,13 @@ afterEach(() => {
 });
 
 test('a speech names the person, never a bare index', () => {
+  const i = firstSpeechIndex();
   act(() => {
-    dispatch({ t: 'LOAD', cursor: 0 });
+    dispatch({ t: 'LOAD', cursor: i });
   });
   render(<Console />);
 
-  const speaker = getSession().plan.segments[0]?.speaker;
+  const speaker = getSession().plan.segments[i]?.speaker;
   expect(speaker).toBeDefined();
   // The nameplate, plus the roster row on the rail.
   expect(screen.getAllByText(speaker?.name ?? '—').length).toBeGreaterThan(0);
@@ -132,8 +138,13 @@ test('an advance raises the undo chip, naming where it landed', () => {
 test('the Ribbon draws the operator’s order verbatim and flags nothing about it', () => {
   // Speaker 3 before speaker 2, speaker 2 twice, speaker 1 never: all intentional.
   const config = instantiatePreset('chinese4v4');
-  const a1 = config.segments[0];
-  const a3 = config.segments[4];
+  // Ids are re-minted per instance, so find the speeches by who gives them.
+  const speechBy = (name: string) => {
+    const id = config.speakers.find((p) => p.name === name)?.id;
+    return config.segments.find((s) => s.kind === 'speech' && s.speakerId === id);
+  };
+  const a1 = speechBy('正一');
+  const a3 = speechBy('正三');
   if (!a1 || !a3) throw new Error('preset changed');
   config.segments = [a3, a1, a3];
   act(() => {
@@ -149,9 +160,26 @@ test('the Ribbon draws the operator’s order verbatim and flags nothing about i
   }
 });
 
+test('the strip numbers the opposition negative, with arrows between squares and no underline', () => {
+  render(<Console />);
+  const pips = screen.getAllByRole('option');
+  const { segments } = getSession().plan;
+  let checked = 0;
+  segments.forEach((ps, i) => {
+    if (ps.kind !== 'speech' || ps.speaker === null) return;
+    const mark = pips[i]?.textContent ?? '';
+    expect(mark).toMatch(ps.speaker.side === 'B' ? /^\u2212\d+$/ : /^\d+$/);
+    checked += 1;
+  });
+  expect(checked).toBeGreaterThan(0);
+  expect(document.querySelectorAll('.tline__arrow')).toHaveLength(pips.length - 1);
+  expect(document.querySelector('.tline__tick')).toBeNull();
+});
+
 test('a prep bank draw takes over the core and Escape ends it', () => {
+  const i = firstSpeechIndex();
   act(() => {
-    dispatch({ t: 'LOAD', cursor: 0 });
+    dispatch({ t: 'LOAD', cursor: i });
     dispatch({ t: 'START' });
   });
   render(<Console />);
@@ -163,5 +191,5 @@ test('a prep bank draw takes over the core and Escape ends it', () => {
   key({ key: 'Escape' });
   expect(getSession().state.bankDraw).toBeNull();
   // The speech it interrupted is running again, because it was running when we drew.
-  expect(getSession().state.run?.clockId).toBe(getSession().plan.segments[0]?.primaryClockId);
+  expect(getSession().state.run?.clockId).toBe(getSession().plan.segments[i]?.primaryClockId);
 });

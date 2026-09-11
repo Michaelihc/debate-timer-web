@@ -194,7 +194,7 @@ describe('token and route parsing', () => {
   it('pulls a token out of a share route only', () => {
     expect(tokenFromHash('#/r/0.abc')).toBe('0.abc');
     expect(tokenFromHash('#/console')).toBeNull();
-    expect(tokenFromHash('#/stage')).toBeNull();
+    expect(tokenFromHash('#/summary')).toBeNull();
     expect(tokenFromHash('')).toBeNull();
     expect(tokenFromHash('#/r/nope')).toBeNull();
   });
@@ -350,7 +350,7 @@ describe('the self-write guard', () => {
     const before = history.length;
     writeHash('#/console', 'replace');
     expect(history.length).toBe(before);
-    writeHash('#/stage', 'push');
+    writeHash('#/summary', 'push');
     expect(history.length).toBe(before + 1);
   });
 

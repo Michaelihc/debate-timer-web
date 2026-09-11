@@ -44,9 +44,6 @@ export interface TopBarProps {
   onLang: () => void;
   audio: AudioState;
   onAudio: () => void;
-  stageOpen: boolean;
-  stageBlocked: boolean;
-  onStage: () => void;
   onEditor: () => void;
 }
 
@@ -66,9 +63,6 @@ export function TopBar({
   onLang,
   audio,
   onAudio,
-  stageOpen,
-  stageBlocked,
-  onStage,
   onEditor,
 }: TopBarProps): JSX.Element {
   const { t } = useLang();
@@ -153,21 +147,10 @@ export function TopBar({
       <div className="utop__side utop__side--right">
         {remote === null ? null : (
           <span className="utop__chip">
-            {t('sg.remote')} <kbd className="keycap">{remote}</kbd>
+            {t('nav.remote')} <kbd className="keycap">{remote}</kbd>
           </span>
         )}
 
-        <button
-          type="button"
-          className="ubtn"
-          onClick={onStage}
-          title={t('sg.sameBrowser')}
-          aria-keyshortcuts="D"
-        >
-          <Icon name="stage" size={14} />
-          <span>{t('nav.stage')}</span>
-          <span className="utop__pip" data-live={stageOpen ? '' : undefined} aria-hidden="true" />
-        </button>
 
         <button
           type="button"
@@ -185,14 +168,6 @@ export function TopBar({
         </button>
       </div>
 
-      {stageBlocked ? (
-        <p className="utop__blocked">
-          <Icon name="alert" size={14} />
-          <a className="utop__link" href="#/stage" target="_blank" rel="noreferrer">
-            {t('sg.blocked')}
-          </a>
-        </p>
-      ) : null}
     </header>
   );
 }

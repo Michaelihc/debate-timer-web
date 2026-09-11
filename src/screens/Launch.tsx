@@ -515,7 +515,7 @@ export default function Launch(): JSX.Element {
 const FIGURE_CAP = 8;
 
 /**
- * The round's two sides, drawn with the same figures the console and the stage draw,
+ * The round's two sides, drawn with the same figures the console draws,
  * facing each other across the card. Nothing here is interactive and nothing is
  * judged: the roster is shown in the order the config gives it.
  */

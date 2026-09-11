@@ -16,7 +16,6 @@ const EN = {
   'nav.launch': 'Rounds',
   'nav.console': 'Console',
   'nav.editor': 'Edit round',
-  'nav.stage': 'Stage',
   'nav.summary': 'Summary',
   'nav.back': 'Back',
   'nav.menu': 'Menu',
@@ -46,7 +45,7 @@ const EN = {
   'lc.noStorage':
     'Site storage is blocked, so recent rounds and resume are unavailable. A share link still carries a whole round.',
   'lc.about':
-    'A timer for competitive debate. Pick a format, change the speakers, the order and the times to match your tournament, then run the round from the console and put the stage window on the projector. Everything lives in this browser and in the address bar — a link carries the whole setup, so there is no account and no server.',
+    'A timer for competitive debate. Pick a format, change the speakers, the order and the times to match your tournament, then run the round from the console and put it full screen on the projector. Everything lives in this browser and in the address bar — a link carries the whole setup, so there is no account and no server.',
   'lc.presetNote': 'Every format is a starting point: open one and edit the roster, the order and the times.',
 
   // ── Transport ────────────────────────────────────────────────────────────────
@@ -252,14 +251,7 @@ const EN = {
   'au.muted': 'Muted',
   'au.enable': 'Tap to enable sound',
 
-  // ── Stage window ─────────────────────────────────────────────────────────────
-  'sg.open': 'Open stage window',
-  'sg.blocked': 'Popup blocked — open the stage in a new tab',
-  'sg.linkLost': 'Link lost',
-  'sg.restored': 'Link restored',
-  'sg.sameBrowser': 'The stage runs in this browser only',
-  'sg.waiting': 'Waiting for the console',
-  'sg.remote': 'Remote',
+  'nav.remote': 'Remote',
 
   // ── Presets ──────────────────────────────────────────────────────────────────
   'pr.editIt': 'Edit',
@@ -289,7 +281,6 @@ const EN = {
   'kb.bankDraw': 'Draw a prep bank',
   'kb.floorPick': 'Give the floor',
   'kb.undoRedo': 'Undo · Redo',
-  'kb.stageWindow': 'Open the stage window',
   'kb.fullscreen': 'Fullscreen',
   'kb.langToggle': 'EN ⇄ 中文',
   'kb.mute': 'Mute cues',
@@ -412,7 +403,6 @@ const EN = {
   'a11y.floorNow': '{side} now has the floor',
   'a11y.timerRegion': 'Countdown timer',
   'a11y.consoleRegion': 'Operator console',
-  'a11y.stageRegion': 'Stage display',
 } as const;
 
 export type StringKey = keyof typeof EN;
@@ -424,7 +414,6 @@ const ZH: Record<StringKey, string> = {
   'nav.launch': '比赛',
   'nav.console': '控制台',
   'nav.editor': '编辑比赛',
-  'nav.stage': '投影',
   'nav.summary': '赛后统计',
   'nav.back': '返回',
   'nav.menu': '菜单',
@@ -452,7 +441,7 @@ const ZH: Record<StringKey, string> = {
   'lc.plusMore': '另外{n}位',
   'lc.noStorage': '浏览器存储被禁用，最近比赛和断点恢复不可用。分享链接仍然包含完整的比赛设置。',
   'lc.about':
-    '一款为辩论赛准备的计时器。先选一个赛制，再按本场比赛改辩手、改顺序、改时长，然后在控制台计时，把投影窗口放到大屏上。所有数据只保存在本浏览器和地址栏里——一条链接就带着整套设置，不需要注册，也没有服务器。',
+    '一款为辩论赛准备的计时器。先选一个赛制，再按本场比赛改辩手、改顺序、改时长，然后在控制台计时，把控制台全屏投到大屏上。所有数据只保存在本浏览器和地址栏里——一条链接就带着整套设置，不需要注册，也没有服务器。',
   'lc.presetNote': '每个赛制都只是起点：打开后可自由修改辩手、顺序和时长。',
 
   't.start': '开始',
@@ -648,13 +637,7 @@ const ZH: Record<StringKey, string> = {
   'au.muted': '已静音',
   'au.enable': '点击启用声音',
 
-  'sg.open': '打开投影窗口',
-  'sg.blocked': '弹窗被拦截 — 请在新标签页打开投影',
-  'sg.linkLost': '连接中断',
-  'sg.restored': '连接已恢复',
-  'sg.sameBrowser': '投影窗口仅限本浏览器',
-  'sg.waiting': '等待操作台连接',
-  'sg.remote': '遥控器',
+  'nav.remote': '遥控器',
 
   'pr.editIt': '编辑',
   'pr.runNow': '立即开始',
@@ -682,7 +665,6 @@ const ZH: Record<StringKey, string> = {
   'kb.bankDraw': '支取准备时间',
   'kb.floorPick': '指定发言方',
   'kb.undoRedo': '撤销 · 重做',
-  'kb.stageWindow': '打开投影窗口',
   'kb.fullscreen': '全屏',
   'kb.langToggle': '中文 ⇄ EN',
   'kb.mute': '静音提示音',
@@ -798,7 +780,6 @@ const ZH: Record<StringKey, string> = {
   'a11y.floorNow': '现在由{side}发言',
   'a11y.timerRegion': '倒计时',
   'a11y.consoleRegion': '操作控制台',
-  'a11y.stageRegion': '投影显示',
 };
 
 export const STRINGS = { en: EN, zh: ZH } as const;

@@ -35,7 +35,6 @@ import { KeyLegendOverlay } from '../ui/KeyLegendOverlay';
 import Launch from '../screens/Launch';
 import Console from '../screens/Console';
 import Editor from '../screens/Editor';
-import Stage from '../screens/Stage';
 import Summary from '../screens/Summary';
 
 import { bootOnce, installAudioArm, useAudio, useBootState, useTheme } from './boot';
@@ -48,16 +47,14 @@ const CONTEXT: Record<RouteName, HotkeyContext> = {
   launch: 'launch',
   console: 'console',
   edit: 'editor',
-  stage: 'stage',
   summary: 'summary',
   share: 'launch',
 };
 
-const HEADING: Record<RouteName, 'nav.launch' | 'nav.console' | 'nav.editor' | 'nav.stage' | 'nav.summary'> = {
+const HEADING: Record<RouteName, 'nav.launch' | 'nav.console' | 'nav.editor' | 'nav.summary'> = {
   launch: 'nav.launch',
   console: 'nav.console',
   edit: 'nav.editor',
-  stage: 'nav.stage',
   summary: 'nav.summary',
   share: 'nav.launch',
 };
@@ -95,8 +92,7 @@ export default function App(): JSX.Element {
   });
   useEffect(() => setContextResolver(() => CONTEXT[routeRef.current.name]), []);
 
-  // `data-theme` is the console's only theme switch. The stage ignores it by design:
-  // a projector renders anything above #000000 as a glowing grey rectangle.
+  // `data-theme` is the app's only theme switch.
   useEffect(() => {
     document.documentElement.dataset['theme'] = theme;
   }, [theme]);
@@ -151,7 +147,6 @@ export default function App(): JSX.Element {
         onClose={() => setLegendOpen(false)}
         context={CONTEXT[route.name]}
         chess={session.plan.segments[session.state.cursor]?.kind === 'chess'}
-        dim={route.name === 'stage'}
       />
 
       {sleep === null ? null : <SleepPrompt />}
@@ -170,8 +165,6 @@ function Screen({ name }: { name: RouteName }): JSX.Element {
       return <Console />;
     case 'edit':
       return <Editor />;
-    case 'stage':
-      return <Stage />;
     case 'summary':
       return <Summary />;
     default:

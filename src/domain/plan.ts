@@ -52,7 +52,7 @@ export interface SegmentPlan {
   segment: Segment;
   segId: Id;
   kind: SegmentKind;
-  /** What the stage shows: explicit label, else role, else speaker name, else kind. */
+  /** What the console shows: explicit label, else role, else speaker name, else kind. */
   label: L10n;
   /** The single speaker of a `speech` segment, when the roster still has them. */
   speaker: SpeakerCfg | null;

@@ -112,7 +112,7 @@ export function getPreset(key: string): RoundConfig | undefined {
 /**
  * A fresh, independently-owned copy: new round id, new speaker ids, new segment ids,
  * every reference rewritten. Two rounds started from the same preset must not share
- * ids, or the library keys collide and a stage window trusts the wrong frame.
+ * ids, or the library keys collide.
  */
 export function instantiatePreset(key: PresetKey): RoundConfig {
   return instantiateConfig(PRESETS[key]);

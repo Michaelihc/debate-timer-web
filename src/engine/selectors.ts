@@ -123,7 +123,7 @@ export function segmentSpeakers(s: RoundState, plan: RunPlan): Speaker[] {
 
 /**
  * Speakers whose every turn in the run order is already behind the cursor — the roster
- * figures that have finished and should stand down on the stage.
+ * figures that have finished and should stand down on the console.
  *
  * The order is the operator's: this walks `plan.segments` verbatim, so a speaker who
  * appears three times is done only after the third, one who never appears is never done,

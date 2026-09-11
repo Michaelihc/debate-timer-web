@@ -40,22 +40,12 @@
   --danger: #FF3A35;
   --warn-ink: #FFD15E;
 
-  /* --- Stage: always true black; a projector renders #000 as no light ----- */
-  --stage-bg: #000000;
-  --stage-rule: #1B1B1F;
-  --stage-ink: #FFFFFF;
-  --stage-dim: #777777;
-  --stage-track: rgba(255, 255, 255, 0.2627);
-  --stage-hold: #0A0A0C;
-
   /* --- Timer state: TimerController's serialized fields, exactly ---------
      normalFGColor / warningFGColor / normalBGColor / timeoutBGColor. The ring
      runs white, turns yellow at the warning, and its TRACK goes dark red once
      the clock expires - the fill changes, but so does the ground behind it.
-     The --pj-* pair below is the SAME ramp, held immune to [data-theme]: the
-     stage runs on a projector where #000 is no light, so it re-pins the state
-     ramp from these rather than inheriting the daylight one. Nothing else may
-     redefine a --pj-* token. */
+     The --pj-* values are the ramp itself; the --state-* tokens point at them
+     so the light theme can override the ramp without losing the source. */
   --pj-normal: #FEFEFE;
   --pj-warn: #FDFF00;
   --pj-over: #FF3A35;
@@ -64,6 +54,9 @@
   --pj-track-over: rgba(149, 19, 19, 0.3137);
   --pj-pip-idle: #FFFFFF;
   --pj-pip-ink: #323232;
+  /* A projector renders the console's ground as black, so side colours are judged
+     against true black in every theme — see contrast.ts. */
+  --pj-ground: #000000;
 
   --state-normal: var(--pj-normal);
   --state-warn: var(--pj-warn);
@@ -103,19 +96,6 @@
   --wd-time: 125%;
   --wd-body: 100%;
   --wd-struct: 87%;
-
-  /* Stage scale. Display type floats with --u; metadata type is floored, or a
-     15px rail label becomes 9.6px mush on a 1024x768 venue projector. */
-  --u: min(100vw / 1600, 100vh / 900);
-  --ts-clock: max(96px, calc(268 * var(--u)));
-  --ts-name: max(32px, calc(96 * var(--u)));
-  --ts-chess: max(64px, calc(168 * var(--u)));
-  --ts-role: max(16px, calc(34 * var(--u)));
-  --ts-next: max(18px, calc(44 * var(--u)));
-  --ts-rail-name: max(15px, calc(28 * var(--u)));
-  --ts-rail-meta: max(12px, calc(15 * var(--u)));
-  --ts-ribbon: max(12px, calc(20 * var(--u)));
-  --ts-context: max(14px, calc(28 * var(--u)));
 
   /* --- Space, rhythm, radius, borders ----------------------------------- */
   --s-0: 0;
@@ -159,8 +139,7 @@
   --motion-scale: 1;
 }
 
-/* --- Console: structure (light) - daylight setup work only. The stage tokens
-   and the state tokens deliberately do not change. ------------------------ */
+/* --- Light theme: daylight setup work only. ------------------------------ */
 [data-theme="light"] {
   color-scheme: light;
   --bg-app: #F2F2EE;
@@ -187,7 +166,7 @@
 
   /* Daylight setup work only. The dark ramp is near-white and pure yellow,
      which sit at ~1:1 on this ground; these hold the same progression and
-     clear 4.5:1. The stage re-pins the projector ramp on its own root. */
+     clear 4.5:1. */
   --state-normal: #17171A;
   --state-warn: #6B5E00;
   --state-final: #6B5E00;
