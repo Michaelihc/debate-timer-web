@@ -9,16 +9,20 @@
 
 import { useSyncExternalStore } from 'react';
 import type { RoundConfig } from '../domain/config';
+import { canonicalJson } from '../domain/config';
 import type { MigrationProblem } from '../domain/migrate';
 import { migrate, parseAndMigrate } from '../domain/migrate';
 import { plan as buildPlan } from '../domain/plan';
+import { hasErrors, validate } from '../domain/validate';
 import type { Now } from '../engine/chronometer';
 import { now } from '../engine/chronometer';
 import type { Prefs, RecentEntry } from '../engine/persist';
 import {
+  clearDraftFor,
   pushRecent,
   readApplied,
   readBaseline,
+  readDraft,
   readFreshLive,
   readLibrary,
   readPrefs,
@@ -272,8 +276,11 @@ export interface Outgoing {
   config: RoundConfig;
   /** Under way: a segment is loaded and the round has not ended. */
   progress: boolean;
-  /** Changed since it was opened (or since the copy saved in the library). */
+  /** Changed since it was opened (or since the copy saved in the library), or holding
+   *  unapplied changes in the editor's draft. */
   edited: boolean;
+  /** The editor's draft of it, when that holds changes the round itself does not have. */
+  draft: RoundConfig | null;
   /** Belongs in Recent rounds: under way, edited, finished, or already listed. */
   keep: boolean;
 }
@@ -285,15 +292,34 @@ function isEdited(config: RoundConfig, plan: RunPlan): boolean {
   return saved === undefined ? false : configHash(saved) !== plan.hash;
 }
 
+/**
+ * The editor's autosaved draft of this round, when it holds changes the round does not have.
+ * A draft belongs to one round, by id: a draft of any other round is not this one's.
+ */
+function unappliedDraft(config: RoundConfig): RoundConfig | null {
+  const record = readDraft();
+  if (record === null || record.config.id !== config.id) return null;
+  return canonicalJson(record.config) === canonicalJson(config) ? null : record.config;
+}
+
 function outgoingOf(plan: RunPlan, state: RoundState): Outgoing | null {
   const config = plan.config;
-  const edited = isEdited(config, plan);
+  // Edits still in the draft count as edits: a tab closed before Apply must not make them
+  // cheaper to throw away than applied ones.
+  const draft = unappliedDraft(config);
+  const edited = draft !== null || isEdited(config, plan);
   // The empty placeholder, or a blank round nobody has touched: nothing to lose.
   if (plan.segments.length === 0 && !edited) return null;
   const phase = roundPhase(state, plan);
   const progress = phase === 'in';
   const listed = readRecents().some((entry) => entry.id === config.id);
-  return { config, progress, edited, keep: progress || edited || listed || phase === 'complete' };
+  return {
+    config,
+    progress,
+    edited,
+    draft,
+    keep: progress || edited || listed || phase === 'complete',
+  };
 }
 
 /** The loaded round, described as something about to be replaced; null when there is
@@ -303,12 +329,21 @@ export function outgoingRound(): Outgoing | null {
   return outgoingOf(s.plan, s.state);
 }
 
-/** Save a round to the library and put it in Recent rounds, edits and all. */
+/**
+ * Save a round to the library and put it in Recent rounds, edits and all. Unapplied changes
+ * in its draft are saved in its place when they can run, and the draft is then done with,
+ * since its round is no longer loaded. Changes that cannot run stay in the draft, where the
+ * launch screen offers them back.
+ */
 export function keepRound(config: RoundConfig): void {
+  const draft = unappliedDraft(config);
+  const runnable = draft !== null && !hasErrors(validate(draft));
+  const kept = runnable ? draft : config;
   const lang = getLang();
-  const name = resolveL10n(config.title, lang) || translate(lang, 'lc.untitled');
-  saveToLibrary(config.id, config, name);
-  pushRecent(recentOf(config));
+  const name = resolveL10n(kept.title, lang) || translate(lang, 'lc.untitled');
+  saveToLibrary(kept.id, kept, name);
+  pushRecent(recentOf(kept));
+  if (draft === null || runnable) clearDraftFor(config.id);
 }
 
 /* ------------------------------------------------------------------------ resume */

@@ -179,6 +179,51 @@
   font-size: var(--t-meta);
 }
 
+/* The two offers sit together, closer to each other than to the formats. */
+.lc__banners {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+/* --- Launch: editor changes that were never applied ---------------------- */
+
+/* Lighter than the round in progress: nothing is running, so one line on the panel
+   ground, marked with the editor's own unapplied dot. */
+.lc__draft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-5);
+  padding: var(--s-3) var(--s-4);
+  border: var(--hair);
+  background: var(--bg-panel);
+}
+
+.lc__draftmain {
+  display: flex;
+  flex: 1 1 24ch;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-width: 0;
+  color: var(--text-hi);
+  font-size: var(--t-ctl);
+}
+
+.lc__draftdot {
+  width: var(--s-3);
+  height: var(--s-3);
+  flex: none;
+  border-radius: var(--r-pill);
+  background: var(--warn-ink);
+}
+
+.lc__draftage {
+  color: var(--text-lo);
+  font-size: var(--t-meta);
+}
+
 /* --- Launch: format cards ------------------------------------------------ */
 
 .lc__grid {

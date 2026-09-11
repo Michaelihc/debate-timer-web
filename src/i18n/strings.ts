@@ -50,6 +50,10 @@ const EN = {
   'lc.about':
     'A timer for competitive debate. Pick a format, change the speakers, the order and the times to match your tournament, then run the round from the console and put it full screen on the projector. Everything stays in this browser and in the address bar. A link carries the whole setup, so there is no account and no server.',
   'lc.presetNote': 'Every format is a starting point: open one and edit the roster, the order and the times.',
+  'lc.draft': 'Unapplied changes to “{title}”',
+  'lc.continueEditing': 'Continue editing',
+  'lc.discardDraftTitle': 'Discard these changes?',
+  'lc.discardDraftBody': 'The unapplied changes to “{title}” will be lost.',
 
   // ── Transport ────────────────────────────────────────────────────────────────
   't.start': 'Start',
@@ -229,6 +233,7 @@ const EN = {
   'd.replaceTitle': 'Start a different round?',
   'd.replaceKept': '“{title}” will be kept in Recent rounds, with any changes you made.',
   'd.replaceRestart': 'Its clocks start again from the beginning when you open it.',
+  'd.replaceDraftBlocked': 'Unapplied changes that still have problems cannot be kept, and will be lost.',
   'd.replaceConfirm': 'Start the new round',
   'd.keepCurrent': 'Keep this round',
   'd.sleepTitle': 'The round was interrupted',
@@ -480,6 +485,10 @@ const ZH: Record<StringKey, string> = {
   'lc.about':
     '一款为辩论赛准备的计时器。先选一个赛制，再按本场比赛改辩手、改顺序、改时长，然后在控制台计时，把控制台全屏投到大屏上。所有数据只保存在本浏览器和地址栏里。一条链接就能带上整套设置，不需要注册，也没有服务器。',
   'lc.presetNote': '每个赛制都只是起点：打开后可自由修改辩手、顺序和时长。',
+  'lc.draft': '“{title}”有未应用的更改',
+  'lc.continueEditing': '继续编辑',
+  'lc.discardDraftTitle': '放弃这些更改？',
+  'lc.discardDraftBody': '“{title}”未应用的更改将会丢失。',
 
   't.start': '开始',
   't.pause': '暂停',
@@ -651,6 +660,7 @@ const ZH: Record<StringKey, string> = {
   'd.replaceTitle': '要换一场比赛吗？',
   'd.replaceKept': '“{title}”会保存在最近的比赛里，你做的修改都会保留。',
   'd.replaceRestart': '再次打开时，计时会从头开始。',
+  'd.replaceDraftBlocked': '还有问题的未应用更改无法保留，将会丢失。',
   'd.replaceConfirm': '开始新的比赛',
   'd.keepCurrent': '留在当前比赛',
   'd.sleepTitle': '计时被中断',
