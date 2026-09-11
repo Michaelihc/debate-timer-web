@@ -14,11 +14,14 @@
  * Enter) LOADS, arrow-key focus walks the strip, and the live square fills to what has
  * ACTUALLY been consumed. A stray click can never restart a leg.
  *
+ * On a screen too narrow for every square, the squares scroll on their own, and the square
+ * the round moves to is brought into view.
+ *
  * The run order is the operator's — drawn verbatim, with nothing flagged, sorted or deduped.
  */
 
 import type { JSX, KeyboardEvent as ReactKeyboardEvent, Ref } from 'react';
-import { Fragment, useImperativeHandle, useRef } from 'react';
+import { Fragment, useEffect, useImperativeHandle, useRef } from 'react';
 import { ariaShortcut, shortcutText } from '../app/hotkeys';
 import { useLang } from '../i18n/useLang';
 import { clamp01 } from '../lib/clamp';
@@ -50,6 +53,23 @@ export interface TimelineProps {
   ref?: Ref<TimelineHandle>;
 }
 
+/** Scroll `box` sideways just enough to centre `pip`, and only if it is out of view. */
+function revealPip(box: HTMLElement, pip: HTMLElement): void {
+  const boxRect = box.getBoundingClientRect();
+  const pipRect = pip.getBoundingClientRect();
+  if (pipRect.left >= boxRect.left && pipRect.right <= boxRect.right) return;
+  const left =
+    box.scrollLeft + (pipRect.left - boxRect.left) - (boxRect.width - pipRect.width) / 2;
+  const still =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof box.scrollTo === 'function') {
+    box.scrollTo({ left, behavior: still ? 'auto' : 'smooth' });
+  } else {
+    box.scrollLeft = left;
+  }
+}
+
 export function Timeline({
   pips,
   cursor,
@@ -64,6 +84,7 @@ export function Timeline({
 }: TimelineProps): JSX.Element {
   const { t } = useLang();
   const fills = useRef<(HTMLSpanElement | null)[]>([]);
+  const strip = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(
     ref,
@@ -79,6 +100,13 @@ export function Timeline({
     }),
     [pips],
   );
+
+  // The round moved: if its square sits past the edge of a narrow strip, bring it back.
+  useEffect(() => {
+    const box = strip.current;
+    const pip = box?.querySelector<HTMLElement>('[aria-current="step"]');
+    if (box && pip) revealPip(box, pip);
+  }, [cursor, pips.length]);
 
   function activate(index: number): void {
     if (selected === index) onLoad(index);
@@ -130,6 +158,7 @@ export function Timeline({
 
       <div className="tline__strip">
         <div
+          ref={strip}
           className="tline__pips"
           role="listbox"
           aria-label={t('tl.title')}

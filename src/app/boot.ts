@@ -8,28 +8,35 @@
  */
 
 import { useSyncExternalStore } from 'react';
-import type { L10n, RoundConfig } from '../domain/config';
+import type { RoundConfig } from '../domain/config';
 import type { MigrationProblem } from '../domain/migrate';
 import { migrate, parseAndMigrate } from '../domain/migrate';
 import { plan as buildPlan } from '../domain/plan';
 import type { Now } from '../engine/chronometer';
 import { now } from '../engine/chronometer';
-import type { LiveSnapshot, Prefs } from '../engine/persist';
+import type { Prefs, RecentEntry } from '../engine/persist';
 import {
-  clearLive,
   pushRecent,
   readApplied,
+  readBaseline,
   readFreshLive,
+  readLibrary,
   readPrefs,
+  readRecents,
+  saveToLibrary,
   storageAvailable,
+  writeBaseline,
   writePrefs,
 } from '../engine/persist';
 import { fromSnapshot } from '../engine/rebase';
-import { clockView, primaryClockId } from '../engine/selectors';
+import { roundPhase } from '../engine/selectors';
 import type { RoundState, RunPlan } from '../engine/state';
+import { reconcileState } from '../engine/state';
 import { armAudio, audioState, subscribeAudio } from '../engine/sound';
 import type { AudioState } from '../engine/sound';
-import { getSession, hydrate, loadRound } from '../engine/store';
+import { getSession, loadRound, restoreRound } from '../engine/store';
+import { getLang, resolveL10n, translate } from '../i18n/useLang';
+import { configHash } from '../lib/hash';
 import { tokenFromHash, tryDecodeShare } from '../lib/urlState';
 import { ROUTES, currentRoute, navigate, replaceRoute } from './router';
 
@@ -133,6 +140,47 @@ export function installAudioArm(): () => void {
   return remove;
 }
 
+/* ---------------------------------------------------------------------- legend */
+
+// The keyboard legend outlives a route change, so whether it is open lives here rather
+// than in one screen: the shell renders it, `?` toggles it, and any screen can open it
+// from a button.
+let legendOpen = false;
+const legendListeners = new Set<() => void>();
+
+function setLegend(next: boolean): void {
+  if (next === legendOpen) return;
+  legendOpen = next;
+  for (const fn of legendListeners) fn();
+}
+
+export function openLegend(): void {
+  setLegend(true);
+}
+
+export function closeLegend(): void {
+  setLegend(false);
+}
+
+export function toggleLegend(): void {
+  setLegend(!legendOpen);
+}
+
+function subscribeLegend(fn: () => void): () => void {
+  legendListeners.add(fn);
+  return () => {
+    legendListeners.delete(fn);
+  };
+}
+
+function getLegendOpen(): boolean {
+  return legendOpen;
+}
+
+export function useLegendOpen(): boolean {
+  return useSyncExternalStore(subscribeLegend, getLegendOpen, getLegendOpen);
+}
+
 /* ------------------------------------------------------------------ round loading */
 
 export interface OpenOptions {
@@ -146,17 +194,21 @@ export interface OpenOptions {
   history?: 'push' | 'replace';
 }
 
+/** A recents row for a config: its id, its title, and the format it came from. */
+function recentOf(config: RoundConfig): Omit<RecentEntry, 'updatedAt'> {
+  return config.presetRef === undefined
+    ? { id: config.id, title: config.title }
+    : { id: config.id, title: config.title, presetRef: config.presetRef };
+}
+
 /** Plan a config, make it the live round, and go to the screen that runs it. */
 export function openConfig(config: RoundConfig, opts: OpenOptions = {}): RunPlan {
   const plan = buildPlan(config);
   loadRound(plan, { markApplied: opts.markApplied !== false });
-  if (opts.recent !== false) {
-    pushRecent(
-      config.presetRef === undefined
-        ? { id: config.id, title: config.title }
-        : { id: config.id, title: config.title, presetRef: config.presetRef },
-    );
-  }
+  // The round as it was opened. An editor apply moves the hash away from this, which is
+  // how a later replace knows there are edits worth keeping.
+  writeBaseline({ id: config.id, hash: plan.hash });
+  if (opts.recent !== false) pushRecent(recentOf(config));
   const route = opts.route ?? ROUTES.console;
   if (opts.history === 'replace') replaceRoute(route);
   else navigate(route);
@@ -213,57 +265,115 @@ export async function openShareToken(token: string): Promise<ImportOutcome> {
   return { config: result.config, problems: result.problems };
 }
 
+/* ------------------------------------------------------------- replacing a round */
+
+/** What is at stake when the loaded round is about to be replaced by another one. */
+export interface Outgoing {
+  config: RoundConfig;
+  /** Under way: a segment is loaded and the round has not ended. */
+  progress: boolean;
+  /** Changed since it was opened (or since the copy saved in the library). */
+  edited: boolean;
+  /** Belongs in Recent rounds: under way, edited, finished, or already listed. */
+  keep: boolean;
+}
+
+function isEdited(config: RoundConfig, plan: RunPlan): boolean {
+  const baseline = readBaseline();
+  if (baseline !== null && baseline.id === config.id) return baseline.hash !== plan.hash;
+  const saved = readLibrary()[config.id]?.config;
+  return saved === undefined ? false : configHash(saved) !== plan.hash;
+}
+
+function outgoingOf(plan: RunPlan, state: RoundState): Outgoing | null {
+  const config = plan.config;
+  const edited = isEdited(config, plan);
+  // The empty placeholder, or a blank round nobody has touched: nothing to lose.
+  if (plan.segments.length === 0 && !edited) return null;
+  const phase = roundPhase(state, plan);
+  const progress = phase === 'in';
+  const listed = readRecents().some((entry) => entry.id === config.id);
+  return { config, progress, edited, keep: progress || edited || listed || phase === 'complete' };
+}
+
+/** The loaded round, described as something about to be replaced; null when there is
+ *  nothing real loaded. */
+export function outgoingRound(): Outgoing | null {
+  const s = getSession();
+  return outgoingOf(s.plan, s.state);
+}
+
+/** Save a round to the library and put it in Recent rounds, edits and all. */
+export function keepRound(config: RoundConfig): void {
+  const lang = getLang();
+  const name = resolveL10n(config.title, lang) || translate(lang, 'lc.untitled');
+  saveToLibrary(config.id, config, name);
+  pushRecent(recentOf(config));
+}
+
 /* ------------------------------------------------------------------------ resume */
 
+/** Boot put back a round that was under way while the operator was on the launch screen. */
 export interface ResumeOffer {
-  config: RoundConfig;
+  /** When its snapshot was last written: its last command, or its last second running. */
+  updatedAt: number;
+}
+
+export interface Restored {
   plan: RunPlan;
-  /** The snapshot rebased onto this document's monotonic clock. */
   state: RoundState;
-  snapshot: LiveSnapshot;
-  title: L10n;
-  /** 1-based, for `d.resumeBody`. */
-  segmentIndex: number;
-  segmentCount: number;
-  remainingMs: number;
-  /** How long ago the round was last touched. */
-  ageMs: number;
+  /** The snapshot's write time, or null when the applied round was loaded fresh. */
+  updatedAt: number | null;
 }
 
-function offerFrom(snapshot: LiveSnapshot, n: Now): ResumeOffer | null {
-  let plan: RunPlan;
-  let state: RoundState;
-  try {
-    plan = buildPlan(snapshot.config);
-    state = fromSnapshot(snapshot.state, n);
-  } catch {
-    return null; // a snapshot from an incompatible build is ignored, never fatal
+/**
+ * Put back the round this browser was running, exactly where it was.
+ *
+ * The live snapshot is the truth about the clocks and the applied config is the truth
+ * about the round's shape. When they are the same round, the snapshot's anchors are
+ * re-based onto this document's clock, so a running clock is charged the wall time that
+ * passed while the page was gone, and a config that moved on since is reconciled by
+ * stable id. Only when there is no usable snapshot is the applied round loaded fresh.
+ *
+ * Nothing here writes to storage. Boot used to load the applied round with a normal commit,
+ * which persisted a pre-round state over the snapshot a moment before reading it back: that
+ * is how a reload lost the operator's place.
+ */
+export function restoreSession(n: Now = now()): Restored | null {
+  const applied = readApplied();
+  const snapshot = readFreshLive();
+  if (snapshot !== null && (applied === null || applied.id === snapshot.config.id)) {
+    try {
+      const plan = buildPlan(applied ?? snapshot.config);
+      let state = fromSnapshot(snapshot.state, n);
+      if (state.configHash !== plan.hash) state = reconcileState(state, plan).state;
+      restoreRound(plan, state);
+      return { plan, state, updatedAt: snapshot.updatedAt };
+    } catch {
+      // A snapshot from an incompatible build is ignored, never fatal.
+    }
   }
-  const id = primaryClockId(state, plan);
-  const view = id ? clockView(state, plan, id, n) : null;
-  return {
-    config: snapshot.config,
-    plan,
-    state,
-    snapshot,
-    title: snapshot.config.title,
-    segmentIndex: Math.min(plan.segments.length, Math.max(1, state.cursor + 1)),
-    segmentCount: plan.segments.length,
-    remainingMs: view?.remainingMs ?? 0,
-    ageMs: Math.max(0, Date.now() - snapshot.updatedAt),
-  };
+  if (applied !== null) {
+    try {
+      const plan = buildPlan(applied);
+      loadRound(plan, { markApplied: false, persist: false });
+      return { plan, state: getSession().state, updatedAt: null };
+    } catch {
+      // A stored config this build cannot plan is ignored; the empty session stands.
+    }
+  }
+  return null;
 }
 
-/** Take the interrupted round: the anchors are rebased, so it resumes at its real time. */
-export function acceptResume(offer: ResumeOffer): void {
-  hydrate(offer.plan, offer.snapshot.state);
+/** Carry on with the loaded round, on the console. */
+export function resumeRound(): void {
   dismissResume();
   navigate(ROUTES.console);
 }
 
-/** Decline it. The snapshot is dropped so the prompt does not return on the next load. */
-export function discardResume(): void {
-  clearLive();
+/** Start the loaded round over from before its first segment, on disk too. */
+export function restartRound(): void {
+  loadRound(getSession().plan, { markApplied: false });
   dismissResume();
 }
 
@@ -271,7 +381,7 @@ export function discardResume(): void {
 
 export interface BootState {
   ready: boolean;
-  /** An interrupted round younger than 8h, or null. */
+  /** Boot put back a round under way (snapshot younger than 8h) and landed on launch. */
   resume: ResumeOffer | null;
   /** Set when a `#/r/…` link could not be decoded; the app lands on Launch and says so. */
   shareError: string | null;
@@ -350,30 +460,33 @@ async function run(): Promise<BootState> {
   const route = currentRoute();
 
   // A shared link wins: the operator followed it on purpose, and it must never be
-  // silently replaced by whatever this browser happened to have open last.
+  // silently replaced by whatever this browser happened to have open last. The round it
+  // replaces is still the operator's, though: it goes into Recent rounds, edits and all,
+  // and stays loaded if the link turns out to be unreadable.
   if (route.name === 'share' && route.token) {
+    const previous = restoreSession();
+    const outgoing = previous === null ? null : outgoingOf(previous.plan, previous.state);
+    if (outgoing?.keep === true) keepRound(outgoing.config);
     await openShareToken(route.token);
     setBoot({ ready: true });
     return bootState;
   }
 
-  const applied = readApplied();
-  if (applied) {
-    try {
-      loadRound(buildPlan(applied), { markApplied: false });
-    } catch {
-      // A stored config this build cannot plan is ignored; the empty session stands.
-    }
-  }
-
-  const snapshot = readFreshLive();
-  const offer = snapshot ? offerFrom(snapshot, now()) : null;
-  // An interrupted round is offered, never taken: resuming a round the operator has
-  // moved on from is the more expensive mistake.
+  // A reload, a crash or a sleep costs seconds, not the round: whatever was running is put
+  // back where it was. On the console it simply carries on. On the launch screen the banner
+  // says where it stands and when it was last touched.
+  const restored = restoreSession();
+  const offer: ResumeOffer | null =
+    restored !== null &&
+    restored.updatedAt !== null &&
+    route.name === 'launch' &&
+    roundPhase(restored.state, restored.plan) === 'in'
+      ? { updatedAt: restored.updatedAt }
+      : null;
   setBoot({ resume: offer, ready: true });
 
-  // Nothing to run and nothing to resume: start where a round gets chosen.
-  if (!applied && !offer && route.name === 'console') replaceRoute(ROUTES.launch);
+  // Nothing to run: start where a round gets chosen.
+  if (restored === null && route.name === 'console') replaceRoute(ROUTES.launch);
 
   return bootState;
 }

@@ -140,10 +140,25 @@ export function applyCueEvents(events: readonly CueEvent[]): void {
 
 // -------------------------------------------------------------------- loading
 
-/** Load a plan and start a fresh round. */
-export function loadRound(plan: RunPlan, opts?: { markApplied?: boolean }): void {
+/**
+ * Load a plan and start a fresh round.
+ *
+ * `persist: false` leaves the live snapshot on disk alone. Boot needs that: loading the
+ * last applied round must never overwrite the snapshot of the round that was running
+ * when the page went away, or a reload costs the operator their place.
+ */
+export function loadRound(
+  plan: RunPlan,
+  opts?: { markApplied?: boolean; persist?: boolean },
+): void {
   if (opts?.markApplied !== false) writeApplied(plan.config);
-  commit(sessionOf(plan, initialState(plan)));
+  commit(sessionOf(plan, initialState(plan)), { persist: opts?.persist !== false });
+}
+
+/** Put back a round state that is already re-based onto this document's clock. Not
+ *  persisted: the snapshot it came from is still what is on disk. */
+export function restoreRound(plan: RunPlan, state: RoundState): void {
+  commit(sessionOf(plan, state), { persist: false });
 }
 
 /** Swap the plan under a live round (an editor apply). The caller reconciles the

@@ -452,6 +452,7 @@ export default function Console(): JSX.Element {
           else toggleMuted();
         }}
         onEditor={() => navigate(ROUTES.edit)}
+        onHome={() => navigate(ROUTES.launch)}
       />
 
       <div className="uconsole__main">
@@ -477,6 +478,7 @@ export default function Console(): JSX.Element {
             transport={view.transport}
             hold={view.hold}
             chess={isChess}
+            spaceHandsOff={swapAllowed}
             canStart={canStart}
             canAdjust={can.adjust}
             canReset={view.phase === 'in' && !view.hold}

@@ -52,29 +52,33 @@ rather than sitting there doing nothing.
 
 ## Keyboard
 
-The whole round can be run without looking at the keyboard. `?` shows this legend in the app.
+The whole round can be run without looking at the keyboard. `?` (or the Keyboard shortcuts button on
+the launch screen) shows this list in the app, in the interface's language.
 On Windows and Linux `⇧` is Shift and `⌥` is Alt; the app prints the names your keyboard uses.
 
 | Key | Action |
 |---|---|
 | `Space` | Start · Pause · Hand off floor |
-| `⇧ Space` | Pause / resume the side that holds the floor *(free debate)* |
+| `⇧ Space` | Pause or resume the side that has the floor *(free debate)* |
 | `S` | Hand the floor to the other side *(free debate)* |
 | `←` `→` | Give the floor to a side *(free debate)* |
-| `N` | Advance — arm the next segment |
-| `⇧ N` | Advance and start the clock |
-| `P` / `PgUp` | Previous segment, at its remembered time |
-| `PgDn` | GO — start, then advance (for a presenter clicker) |
+| `N` | Next segment, without starting its clock |
+| `⇧ N` | Next segment, and start its clock |
+| `P` / `PgUp` | Previous segment, from where it stopped |
+| `PgDn` | Start the clock, or go to the next segment while it runs (for a presenter clicker) |
 | `↑` `↓` | ±15s on the current clock (`⇧` for 60s, `⌥` for 5s) |
-| `B` `.` | Hold / release the whole round |
+| `B` `.` | Pause or resume the whole round |
 | `R` | Reset the segment |
-| `⏎` | Load the segment under the cursor |
+| `⏎` | Open the selected segment |
 | `E` | Open the editor |
 | `L` | EN ⇄ 中文 |
 | `M` | Mute cues |
 | `F` | Fullscreen |
 | `Ctrl S` (`⌘ S` on a Mac) | Share |
-| `?` | This legend |
+| `?` | Show these shortcuts |
+
+A reload, a crash or a closed tab does not cost the round: reopening the console puts it back at the
+same segment and time, with a running clock charged the time that passed.
 
 ## Notable differences from the Unity version
 
