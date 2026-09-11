@@ -1,13 +1,17 @@
 /**
- * One roster row, 44px: grip · ordinal · name · role · time · ⋯
+ * One roster row:  ⠿ │ 1 │ name            │ 3:00 │ ⋯
+ *                           role, underneath
+ *
+ * Name and role stack, so a role like 总结陈词 or "Opening Constructive" is always read in
+ * full rather than cut to 总结陈. The grip shows while the row is hovered or focused.
  *
  * The keyboard is the primary path. Enter in the name field creates the next row and
- * focuses it — eight speakers are eight names and eight Enters. Alt+↑/↓ reorders,
- * ⌘D duplicates, ⌘⌫ deletes, Tab walks name → role → time → next name.
+ * focuses it — eight speakers are eight names and eight Enters. Alt+↑/↓ reorders, ⌘D
+ * duplicates, ⌘⌫ deletes, Tab walks name → role → time → ⋯.
  *
- * The role field edits the current language and mirrors into the other while that other
- * is still empty, so a monolingual operator never sees a second box and a bilingual one
- * presses L and types the other half.
+ * The role field edits the current language and fills the other half while that half is
+ * still empty (or still the copy this field put there), so an operator working in one
+ * language types a role once and both consoles show it.
  */
 
 import type { DragEvent as ReactDragEvent, JSX, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
@@ -20,18 +24,24 @@ import { TimeField } from './TimeField';
 
 import '../screens/editor.css';
 
+/** "Focus this speaker's name" — a fresh `seq` asks again even for the same speaker. */
+export interface FocusRequest {
+  id: string;
+  seq: number;
+}
+
 export interface SpeakerRowProps {
   speaker: SpeakerCfg;
   /** 1-based position within this side. */
   ordinal: number;
   /** Position within this side's array, for reordering. */
   index: number;
-  color: string;
   /** The side's own name, so "Speaker 1" is not ambiguous across the two rosters. */
   sideLabel: string;
   secondsOnly: boolean;
   /** Nothing here judges the run order; this is only `UNNAMED_SPEAKER` from validate.ts. */
   flagged: boolean;
+  focus: FocusRequest | null;
   onPatch: (patch: Partial<SpeakerCfg>) => void;
   onEnter: () => void;
   onDuplicate: () => void;
@@ -40,17 +50,16 @@ export interface SpeakerRowProps {
   onSetAllOnSide: () => void;
   onMove: (delta: number) => void;
   onReorder: (from: number, to: number) => void;
-  focusKey: string | null;
 }
 
 export function SpeakerRow({
   speaker,
   ordinal,
   index,
-  color,
   sideLabel,
   secondsOnly,
   flagged,
+  focus,
   onPatch,
   onEnter,
   onDuplicate,
@@ -59,7 +68,6 @@ export function SpeakerRow({
   onSetAllOnSide,
   onMove,
   onReorder,
-  focusKey,
 }: SpeakerRowProps): JSX.Element {
   const { t, lang, l10n } = useLang();
   const [dragArmed, setDragArmed] = useState(false);
@@ -67,8 +75,8 @@ export function SpeakerRow({
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (focusKey === speaker.id) nameRef.current?.focus();
-  }, [focusKey, speaker.id]);
+    if (focus !== null && focus.id === speaker.id) nameRef.current?.focus();
+  }, [focus, speaker.id]);
 
   function onRowKeyDown(e: ReactKeyboardEvent<HTMLLIElement>): void {
     // Alt+↑/↓ reorders from the name and role fields — that is the roster's keyboard
@@ -92,11 +100,6 @@ export function SpeakerRow({
     }
   }
 
-  function onDragStart(e: ReactDragEvent<HTMLLIElement>): void {
-    e.dataTransfer.setData(DRAG_MIME, String(index));
-    e.dataTransfer.effectAllowed = 'move';
-  }
-
   function onDragOver(e: ReactDragEvent<HTMLLIElement>): void {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -116,24 +119,29 @@ export function SpeakerRow({
     onReorder(raw, target);
   }
 
-  const roleText = l10n(speaker.role);
-
   function setRole(text: string): void {
+    const mine = lang === 'zh' ? (speaker.role?.zh ?? '') : (speaker.role?.en ?? '');
     const other = lang === 'zh' ? (speaker.role?.en ?? '') : (speaker.role?.zh ?? '');
-    // Mirror into the untouched language so one typed word reaches both.
-    const mirrored = other.trim() === '' ? text : other;
+    // Fill the other half while it is empty or still a copy of this one, and only then —
+    // checking "empty" alone stopped mirroring after the first keystroke.
+    const mirrored = other.trim() === '' || other === mine ? text : other;
     const next: L10n = lang === 'zh' ? { en: mirrored, zh: text } : { en: text, zh: mirrored };
     onPatch(next.en === '' && next.zh === '' ? { role: undefined } : { role: next });
   }
 
+  const who = `${sideLabel} · ${t('ed.speakerN', { i: ordinal })}`;
+
   return (
     <li
-      className="srow"
+      className="person"
       data-flagged={flagged ? '' : undefined}
       data-drop={dropEdge ?? undefined}
       draggable={dragArmed}
       onKeyDown={onRowKeyDown}
-      onDragStart={onDragStart}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, String(index));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
       onDragEnd={() => {
         setDragArmed(false);
         setDropEdge(null);
@@ -142,59 +150,53 @@ export function SpeakerRow({
       onDragLeave={() => setDropEdge(null)}
       onDrop={onDrop}
     >
-      <span className="srow__spine" style={{ background: color }} aria-hidden="true" />
-
-      <button
-        type="button"
-        className="srow__grip"
-        aria-label={t('ed.reorderHint')}
+      <span
+        className="person__grip"
+        aria-hidden="true"
+        title={t('ed.reorderHint')}
         onPointerDown={() => setDragArmed(true)}
         onPointerUp={() => setDragArmed(false)}
-        onKeyDown={(e) => {
-          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-          e.preventDefault();
-          onMove(e.key === 'ArrowUp' ? -1 : 1);
-        }}
       >
         <Icon name="grip" />
-      </button>
+      </span>
 
-      <span className="srow__ord t-meta num" aria-hidden="true">
+      <span className="person__ord t-meta num" aria-hidden="true">
         {ordinal}
       </span>
 
-      <input
-        ref={nameRef}
-        className="srow__name t-row"
-        type="text"
-        value={speaker.name}
-        placeholder={t('ed.namePlaceholder')}
-        aria-label={`${sideLabel} · ${t('ed.speakerN', { i: ordinal })}`}
-        autoComplete="off"
-        onChange={(e) => onPatch({ name: e.target.value })}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter') return;
-          e.preventDefault();
-          onEnter();
-        }}
-      />
-
-      <input
-        className="srow__role t-meta"
-        type="text"
-        value={roleText}
-        placeholder={t('ed.role')}
-        aria-label={t('ed.role')}
-        title={t('ed.roleHint')}
-        autoComplete="off"
-        onChange={(e) => setRole(e.target.value)}
-      />
+      <span className="person__text">
+        <input
+          ref={nameRef}
+          className="person__name t-row"
+          type="text"
+          value={speaker.name}
+          placeholder={t('ed.namePlaceholder')}
+          aria-label={who}
+          autoComplete="off"
+          onChange={(e) => onPatch({ name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            onEnter();
+          }}
+        />
+        <input
+          className="person__role t-meta"
+          type="text"
+          value={l10n(speaker.role)}
+          placeholder={t('ed.rolePlaceholder')}
+          aria-label={`${who} · ${t('ed.role')}`}
+          title={t('ed.roleHint')}
+          autoComplete="off"
+          onChange={(e) => setRole(e.target.value)}
+        />
+      </span>
 
       <TimeField
-        className="srow__time"
+        className="person__time"
         valueMs={speaker.defaultMs}
         onChange={(ms) => onPatch({ defaultMs: ms })}
-        label={t('ed.time')}
+        label={`${who} · ${t('ed.time')}`}
         labelHidden
         secondsOnly={secondsOnly}
         minMs={0}

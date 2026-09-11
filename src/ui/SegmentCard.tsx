@@ -1,22 +1,27 @@
 /**
- * One run-sheet card, 44px:
- *   ⠿ grip │ cumulative start │ 4px side spine │ kind glyph │ label │ chip │ duration │ cues │ ⋯
+ * One step of the run order:
+ *
+ *   ⠿ │ 2 ▌ [正一]  开篇立论 ……………………… Custom │ 3:00 │ ⋯
+ *
+ * Who, what, how long. Everything else about a segment — its speaker, the choice between
+ * the speaker's time and its own, protected time, cues, its label in both languages —
+ * opens in place under the row when the row is clicked, and closes the same way (or Esc).
+ * The grip only shows while the row is hovered or focused.
  *
  * The run order is the operator's. A speaker may appear here once, five times, or never;
- * prep, free debate and breaks may sit anywhere. This card renders position and duration
- * and NOTHING about whether the sequence looks conventional — no badge, no asterisk, no
- * tooltip, no colour. The only red thing it can ever show is a `validate.ts` error, and
- * the only error a card can carry is a reference to a speaker that no longer exists.
+ * prep, free debate and breaks may sit anywhere. This row renders position, identity and
+ * duration and NOTHING about whether the sequence looks conventional — no badge, no
+ * asterisk, no tooltip, no colour. The only red thing it can show is a `validate.ts` error:
+ * a reference to a speaker the roster no longer has.
  *
- * Identity colour lives on the 4px spine and the speaker chip — periphery. Nothing on
- * this card reads a clock-state colour, because nothing on this card is a clock.
+ * Identity colour lives on the 4px spine and the speaker chip — periphery. Nothing here
+ * reads a clock-state colour, because nothing here is a clock.
  */
 
-import type { DragEvent as ReactDragEvent, JSX, KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { useState } from 'react';
-import type { Segment, SegmentKind, SideId, SpeakerCfg } from '../domain/config';
+import type { DragEvent as ReactDragEvent, JSX, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
+import { useId, useRef, useState } from 'react';
+import type { Segment } from '../domain/config';
 import { isTypingTarget } from '../app/hotkeys';
-import type { StringKey } from '../i18n/strings';
 import { formatTime } from '../lib/format';
 import { useLang } from '../i18n/useLang';
 import { Icon } from './Icons';
@@ -26,83 +31,73 @@ import { DRAG_MIME, speakerChipStyle } from './rowShared';
 
 import '../screens/editor.css';
 
-/**
- * A one-glyph tell for the kind, so the eye reads structure before words.
- *
- * Every one of these is a plain typographic character with no emoji presentation — U+23F8
- * PAUSE BUTTON would have been the obvious mark for `prep`, but it is emoji-capable and
- * arrives coloured and differently shaped on half the machines in a venue.
- */
-const GLYPH: Record<SegmentKind, string> = {
-  speech: '▌',
-  shared: '⇄',
-  prep: '‖',
-  chess: '⧗',
-  break: '—',
-};
+export interface SegmentWho {
+  text: string;
+  /** The side's colour when the clock is one side's; null when it is both sides'. */
+  color: string | null;
+}
 
 export interface SegmentCardProps {
   segment: Segment;
   index: number;
   count: number;
-  /** Cumulative round time at which this segment starts. */
-  offsetMs: number;
+  label: string;
+  /** Whose clock it is: the speaker, one side, both sides — or nobody, for a break. */
+  who: SegmentWho | null;
+  /** The segment names a speaker the roster no longer has (`MISSING_SPEAKER`). */
+  missing: boolean;
+  /** Side colour for the spine; null when the clock is not one side's. */
+  color: string | null;
   /** The number the operator edits: `perSideMs` for free debate, the allotment otherwise. */
   durationMs: number;
   perSide: boolean;
-  label: string;
-  speaker: SpeakerCfg | null;
-  /** The segment names a speaker the roster no longer has (`MISSING_SPEAKER`). */
-  missing: boolean;
-  side: SideId | null;
-  color: string | null;
-  cues: readonly number[];
-  customCues: boolean;
-  /** A speech taking the speaker's default time rather than its own. */
-  inherited: boolean;
-  selected: boolean;
+  /** A speech carrying its own time instead of following its speaker's. */
+  custom: boolean;
+  expanded: boolean;
   secondsOnly: boolean;
-  onSelect: () => void;
+  /** Id of the screen's one line explaining Alt+↑ / Alt+↓. */
+  hintId?: string;
+  onToggle: () => void;
   onDuration: (ms: number) => void;
-  onToggleInherit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onMove: (delta: number) => void;
   onReorder: (from: number, to: number) => void;
+  /** The details, rendered under the row while it is expanded. */
+  children?: ReactNode;
 }
 
 export function SegmentCard({
   segment,
   index,
   count,
-  offsetMs,
+  label,
+  who,
+  missing,
+  color,
   durationMs,
   perSide,
-  label,
-  speaker,
-  missing,
-  side,
-  color,
-  cues,
-  customCues,
-  inherited,
-  selected,
+  custom,
+  expanded,
   secondsOnly,
-  onSelect,
+  hintId,
+  onToggle,
   onDuration,
-  onToggleInherit,
   onDuplicate,
   onDelete,
   onMove,
   onReorder,
+  children,
 }: SegmentCardProps): JSX.Element {
-  const { t, l10n } = useLang();
+  const { t } = useLang();
+  const detailsId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const [dragArmed, setDragArmed] = useState(false);
   const [dropEdge, setDropEdge] = useState<'above' | 'below' | null>(null);
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLLIElement>): void {
-    // Inside the duration box every key belongs to the field — Alt+↑/↓ there is the
-    // ±5s step, not a reorder, and firing both would move the card AND change its time.
+    // Inside a field every key belongs to the field — Alt+↑/↓ in a time box is its ±5s
+    // step, not a reorder, and firing both would move the row AND change its time.
     if (isTypingTarget(e.target)) return;
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
@@ -115,14 +110,18 @@ export function SegmentCard({
       onDuplicate();
       return;
     }
-    if (e.key === 'Backspace' || e.key === 'Delete') {
+    const onRow = e.target === e.currentTarget || e.target === toggleRef.current;
+    if (onRow && (e.key === 'Backspace' || e.key === 'Delete')) {
       e.preventDefault();
       onDelete();
       return;
     }
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Escape' && expanded) {
+      // Esc closes the open row before it means "leave the editor".
       e.preventDefault();
-      onSelect();
+      e.stopPropagation();
+      toggleRef.current?.focus();
+      onToggle();
     }
   }
 
@@ -138,25 +137,27 @@ export function SegmentCard({
     onReorder(raw, target);
   }
 
-  const name = `${t('ed.segmentN', { i: index + 1 })} · ${label} · ${formatTime(durationMs, { secondsOnly })}`;
+  const time = formatTime(durationMs, { secondsOnly });
+  const name = [
+    t('ed.segmentN', { i: index + 1 }),
+    missing ? t('ed.speakerDeleted') : who?.text,
+    label,
+    perSide ? `${time} ${t('ed.perSide')}` : time,
+    custom ? t('ed.customTime') : undefined,
+  ]
+    .filter((part): part is string => part !== undefined && part !== '')
+    .join(' · ');
 
   return (
     <li
-      className="scard"
-      tabIndex={0}
-      aria-label={name}
-      aria-current={selected ? 'true' : undefined}
-      data-selected={selected ? '' : undefined}
-      data-missing={missing ? '' : undefined}
+      className="step"
+      data-seg={segment.id}
       data-kind={segment.kind}
-      data-side={side ?? undefined}
+      data-expanded={expanded ? '' : undefined}
+      data-missing={missing ? '' : undefined}
       data-drop={dropEdge ?? undefined}
       draggable={dragArmed}
       onKeyDown={onKeyDown}
-      onClick={(e) => {
-        if (e.target instanceof HTMLElement && e.target.closest('input,button,select,textarea')) return;
-        onSelect();
-      }}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, String(index));
         e.dataTransfer.effectAllowed = 'move';
@@ -174,119 +175,97 @@ export function SegmentCard({
       onDragLeave={() => setDropEdge(null)}
       onDrop={onDrop}
     >
-      <span className="scard__at t-cap num" aria-label={t('ed.startsAt')}>
-        {formatTime(offsetMs, { secondsOnly })}
-      </span>
-
-      <button
-        type="button"
-        className="scard__grip"
-        aria-label={t('ed.reorderHint')}
-        onPointerDown={() => setDragArmed(true)}
-        onPointerUp={() => setDragArmed(false)}
-        onKeyDown={(e) => {
-          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-          e.preventDefault();
-          onMove(e.key === 'ArrowUp' ? -1 : 1);
+      <div
+        className="step__head"
+        onClick={(e) => {
+          // The whole row opens the details; its own controls keep their clicks.
+          if (e.target instanceof Element && e.target.closest('input,button,select,textarea,.rowmenu')) return;
+          onToggle();
         }}
       >
-        <Icon name="grip" />
-      </button>
-
-      <span
-        className="scard__spine"
-        style={color === null ? undefined : { background: color }}
-        aria-hidden="true"
-      />
-
-      <span className="scard__glyph" aria-hidden="true">
-        {GLYPH[segment.kind]}
-      </span>
-
-      <span className="scard__label t-row">{label}</span>
-
-      {missing ? (
-        <span className="scard__missing t-cap">
-          <Icon name="alert" /> {t('ed.speakerDeleted')}
+        <span
+          className="step__grip"
+          aria-hidden="true"
+          title={t('ed.reorderHint')}
+          onPointerDown={() => setDragArmed(true)}
+          onPointerUp={() => setDragArmed(false)}
+        >
+          <Icon name="grip" />
         </span>
-      ) : speaker ? (
-        <span className="scard__chip t-cap" style={color === null ? undefined : speakerChipStyle(color)}>
-          {speaker.name.trim() === '' ? l10n(speaker.role) || t('k.speech') : speaker.name}
-        </span>
-      ) : (
-        <span className="scard__badge t-cap">{t(badgeKey(segment.kind))}</span>
-      )}
 
-      <span className="scard__cues t-cap" aria-label={t('ed.cueTiers')}>
-        {cues.length === 0 ? (
-          <span className="scard__cue-none">{t('ui.none')}</span>
-        ) : (
-          cues.map((at) => (
-            <span key={at} className="scard__cue" data-custom={customCues ? '' : undefined}>
-              {formatTime(at, { secondsOnly })}
-            </span>
-          ))
-        )}
-      </span>
+        <button
+          ref={toggleRef}
+          type="button"
+          className="step__toggle"
+          aria-expanded={expanded}
+          aria-controls={expanded ? detailsId : undefined}
+          aria-label={name}
+          aria-describedby={hintId}
+          onClick={onToggle}
+        >
+          <span className="step__num t-meta num" aria-hidden="true">
+            {index + 1}
+          </span>
+          <span
+            className="step__spine"
+            style={color === null ? undefined : { background: color }}
+            aria-hidden="true"
+          />
+          <span className="step__who" aria-hidden="true">
+            {missing ? (
+              <span className="step__missing t-cap">
+                <Icon name="alert" /> {t('ed.speakerDeleted')}
+              </span>
+            ) : who === null ? null : who.color === null ? (
+              <span className="step__chip step__chip--both t-cap">{who.text}</span>
+            ) : (
+              <span className="step__chip t-cap" style={speakerChipStyle(who.color)}>
+                {who.text}
+              </span>
+            )}
+          </span>
+          <span className="step__label t-row">{label}</span>
+          <Icon name="caret" className="step__caret" />
+        </button>
 
-      <span className="scard__dur">
-        {segment.kind === 'speech' ? (
-          <button
-            type="button"
-            className="scard__link"
-            aria-pressed={!inherited}
-            title={inherited ? t('ed.inherit') : t('ed.override')}
-            aria-label={inherited ? t('ed.inherit') : t('ed.override')}
-            onClick={onToggleInherit}
-          >
-            <Icon name={inherited ? 'link' : 'unlink'} />
-          </button>
+        {perSide ? (
+          <span className="step__note t-meta">{t('ed.perSide')}</span>
+        ) : custom ? (
+          <span className="step__note step__note--custom t-meta" title={t('ed.customTimeHint')}>
+            {t('ed.customTime')}
+          </span>
         ) : null}
+
         <TimeField
-          className="scard__time"
+          className="step__time"
           valueMs={durationMs}
           onChange={onDuration}
-          label={perSide ? `${t('ed.time')} · ${t('ed.perSide')}` : t('ed.time')}
+          label={`${t('ed.segmentN', { i: index + 1 })} · ${perSide ? `${t('ed.time')} · ${t('ed.perSide')}` : t('ed.time')}`}
           labelHidden
           secondsOnly={secondsOnly}
-          inherited={inherited}
         />
-      </span>
 
-      <RowMenu label={t('ed.more')}>
-        <button type="button" onClick={onSelect}>
-          {t('ed.inspector')}
-        </button>
-        <button type="button" onClick={onDuplicate}>
-          {t('ed.duplicate')}
-        </button>
-        <button type="button" onClick={() => onMove(-1)}>
-          {t('ed.moveUp')}
-        </button>
-        <button type="button" onClick={() => onMove(1)}>
-          {t('ed.moveDown')}
-        </button>
-        <button type="button" data-tone="danger" onClick={onDelete}>
-          {t('ed.delete')}
-        </button>
-      </RowMenu>
+        <RowMenu label={t('ed.more')}>
+          <button type="button" onClick={onDuplicate}>
+            {t('ed.duplicate')}
+          </button>
+          <button type="button" disabled={index === 0} onClick={() => onMove(-1)}>
+            {t('ed.moveUp')}
+          </button>
+          <button type="button" disabled={index === count - 1} onClick={() => onMove(1)}>
+            {t('ed.moveDown')}
+          </button>
+          <button type="button" data-tone="danger" onClick={onDelete}>
+            {t('ed.delete')}
+          </button>
+        </RowMenu>
+      </div>
 
-      <span className="sr-only">{t('ed.segmentN', { i: index + 1 })} / {count}</span>
+      {expanded ? (
+        <div className="step__details" id={detailsId}>
+          {children}
+        </div>
+      ) : null}
     </li>
   );
-}
-
-function badgeKey(kind: SegmentKind): StringKey {
-  switch (kind) {
-    case 'chess':
-      return 'k.free';
-    case 'shared':
-      return 'k.shared';
-    case 'prep':
-      return 'k.prep';
-    case 'break':
-      return 'k.break';
-    default:
-      return 'k.speech';
-  }
 }
