@@ -495,25 +495,46 @@ test('a held round offers one way to resume it, not two', () => {
   expect(screen.queryByRole('button', { name: /pause round/i })).toBeNull();
 });
 
-test('the free-debate primary button prints the key that does what the button does', () => {
+test('in free debate Space pauses and resumes the side with the floor, as the button does', () => {
+  const i = chessIndex();
   act(() => {
-    dispatch({ t: 'LOAD', cursor: chessIndex() });
+    dispatch({ t: 'LOAD', cursor: i });
   });
   render(<Console />);
+  const segId = getSession().plan.segments[i]?.segId ?? '';
   const primary = (): HTMLElement => el('.transport__main .tbtn--primary');
   const caps = (): string[] =>
     [...primary().querySelectorAll('.keycap')].map((k) => k.textContent ?? '');
 
+  // Space is one binding with one meaning; there is no Shift Space variant to learn.
+  expect(bindingsFor('console').filter((b) => b.chords.some((c) => c.key === ' '))).toHaveLength(1);
+
   // Nobody running: Space starts the floor, exactly as the button does.
   expect(primary().textContent).toMatch(/Start/);
   expect(caps()).toEqual(['Space']);
+  key({ key: ' ' });
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'A'));
 
-  // One side running: Space would hand the floor over, so the button's pause is Shift Space.
-  act(() => {
-    dispatch({ t: 'START' });
-  });
+  // One side running: the button pauses it, and so does Space. The floor stays put.
   expect(primary().textContent).toMatch(/Pause/);
-  expect(caps()).toEqual(['Shift', 'Space']);
+  expect(caps()).toEqual(['Space']);
+  key({ key: ' ' });
+  expect(getSession().state.run).toBeNull();
+  expect(getSession().state.floor).toBe('A');
+  expect(primary().textContent).not.toMatch(/Pause/);
+  expect(caps()).toEqual(['Space']);
+
+  // Shift Space is not a second pause key any more.
+  const paused = getSession().state;
+  key({ key: ' ', shiftKey: true });
+  expect(getSession().state).toBe(paused);
+
+  // Space resumes the same side; handing the floor over is the arrow keys' job.
+  key({ key: ' ' });
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'A'));
+  key({ key: 'ArrowRight' });
+  expect(getSession().state.floor).toBe('B');
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'B'));
 });
 
 test('the keyboard legend speaks the interface language, one row per binding', () => {

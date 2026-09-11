@@ -242,7 +242,6 @@ export default function Console(): JSX.Element {
 
   useHotkeys('console', {
     toggle: () => dispatch({ t: 'TOGGLE' }),
-    togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
     advance: () => dispatch({ t: 'ADVANCE' }),
     advanceStart: () => dispatch({ t: 'ADVANCE', start: true }),
     prev: () => dispatch({ t: 'PREV' }),
@@ -477,14 +476,11 @@ export default function Console(): JSX.Element {
             phase={view.phase}
             transport={view.transport}
             hold={view.hold}
-            chess={isChess}
-            spaceHandsOff={swapAllowed}
             canStart={canStart}
             canAdjust={can.adjust}
             canReset={view.phase === 'in' && !view.hold}
             on={{
               toggle: () => dispatch({ t: 'TOGGLE' }),
-              togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
               reset: resetSegment,
               hold: toggleHold,
               adjust,

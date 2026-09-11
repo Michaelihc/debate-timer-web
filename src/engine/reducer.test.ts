@@ -707,7 +707,7 @@ describe('free debate', () => {
 /* ----------------------------------------------------------- context-sensitive */
 
 describe('TOGGLE', () => {
-  it('arms pre-round, starts, pauses, resumes, and hands off in free debate', () => {
+  it('arms pre-round, then starts, pauses and resumes', () => {
     const h = harness();
     h.go({ t: 'TOGGLE' }, 0);
     expect(h.state().cursor).toBe(0);
@@ -719,17 +719,63 @@ describe('TOGGLE', () => {
     expect(transportOf(h.state(), SP1)).toBe('paused');
     h.go({ t: 'TOGGLE' }, 10_000);
     expect(isRunning(h.state(), SP1)).toBe(true);
+  });
 
-    h.go({ t: 'LOAD', cursor: 2 }, 20_000);
-    h.go({ t: 'TOGGLE' }, 20_000);
+  it('pauses and resumes the side holding the floor in free debate, and never hands off', () => {
+    const h = harness();
+    h.go({ t: 'LOAD', cursor: 2 }, 0);
+    h.go({ t: 'TOGGLE' }, 0);
     expect(h.state().floor).toBe('A');
-    h.go({ t: 'TOGGLE' }, 30_000);
-    expect(h.state().floor).toBe('B'); // hand-off, not pause
-    expect(isRunning(h.state(), FD_B)).toBe(true);
+    expect(isRunning(h.state(), FD_A)).toBe(true);
 
-    h.go({ t: 'TOGGLE', pauseInChess: true }, 35_000);
+    h.go({ t: 'TOGGLE' }, 10_000); // a pause, not a hand-off
+    expect(h.state().run).toBeNull();
+    expect(h.state().floor).toBe('A');
+    expect(h.rem(FD_A, 60_000)).toBe(20_000);
+    expect(h.rem(FD_B, 60_000)).toBe(30_000);
+
+    h.go({ t: 'TOGGLE' }, 60_000); // and the same side resumes
+    expect(h.state().floor).toBe('A');
+    expect(isRunning(h.state(), FD_A)).toBe(true);
+    expect(isRunning(h.state(), FD_B)).toBe(false);
+
+    // Handing over is its own command; after it, Space pauses whoever has the floor.
+    h.go({ t: 'GIVE_FLOOR', side: 'B' }, 65_000);
+    h.go({ t: 'TOGGLE' }, 70_000);
     expect(h.state().run).toBeNull();
     expect(h.state().floor).toBe('B');
+    expect(h.rem(FD_B, 99_000)).toBe(25_000);
+  });
+
+  it('pauses both free-debate sides when both run, and resumes only the floor', () => {
+    const h = harness(makeConfig({ freeDebateExclusive: false }));
+    h.go({ t: 'LOAD', cursor: 2 }, 0);
+    h.go({ t: 'START' }, 0);
+    h.go({ t: 'SWAP' }, 5_000); // A keeps running, B takes the floor
+
+    h.go({ t: 'TOGGLE' }, 10_000);
+    expect(isRunning(h.state(), FD_A)).toBe(false);
+    expect(isRunning(h.state(), FD_B)).toBe(false);
+    expect(h.state().floor).toBe('B');
+
+    h.go({ t: 'TOGGLE' }, 20_000);
+    expect(isRunning(h.state(), FD_B)).toBe(true);
+    expect(isRunning(h.state(), FD_A)).toBe(false);
+  });
+
+  it('starts nothing in free debate until the operator has picked a side', () => {
+    const config = makeConfig();
+    const chess = config.segments[2];
+    if (chess?.kind !== 'chess') throw new Error('fixture drift');
+    chess.firstFloor = 'operator';
+
+    const h = harness(config);
+    const armed = h.go({ t: 'LOAD', cursor: 2 }, 0);
+    expect(h.go({ t: 'TOGGLE' }, 0)).toBe(armed);
+
+    h.go({ t: 'GIVE_FLOOR', side: 'B' }, 1_000);
+    h.go({ t: 'TOGGLE' }, 1_000);
+    expect(isRunning(h.state(), FD_B)).toBe(true);
   });
 });
 
