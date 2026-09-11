@@ -3,7 +3,7 @@
  *
  * The Unity scene puts exactly two buttons here, a blue Pause and a coral Reset, and this
  * row keeps that pair as its loud half. Under it sit the ±15s nudges and, quieter still,
- * Hold round. Moving between segments is not a timer control: Back and Next live on the
+ * Pause round. Moving between segments is not a timer control: Back and Next live on the
  * timeline strip, beside the green ▶▶ the original had there.
  *
  * An enabled button always does what its label says. ±15s is live exactly when there is a
@@ -42,6 +42,12 @@ export interface TransportProps {
   transport: TransportState;
   hold: boolean;
   chess: boolean;
+  /**
+   * Free debate with exactly one side running (`canSwap`). Plain Space hands the floor
+   * over then, so the primary button, which pauses, is the Shift Space key. Everywhere
+   * else Space does exactly what the primary button does.
+   */
+  spaceHandsOff: boolean;
   /** Space is inert until a side is picked (`firstFloor: 'operator'`). */
   canStart: boolean;
   /** There is a clock for ±15s to act on, and the round is not held. */
@@ -95,6 +101,7 @@ export function Transport({
   transport,
   hold,
   chess,
+  spaceHandsOff,
   canStart,
   canAdjust,
   canReset,
@@ -116,9 +123,14 @@ export function Transport({
 
   const mainIcon: IconName = hold ? 'hold' : running ? 'pause' : 'play';
   // While held the one thing the round accepts is its release, so that is what the
-  // primary button does — in free debate too.
-  const mainAction: HotkeyAction = hold ? 'hold' : chess ? 'togglePause' : 'toggle';
+  // primary button does, in free debate too.
   const onMain = hold ? on.hold : chess ? on.togglePause : on.toggle;
+  // The keycap on the button is the key that does what the button does right now.
+  const mainKeys: HotkeyAction = hold
+    ? 'hold'
+    : chess && spaceHandsOff
+      ? 'togglePause'
+      : 'toggle';
 
   return (
     <div className="transport" role="group" aria-label={t('nav.console')}>
@@ -127,7 +139,7 @@ export function Transport({
           onClick={onMain}
           icon={mainIcon}
           label={mainLabel}
-          action={mainAction}
+          action={mainKeys}
           tone="primary"
           caps
           disabled={!hold && (complete || !canStart)}
@@ -160,14 +172,14 @@ export function Transport({
           tone="step"
           disabled={!canAdjust}
         />
-        <span className="transport__rule" aria-hidden="true" />
-        <Key
-          onClick={on.hold}
-          icon="hold"
-          label={hold ? t('t.release') : t('t.hold')}
-          action="hold"
-          tone="quiet"
-        />
+        {/* While the round is held, the primary button above is the one that resumes it;
+            a second button with the same words would only ask which one to press. */}
+        {hold ? null : (
+          <>
+            <span className="transport__rule" aria-hidden="true" />
+            <Key onClick={on.hold} icon="hold" label={t('t.hold')} action="hold" tone="quiet" />
+          </>
+        )}
       </div>
     </div>
   );

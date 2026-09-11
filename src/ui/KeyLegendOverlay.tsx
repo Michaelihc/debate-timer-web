@@ -2,15 +2,14 @@
  * The `?` overlay. It renders `KEYMAP` directly, so a binding cannot exist without a
  * legend row and a legend row cannot lie about a binding.
  *
- * Bilingual by design, not by toggle: at a Chinese tournament the operator's colleague
- * reading over their shoulder may not share the UI language, and this is the one screen
- * where showing both costs nothing.
+ * It speaks the interface's language, like every other screen, and prints each binding
+ * once. Esc is a binding like the rest, so it is a row, not a second footer line.
  */
 
 import type { JSX } from 'react';
 import type { HotkeyContext, KeyBinding } from '../app/hotkeys';
 import { bindingsForGroup, capsOf, displayCaps } from '../app/hotkeys';
-import { translate, useLang } from '../i18n/useLang';
+import { useLang } from '../i18n/useLang';
 import { Overlay } from './Overlay';
 
 import './ui.css';
@@ -42,19 +41,13 @@ export function ActionKeys({ action }: { action: Parameters<typeof capsOf>[0] })
 }
 
 function Row({ binding, chess }: { binding: KeyBinding; chess: boolean }): JSX.Element {
+  const { t } = useLang();
   const inert = binding.chessOnly === true && !chess;
   return (
     <li className="legend__row" data-inert={inert ? '' : undefined}>
       {/* ⌘ ⇧ ⌥ on a Mac, Ctrl Shift Alt everywhere else. */}
       <Keycaps caps={displayCaps(binding.caps)} />
-      <span className="legend__text">
-        <span className="t-ctl" lang="en">
-          {translate('en', binding.label)}
-        </span>
-        <span className="t-meta legend__zh" lang="zh">
-          {translate('zh', binding.label)}
-        </span>
-      </span>
+      <span className="legend__text t-ctl">{t(binding.label)}</span>
     </li>
   );
 }
@@ -91,9 +84,6 @@ export function KeyLegendOverlay({
           </ul>
         </section>
       </div>
-      <p className="t-meta legend__foot">
-        <Keycaps caps={['Esc']} /> {t('kb.escape')}
-      </p>
     </Overlay>
   );
 }

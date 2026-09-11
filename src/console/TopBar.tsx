@@ -6,6 +6,9 @@
  * The motion is the biggest thing on the screen after the clock, because in the room it is
  * the one piece of text an audience reads.
  *
+ * Home sits beside the lime button as a quiet outline: the way back to the formats and
+ * recent rounds, without competing with the one loud action in the corner.
+ *
  * The audio state stays permanently visible rather than buried: a muted or un-armed
  * AudioContext is the commonest reason a venue hears no bells, and finding that out at the
  * first speech is too late. The round readout ticks from the frame loop, so this component
@@ -45,6 +48,8 @@ export interface TopBarProps {
   audio: AudioState;
   onAudio: () => void;
   onEditor: () => void;
+  /** Back to the launch screen. The round keeps its place. */
+  onHome: () => void;
 }
 
 function scheduleWord(deltaMs: number): 'ahead' | 'behind' | 'on' {
@@ -64,6 +69,7 @@ export function TopBar({
   audio,
   onAudio,
   onEditor,
+  onHome,
 }: TopBarProps): JSX.Element {
   const { t } = useLang();
   const elapsedEl = useRef<HTMLSpanElement>(null);
@@ -110,13 +116,16 @@ export function TopBar({
           <Icon name="edit" size={14} />
           <span>{t('nav.editor')}</span>
         </button>
+        <button type="button" className="ubtn" onClick={onHome}>
+          <span>{t('nav.home')}</span>
+        </button>
       </div>
 
       <div className="utop__mid">
         <h1 className="utop__title">{title}</h1>
         <p className="utop__meta">
           <span className="utop__sub">{subtitle}</span>
-          <span className="utop__dot" aria-hidden="true">·</span>
+          <span className="utop__dot utop__sub" aria-hidden="true">·</span>
           <span>{t('r.segmentOf', { i: segmentIndex, n: segmentCount })}</span>
           <span className="utop__dot" aria-hidden="true">·</span>
           <span className="utop__round">
@@ -151,7 +160,6 @@ export function TopBar({
           </span>
         )}
 
-
         <button
           type="button"
           className="ubtn"
@@ -167,7 +175,6 @@ export function TopBar({
           {lang === 'zh' ? '中文' : 'EN'}
         </button>
       </div>
-
     </header>
   );
 }

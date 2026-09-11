@@ -18,7 +18,7 @@
  */
 
 import type { ChangeEvent, CSSProperties, DragEvent, JSX } from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Lang, RoundConfig } from '../domain/config';
 import type { MigrationProblem } from '../domain/migrate';
@@ -30,6 +30,9 @@ import {
   instantiateConfig,
   instantiatePreset,
 } from '../domain/presets';
+import type { Now } from '../engine/chronometer';
+import { now } from '../engine/chronometer';
+import { registerTick } from '../engine/loop';
 import type { RecentEntry } from '../engine/persist';
 import {
   clearRecents,
@@ -39,12 +42,15 @@ import {
   readRecents,
   saveToLibrary,
 } from '../engine/persist';
-import { roundPhase } from '../engine/selectors';
-import { useRound } from '../engine/store';
+import { clockView, primaryClockId, roundPhase } from '../engine/selectors';
+import type { Session } from '../engine/store';
+import { getSession, useRound } from '../engine/store';
 import type { StringKey } from '../i18n/strings';
+import type { TFn } from '../i18n/useLang';
 import { useLang } from '../i18n/useLang';
 import { autoInk } from '../lib/contrast';
 import { formatTime } from '../lib/format';
+import { configHash } from '../lib/hash';
 import { useConfirm } from '../ui/useConfirm';
 import { Icon } from '../ui/Icons';
 import { Keycaps } from '../ui/KeyLegendOverlay';
@@ -54,18 +60,22 @@ import { Debater } from '../ui/unity/Debater';
 
 import type { OpenOptions } from '../app/boot';
 import {
-  acceptResume,
   clearShareError,
-  discardResume,
+  dismissResume,
   hasRound,
   importText,
+  keepRound,
   openConfig,
+  openLegend,
+  outgoingRound,
+  restartRound,
+  resumeRound,
   toggleTheme,
   useBootState,
   useTheme,
 } from '../app/boot';
 import { useHotkeys } from '../app/hotkeys';
-import { ROUTES } from '../app/router';
+import { ROUTES, navigate } from '../app/router';
 
 import './screens.css';
 
@@ -93,6 +103,32 @@ function agoPhrase(ms: number, lang: Lang): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return rtf.format(-hours, 'hour');
   return rtf.format(-Math.round(hours / 24), 'day');
+}
+
+/** `Updated just now` inside the first minute: `0 seconds ago` reads like a fault. */
+function updatedPhrase(ms: number, lang: Lang, t: TFn): string {
+  return ms < 60_000 ? t('lc.updatedJustNow') : t('lc.updated', { time: agoPhrase(ms, lang) });
+}
+
+/** `4v4 · 10 segments · 34:00`, or null for a round with nothing in it yet. */
+function structureLine(config: RoundConfig, totalMs: number, t: TFn): string | null {
+  if (config.segments.length === 0 && config.speakers.length === 0) return null;
+  const a = config.speakers.filter((s) => s.side === 'A').length;
+  const b = config.speakers.filter((s) => s.side === 'B').length;
+  return t('lc.structure', {
+    sides: `${a}v${b}`,
+    n: config.segments.length,
+    len: formatTime(totalMs),
+  });
+}
+
+/** What the round's clock reads right now. A free debate nobody has opened reads its
+ *  first side, since both sides start from the same allotment. */
+function remainingNow(s: Session, n: Now): number {
+  const segment = s.plan.segments[s.state.cursor];
+  const id = primaryClockId(s.state, s.plan) ?? segment?.clockIds[0] ?? null;
+  const view = id === null ? null : clockView(s.state, s.plan, id, n);
+  return view?.remainingMs ?? 0;
 }
 
 function sideColors(config: RoundConfig): { A?: string; B?: string } {
@@ -145,25 +181,65 @@ export default function Launch(): JSX.Element {
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // The only thing worth a dialog on this screen: walking away from a round that is
-  // mid-flight. Everything else here is either additive or trivially reversible.
-  const inProgress = roundPhase(session.state, session.plan) === 'in';
+  const underWay = roundPhase(session.state, session.plan) === 'in';
 
+  /**
+   * Open a round. The only thing worth a dialog on this screen is what that does to the
+   * round already loaded: under way or edited, the operator is asked first. Either way it
+   * goes into Recent rounds, edits and all, before the new round takes its place.
+   */
   const openWith = useCallback(
     async (config: RoundConfig, opts: OpenOptions = {}): Promise<void> => {
-      if (inProgress) {
-        const ok = await ask({ title: t('d.leaveRound'), confirmLabel: t('d.confirm') });
+      const current = getSession();
+      // The round that is already loaded: go to it. Opening it again would start it
+      // over, and nobody presses Open to lose their place.
+      if (
+        hasRound() &&
+        config.id === current.config.id &&
+        configHash(config) === current.plan.hash
+      ) {
+        dismissResume();
+        navigate(opts.route ?? ROUTES.console);
+        return;
+      }
+      const outgoing = outgoingRound();
+      if (outgoing !== null && (outgoing.progress || outgoing.edited)) {
+        const title = l10n(outgoing.config.title) || t('lc.untitled');
+        const ok = await ask({
+          title: t('d.replaceTitle'),
+          body: (
+            <>
+              <p>{t('d.replaceKept', { title })}</p>
+              {outgoing.progress ? <p>{t('d.replaceRestart')}</p> : null}
+            </>
+          ),
+          confirmLabel: t('d.replaceConfirm'),
+          cancelLabel: t('d.keepCurrent'),
+        });
         if (!ok) return;
       }
+      if (outgoing?.keep === true) keepRound(outgoing.config);
       if (opts.recent !== false) {
         // Recents store only a title; the config itself lives in the library, which is
         // what makes a recent row re-openable on the next visit.
         saveToLibrary(config.id, config, l10n(config.title) || t('lc.untitled'));
       }
+      dismissResume();
       openConfig(config, opts);
     },
-    [ask, inProgress, l10n, t],
+    [ask, l10n, t],
   );
+
+  /** Starting the loaded round over throws its clocks away, so it is asked, not done. */
+  const restart = useCallback(async (): Promise<void> => {
+    const ok = await ask({
+      title: t('d.restartTitle'),
+      body: t('d.restartBody'),
+      confirmLabel: t('d.discard'),
+      tone: 'danger',
+    });
+    if (ok) restartRound();
+  }, [ask, t]);
 
   useHotkeys('launch', {
     editor: () => {
@@ -242,8 +318,6 @@ export default function Launch(): JSX.Element {
     setPasted('');
   }, []);
 
-  const resume = boot.resume;
-
   return (
     <section className="scr" aria-labelledby="lc-title">
       <header className="scr__bar">
@@ -257,55 +331,32 @@ export default function Launch(): JSX.Element {
           <button type="button" className="btn btn--quiet" onClick={toggleLang}>
             {t('kb.langToggle')}
           </button>
+          {/* Labelled with what it does, not with the theme already on screen. */}
+          <button type="button" className="btn btn--quiet" onClick={toggleTheme}>
+            {theme === 'dark' ? t('nav.useLight') : t('nav.useDark')}
+          </button>
           <button
             type="button"
-            className="btn btn--quiet"
-            onClick={toggleTheme}
-            aria-label={`${t('nav.theme')}: ${theme === 'dark' ? t('nav.themeDark') : t('nav.themeLight')}`}
+            className="btn btn--quiet scr__keyhint"
+            onClick={openLegend}
+            aria-haspopup="dialog"
+            aria-keyshortcuts="?"
           >
-            {theme === 'dark' ? t('nav.themeDark') : t('nav.themeLight')}
-          </button>
-          <span className="scr__keyhint">
             <Keycaps caps={['?']} />
             {t('kb.title')}
-          </span>
+          </button>
         </div>
       </header>
 
       <div className="scr__scroll">
         <div className="scr__inner">
-          {resume === null ? null : (
-            <div className="lc__resume" role="region" aria-labelledby="lc-resume">
-              <div className="lc__resumemain">
-                <h2 id="lc-resume" className="lc__resumetitle t-row">
-                  {t('d.resumeTitle')}
-                </h2>
-                <p className="lc__resumebody">
-                  {t('d.resumeBody', {
-                    title: l10n(resume.title) || t('lc.untitled'),
-                    i: resume.segmentIndex,
-                    n: resume.segmentCount,
-                    time: formatTime(resume.remainingMs),
-                  })}
-                </p>
-                <span className="lc__resumeage">
-                  {t('lc.updated', { time: agoPhrase(resume.ageMs, lang) })}
-                </span>
-              </div>
-              <div className="scr__acts">
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={() => acceptResume(resume)}
-                >
-                  {t('d.resume')}
-                </button>
-                <button type="button" className="btn btn--quiet" onClick={discardResume}>
-                  {t('d.discard')}
-                </button>
-              </div>
-            </div>
-          )}
+          {underWay ? (
+            <ResumeBanner
+              updatedAt={boot.resume?.updatedAt ?? null}
+              listedAt={listedAt}
+              onRestart={() => void restart()}
+            />
+          ) : null}
 
           {boot.shareError === null ? null : (
             <div className="scr__alert" data-tone="warn" role="alert">
@@ -338,7 +389,6 @@ export default function Launch(): JSX.Element {
               <h2 id="lc-formats" className="scr__sectitle t-row">
                 {t('lc.presets')}
               </h2>
-              <span className="scr__note">{t('pr.basedOn')}</span>
             </div>
             <p className="scr__note">{t('lc.presetNote')}</p>
             <div className="lc__grid">
@@ -377,13 +427,12 @@ export default function Launch(): JSX.Element {
                         {l10n(entry.title) || t('lc.untitled')}
                       </span>
                       <span className="lc__rowmeta">
-                        {t('lc.structure', {
-                          sides: `${config.speakers.filter((s) => s.side === 'A').length}v${config.speakers.filter((s) => s.side === 'B').length}`,
-                          n: config.segments.length,
-                          len: formatTime(totalMs),
-                        })}
-                        {' · '}
-                        {t('lc.updated', { time: agoPhrase(listedAt - entry.updatedAt, lang) })}
+                        {[
+                          structureLine(config, totalMs, t),
+                          updatedPhrase(listedAt - entry.updatedAt, lang, t),
+                        ]
+                          .filter((part): part is string => part !== null)
+                          .join(' · ')}
                       </span>
                     </div>
                     <div className="scr__acts">
@@ -425,14 +474,14 @@ export default function Launch(): JSX.Element {
               onDrop={onDrop}
             >
               <label className="sr-only" htmlFor="lc-paste">
-                {t('sh.import')}
+                {t('lc.pasteLink')}
               </label>
               <textarea
                 id="lc-paste"
                 className="lc__paste"
                 value={pasted}
                 spellCheck={false}
-                placeholder={t('sh.import')}
+                placeholder={t('lc.pasteLink')}
                 onChange={(event) => setPasted(event.target.value)}
               />
               <div className="lc__importacts">
@@ -505,6 +554,70 @@ export default function Launch(): JSX.Element {
 
       {dialog}
     </section>
+  );
+}
+
+/* ----------------------------------------------------------- round in progress */
+
+interface ResumeBannerProps {
+  /** When boot put the round back from storage; null when the operator just walked here. */
+  updatedAt: number | null;
+  /** The one wall-clock reading this visit uses for every "updated" phrase. */
+  listedAt: number;
+  onRestart: () => void;
+}
+
+/**
+ * The round that is loaded and under way, above everything else on the screen: which
+ * segment it is on and what its clock reads. A running clock keeps counting here, written
+ * by the frame loop, so the number is the one the console will show.
+ */
+function ResumeBanner({ updatedAt, listedAt, onRestart }: ResumeBannerProps): JSX.Element {
+  const { t, l10n, lang } = useLang();
+  const session = useRound();
+  const left = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const paint = (n: Now): void => {
+      const s = getSession();
+      const text = t('d.resumeLeft', {
+        time: formatTime(remainingNow(s, n), { secondsOnly: s.plan.display === 'seconds' }),
+      });
+      const el = left.current;
+      if (el && el.textContent !== text) el.textContent = text;
+    };
+    paint(now());
+    return registerTick(paint);
+  }, [t]);
+
+  return (
+    <div className="lc__resume" role="region" aria-labelledby="lc-resume">
+      <div className="lc__resumemain">
+        <h2 id="lc-resume" className="lc__resumetitle t-row">
+          {t('d.resumeTitle')}
+        </h2>
+        <p className="lc__resumebody">
+          {t('d.resumeWhere', {
+            title: l10n(session.config.title) || t('lc.untitled'),
+            i: session.state.cursor + 1,
+            n: session.plan.segments.length,
+          })}
+          {' · '}
+          <span ref={left} data-numeric="" />
+        </p>
+        {updatedAt === null ? null : (
+          <span className="lc__resumeage">{updatedPhrase(listedAt - updatedAt, lang, t)}</span>
+        )}
+      </div>
+      <div className="scr__acts">
+        <button type="button" className="btn btn--primary" onClick={resumeRound}>
+          {t('d.resume')}
+        </button>
+        <button type="button" className="btn btn--quiet" onClick={onRestart}>
+          {t('d.discard')}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -634,6 +747,7 @@ function StagedRound({ config, onRun, onEdit, onDiscard }: StagedRoundProps): JS
   const runPlan = useMemo(() => buildPlan(config), [config]);
   const segments = useMemo(() => ribbonFromPlan(runPlan, null, lang), [runPlan, lang]);
   const colors = useMemo(() => sideColors(config), [config]);
+  const structure = structureLine(config, runPlan.totalMs, t);
 
   return (
     <div className="lc__staged">
@@ -643,13 +757,7 @@ function StagedRound({ config, onRun, onEdit, onDiscard }: StagedRoundProps): JS
       {segments.length === 0 ? null : (
         <Ribbon scale="thumb" segments={segments} colors={colors} />
       )}
-      <span className="lc__cardmeta">
-        {t('lc.structure', {
-          sides: `${config.speakers.filter((s) => s.side === 'A').length}v${config.speakers.filter((s) => s.side === 'B').length}`,
-          n: config.segments.length,
-          len: formatTime(runPlan.totalMs),
-        })}
-      </span>
+      {structure === null ? null : <span className="lc__cardmeta">{structure}</span>}
       <div className="scr__acts">
         <button type="button" className="btn btn--primary" onClick={onRun}>
           {t('pr.runNow')}

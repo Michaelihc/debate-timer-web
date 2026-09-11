@@ -13,7 +13,7 @@
  */
 
 import type { JSX } from 'react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import '../styles/tokens.css';
 import '../styles/reset.css';
@@ -37,7 +37,16 @@ import Console from '../screens/Console';
 import Editor from '../screens/Editor';
 import Summary from '../screens/Summary';
 
-import { bootOnce, installAudioArm, useAudio, useBootState, useTheme } from './boot';
+import {
+  bootOnce,
+  closeLegend,
+  installAudioArm,
+  toggleLegend,
+  useAudio,
+  useBootState,
+  useLegendOpen,
+  useTheme,
+} from './boot';
 import type { HotkeyContext } from './hotkeys';
 import { setContextResolver, useHotkeys } from './hotkeys';
 import type { RouteName } from './router';
@@ -71,7 +80,7 @@ export default function App(): JSX.Element {
   const audio = useAudio();
   const { t, l10n, toggleLang } = useLang();
   const session = useRound();
-  const [legendOpen, setLegendOpen] = useState(false);
+  const legendOpen = useLegendOpen();
   const heading = useRef<HTMLHeadingElement>(null);
 
   // The engine, the audio gesture and the context resolver are document-scoped and are
@@ -113,13 +122,13 @@ export default function App(): JSX.Element {
   }, [route.name]);
 
   useHotkeys(CONTEXT[route.name], {
-    legend: () => setLegendOpen((open) => !open),
+    legend: toggleLegend,
     langToggle: () => toggleLang(),
     fullscreen: toggleFullscreen,
     mute: () => {
       toggleMuted();
     },
-    escape: legendOpen ? () => setLegendOpen(false) : undefined,
+    escape: legendOpen ? closeLegend : undefined,
   });
 
   const sleep = session.state.sleepPending;
@@ -144,7 +153,7 @@ export default function App(): JSX.Element {
 
       <KeyLegendOverlay
         open={legendOpen}
-        onClose={() => setLegendOpen(false)}
+        onClose={closeLegend}
         context={CONTEXT[route.name]}
         chess={session.plan.segments[session.state.cursor]?.kind === 'chess'}
       />

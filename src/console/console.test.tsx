@@ -122,7 +122,7 @@ test('every control stays live past zero', () => {
   });
   render(<Console />);
 
-  for (const label of ['Pause', 'Reset', 'Next', 'Back', '15s', 'Hold round']) {
+  for (const label of ['Pause', 'Reset', 'Next', 'Back', '15s', 'Pause round']) {
     const buttons = screen.getAllByRole('button', { name: new RegExp(label, 'i') });
     expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) expect(button).toBeEnabled();
@@ -405,4 +405,132 @@ test('the strip numbers the opposition negative, with arrows between squares and
   expect(checked).toBeGreaterThan(0);
   expect(document.querySelectorAll('.tline__arrow')).toHaveLength(pips.length - 1);
   expect(document.querySelector('.tline__tick')).toBeNull();
+});
+
+/* ------------------------------------------------------------ reload, home, hold */
+
+import { restoreSession } from '../app/boot';
+import { plan as planOf } from '../domain/plan';
+import { nowFrom } from '../engine/chronometer';
+import { readLive } from '../engine/persist';
+import { loadRound } from '../engine/store';
+import { setLang } from '../i18n/useLang';
+import { KeyLegendOverlay } from '../ui/KeyLegendOverlay';
+
+/** The page goes away: this document's round is gone, and boot starts from storage. */
+function pageGoesAway(): void {
+  act(() => {
+    loadRound(planOf(instantiatePreset('bp')), { markApplied: false, persist: false });
+  });
+}
+
+test('a reload puts a paused round back at the same segment and the same time', () => {
+  const i = firstSpeechIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+    dispatch({ t: 'START' });
+    dispatch({ t: 'ADJUST', deltaMs: -3_000 });
+    dispatch({ t: 'PAUSE' });
+  });
+  const before = remainingOf(i);
+  expect(readLive()?.state.cursor).toBe(i);
+
+  pageGoesAway();
+  act(() => {
+    restoreSession();
+  });
+
+  expect(getSession().state.cursor).toBe(i);
+  expect(remainingOf(i)).toBe(before);
+  // Restoring wrote nothing over the snapshot it restored from.
+  expect(readLive()?.state.cursor).toBe(i);
+
+  render(<Console />);
+  expect(el('.utop__meta').textContent).toContain(`Segment ${i + 1} of`);
+});
+
+test('a reload puts a running clock back, charged the wall time the page was away', () => {
+  const i = firstSpeechIndex();
+  const started = now();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i }, started);
+    dispatch({ t: 'START' }, started);
+  });
+  const full = getSession().plan.segments[i]?.allottedMs ?? 0;
+
+  pageGoesAway();
+  // A new document: its monotonic clock starts somewhere else, seven seconds of wall
+  // time later.
+  const back = nowFrom(50, started.epoch + 7_000);
+  act(() => {
+    restoreSession(back);
+  });
+
+  const s = getSession();
+  expect(s.state.cursor).toBe(i);
+  expect(s.state.run).not.toBeNull();
+  const id = s.plan.segments[i]?.primaryClockId ?? '';
+  expect(clockView(s.state, s.plan, id, back)?.remainingMs).toBe(full - 7_000);
+});
+
+test('the console has a way home, and going there keeps the round where it was', () => {
+  const i = firstSpeechIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+  });
+  render(<Console />);
+  fireEvent.click(within(el('.utop')).getByRole('button', { name: 'Home' }));
+  expect(location.hash).toBe('#/');
+  expect(getSession().state.cursor).toBe(i);
+});
+
+test('a held round offers one way to resume it, not two', () => {
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: firstSpeechIndex() });
+    dispatch({ t: 'START' });
+    dispatch({ t: 'HOLD' });
+  });
+  render(<Console />);
+  expect(screen.getAllByRole('button', { name: /resume round/i })).toHaveLength(1);
+  expect(screen.queryByRole('button', { name: /pause round/i })).toBeNull();
+});
+
+test('the free-debate primary button prints the key that does what the button does', () => {
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: chessIndex() });
+  });
+  render(<Console />);
+  const primary = (): HTMLElement => el('.transport__main .tbtn--primary');
+  const caps = (): string[] =>
+    [...primary().querySelectorAll('.keycap')].map((k) => k.textContent ?? '');
+
+  // Nobody running: Space starts the floor, exactly as the button does.
+  expect(primary().textContent).toMatch(/Start/);
+  expect(caps()).toEqual(['Space']);
+
+  // One side running: Space would hand the floor over, so the button's pause is Shift Space.
+  act(() => {
+    dispatch({ t: 'START' });
+  });
+  expect(primary().textContent).toMatch(/Pause/);
+  expect(caps()).toEqual(['Shift', 'Space']);
+});
+
+test('the keyboard legend speaks the interface language, one row per binding', () => {
+  act(() => {
+    setLang('zh');
+  });
+  try {
+    render(<KeyLegendOverlay open onClose={() => undefined} context="console" />);
+    const dialog = screen.getByRole('dialog');
+    const text = dialog.textContent ?? '';
+    expect(text).toContain('重置本环节');
+    expect(text).not.toContain('Reset the segment');
+    const esc = [...dialog.querySelectorAll('.keycap')].filter((k) => k.textContent === 'Esc');
+    expect(esc).toHaveLength(1);
+  } finally {
+    act(() => {
+      setLang('en');
+    });
+  }
 });

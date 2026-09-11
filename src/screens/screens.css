@@ -60,13 +60,9 @@
   gap: var(--s-2);
 }
 
+/* The keyboard legend's button: a quiet button like its neighbours, led by its keycap. */
 .scr__keyhint {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding-inline: var(--s-2);
-  color: var(--text-lo);
-  font-size: var(--t-cap);
+  gap: var(--s-3);
   white-space: nowrap;
 }
 

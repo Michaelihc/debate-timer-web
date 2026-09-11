@@ -15,6 +15,7 @@ export const KEYS = {
   recents: 'dt.v3.recents',
   live: 'dt.v3.live',
   link: 'dt.v3.link',
+  baseline: 'dt.v3.baseline',
 } as const;
 
 export const SNAPSHOT_MAX_AGE_MS = 8 * 60 * 60 * 1000;
@@ -228,6 +229,29 @@ export function writeApplied(config: RoundConfig): void {
 
 export function clearApplied(): void {
   removeRaw(KEYS.applied);
+}
+
+// ------------------------------------------------------------------- baseline
+
+/**
+ * The loaded round as it was when it was opened: its id and config hash. A round whose
+ * hash has moved away from this has been edited, and is kept before anything replaces it.
+ */
+export interface Baseline {
+  id: string;
+  hash: string;
+}
+
+export function readBaseline(): Baseline | null {
+  const stored = readJson<Baseline>(KEYS.baseline);
+  if (!isRecord(stored)) return null;
+  return typeof stored.id === 'string' && typeof stored.hash === 'string'
+    ? { id: stored.id, hash: stored.hash }
+    : null;
+}
+
+export function writeBaseline(baseline: Baseline): void {
+  writeJson(KEYS.baseline, baseline);
 }
 
 export function readDraft(): DraftRecord | null {

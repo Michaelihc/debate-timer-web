@@ -164,10 +164,9 @@
   background: transparent;
   color: var(--text-mid);
   font-family: inherit;
-  font-size: var(--t-cap);
+  font-size: var(--t-meta);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background var(--d-fast) var(--ease-out),
@@ -191,8 +190,11 @@
   color: var(--text-inv);
 }
 
+/* Sound that is muted, or not yet switched on (after a reload nothing may play until the
+   operator's first click or key), is the one chip that must be noticed before a bell is
+   missed. */
 .ubtn[data-status='muted'],
-.ubtn[data-status='idle'] {
+.ubtn[data-status='locked'] {
   color: var(--warn-ink);
   border-color: var(--warn-ink);
 }
@@ -357,9 +359,7 @@
   justify-content: center;
   gap: var(--s-3);
   margin: 0;
-  font-size: var(--t-cap);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: var(--t-meta);
   color: var(--text-mid);
 }
 
@@ -510,9 +510,7 @@
 }
 
 .ubar__word {
-  font-size: var(--t-cap);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--t-meta);
   color: var(--text-lo);
 }
 
@@ -541,10 +539,8 @@
   background: transparent;
   color: var(--green);
   font-family: inherit;
-  font-size: var(--t-cap);
+  font-size: var(--t-meta);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   cursor: pointer;
   transition:
     background var(--d-fast) var(--ease-out),
@@ -596,10 +592,8 @@
   background: transparent;
   color: var(--text-mid);
   font-family: inherit;
-  font-size: var(--t-cap);
+  font-size: var(--t-meta);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   cursor: pointer;
   transition:
     border-color var(--d-fast) var(--ease-out),
@@ -629,10 +623,8 @@
   background: var(--green);
   color: var(--text-inv);
   font-family: inherit;
-  font-size: var(--t-cap);
+  font-size: var(--t-meta);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   cursor: pointer;
   transition: background var(--d-fast) var(--ease-out);
 }
@@ -984,11 +976,27 @@
     --uc-ring: clamp(150px, 46vw, 260px);
     --uc-fig: clamp(40px, 7vh, 64px);
     --uc-pip: 28px;
-    /* Below this width the bands stop competing for a fixed viewport and the
-       console scrolls as one column instead. */
-    grid-template-rows: none;
-    grid-auto-rows: auto;
+    /* Below this width the bands stop competing for a fixed viewport and the console
+       scrolls as one column instead. A flex column rather than a grid: a grid item can
+       only stick within its own row, and the strip below has to stick to the screen. */
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
+  }
+
+  .uconsole > * {
+    flex: none;
+  }
+
+  /* Back and Next stay on screen however far the column scrolls. In free debate the bars
+     and the rosters would otherwise push them below the fold. */
+  .tline {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-top: auto;
+    border-top: var(--hair);
+    background: var(--bg-app);
   }
 
   .uconsole__main {
@@ -1030,11 +1038,44 @@
 }
 
 @media (max-width: 460px) {
-  .utop__side--left,
+  /* Phone: the corner buttons share the first row and the motion takes the second, so
+     Edit and Home stay within reach instead of being dropped for room. */
+  .utop {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    grid-template-areas:
+      'left right'
+      'mid mid';
+    row-gap: var(--s-3);
+  }
+
+  .utop__side--left {
+    grid-area: left;
+  }
+
+  .utop__side--right {
+    grid-area: right;
+  }
+
+  .utop__mid {
+    grid-area: mid;
+  }
+
   .utop__sub,
-  .utop__round,
-  .tline__navlabel {
+  .utop__round {
     display: none;
+  }
+
+  /* Back and Next keep their words on a row of their own; the squares get the full
+     width under them. */
+  .tline {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-3);
+  }
+
+  .tline__nav > * {
+    flex: 1 1 0;
+    justify-content: center;
   }
 }
 

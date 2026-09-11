@@ -86,3 +86,139 @@ describe('Summary', () => {
     expect(overrun?.textContent?.startsWith('+')).toBe(true);
   });
 });
+
+/* ------------------------------------------------------- replacing a loaded round */
+
+import { act, fireEvent, within } from '@testing-library/react';
+import { beforeEach } from 'vitest';
+import { openConfig } from '../app/boot';
+import { readLibrary, readRecents } from '../engine/persist';
+import { reconcileState } from '../engine/state';
+import { getSession, replacePlan } from '../engine/store';
+
+function runNowOn(index: number): HTMLElement {
+  const button = screen.getAllByRole('button', { name: 'Run now' })[index];
+  if (!button) throw new Error(`no Run now button ${index}`);
+  return button;
+}
+
+function recentRow(title: string): HTMLElement {
+  const row = [...document.querySelectorAll<HTMLElement>('.lc__row')].find((r) =>
+    (r.textContent ?? '').includes(title),
+  );
+  if (!row) throw new Error(`no recent row for ${title}`);
+  return row;
+}
+
+describe('Launch, when another round replaces the loaded one', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('asks before replacing a round under way, and keeps it in Recent rounds', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false });
+    dispatch({ t: 'ADVANCE' });
+    render(<Launch />);
+
+    await act(async () => {
+      fireEvent.click(runNowOn(1));
+    });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByText('Start a different round?')).toBeTruthy();
+    // Nothing is replaced while the question is open.
+    expect(getSession().config.id).toBe(config.id);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Start the new round' }));
+    });
+    expect(getSession().config.presetRef).toBe('bp');
+    expect(readRecents().map((entry) => entry.id)).toContain(config.id);
+    expect(readLibrary()[config.id]).toBeDefined();
+  });
+
+  it('keeps the round loaded when the operator says no', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false });
+    dispatch({ t: 'ADVANCE' });
+    render(<Launch />);
+    await act(async () => {
+      fireEvent.click(runNowOn(1));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Keep this round' }));
+    });
+    expect(getSession().config.id).toBe(config.id);
+    expect(getSession().state.cursor).toBe(0);
+  });
+
+  it('keeps an edited round with its edits, and reopening it brings them back', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false, route: '#/edit' });
+    // An editor apply: a speaker renamed and given a different time.
+    const edited = structuredClone(config);
+    const first = edited.speakers[0];
+    if (!first) throw new Error('preset changed');
+    first.name = 'Michael';
+    first.defaultMs = 210_000;
+    const next = plan(edited);
+    replacePlan(next, reconcileState(getSession().state, next).state);
+    render(<Launch />);
+
+    await act(async () => {
+      fireEvent.click(runNowOn(1));
+    });
+    // Not started, but edited: still asked.
+    expect(screen.getByText('Start a different round?')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Start the new round' }));
+    });
+    expect(getSession().config.presetRef).toBe('bp');
+    expect(readLibrary()[config.id]?.config.speakers[0]?.name).toBe('Michael');
+
+    // Back on the launch screen, the edited round is listed and opens as edited.
+    cleanup();
+    render(<Launch />);
+    await act(async () => {
+      fireEvent.click(within(recentRow('Chinese Academic Debate')).getByRole('button', { name: 'Open' }));
+    });
+    const reopened = getSession().config;
+    expect(reopened.id).toBe(config.id);
+    expect(reopened.speakers[0]?.name).toBe('Michael');
+    expect(reopened.speakers[0]?.defaultMs).toBe(210_000);
+  });
+
+  it('replaces a round nobody has started or edited without asking', async () => {
+    openConfig(instantiatePreset('chinese4v4'), { recent: false });
+    render(<Launch />);
+    await act(async () => {
+      fireEvent.click(runNowOn(1));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(getSession().config.presetRef).toBe('bp');
+  });
+
+  it('opening the round that is already loaded goes back to it with its clocks intact', async () => {
+    openConfig(instantiatePreset('chinese4v4'));
+    dispatch({ t: 'ADVANCE' });
+    dispatch({ t: 'ADVANCE' });
+    const cursor = getSession().state.cursor;
+    render(<Launch />);
+    await act(async () => {
+      fireEvent.click(within(recentRow('Chinese Academic Debate')).getByRole('button', { name: 'Open' }));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(getSession().state.cursor).toBe(cursor);
+    expect(location.hash).toBe('#/console');
+  });
+
+  it('says which segment the loaded round is on and what its clock reads', () => {
+    openConfig(instantiatePreset('chinese4v4'), { recent: false });
+    dispatch({ t: 'ADVANCE' });
+    dispatch({ t: 'ADVANCE' });
+    render(<Launch />);
+    const banner = screen.getByRole('region', { name: 'Round in progress' });
+    expect(banner.textContent).toContain('segment 2 of 10');
+    expect(banner.textContent).toContain('3:00 remaining');
+  });
+});
