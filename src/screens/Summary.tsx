@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SideId } from '../domain/config';
 import { now } from '../engine/chronometer';
 import { runningClockIds } from '../engine/chronometer';
-import { clockView, roundElapsedMs, roundPhase } from '../engine/selectors';
+import { clockView, roundPhase } from '../engine/selectors';
 import { useRound } from '../engine/store';
 import { useLang } from '../i18n/useLang';
 import { formatDelta, formatTime } from '../lib/format';
@@ -166,18 +166,20 @@ export default function Summary(): JSX.Element {
     [rows, config, l10n],
   );
 
-  const scheduledMs = plan.totalMs;
-  const actualMs = useMemo(() => {
-    void tick;
-    return roundElapsedMs(state, now());
-  }, [state, tick]);
-  const deltaMs = actualMs - scheduledMs;
+  // The headline is the table's own totals, so the page never disagrees with itself. It used
+  // to set the wall-clock time since the round began against the schedule, which counted every
+  // pause and every hour the tab was closed, and could claim hours over a table of minutes.
+  const headlineText = [
+    `${t('sum.allotted')} ${formatTime(totals.allotted)}`,
+    `${t('sum.used')} ${formatTime(totals.used)}`,
+    ...(totals.over > 0 ? [`${t('sum.over')} ${formatDelta(totals.over)}`] : []),
+  ].join('\t');
 
   const asText = useCallback((): string => {
     const head = [t('sum.order'), t('sum.segment'), t('sum.speaker'), t('sum.allotted'), t('sum.used'), t('sum.over')];
     const lines: string[] = [
       l10n(config.title) || t('lc.untitled'),
-      `${t('r.scheduled')} ${formatTime(scheduledMs)}\t${t('sum.actual')} ${formatTime(actualMs)}\t${formatDelta(deltaMs)}`,
+      headlineText,
       '',
       head.join('\t'),
     ];
@@ -203,7 +205,7 @@ export default function Summary(): JSX.Element {
       `${t('sum.total')}\t${formatTime(totals.used)} / ${formatTime(totals.allotted)}\t${totals.over > 0 ? formatDelta(totals.over) : '—'}`,
     );
     return lines.join('\n');
-  }, [actualMs, config, deltaMs, l10n, rows, scheduledMs, sideTotals, t, totals]);
+  }, [config, headlineText, l10n, rows, sideTotals, t, totals]);
 
   const onCopy = useCallback(async (): Promise<void> => {
     const text = asText();
@@ -268,23 +270,19 @@ export default function Summary(): JSX.Element {
               <div className="sum__head">
                 <div className="sum__figures">
                   <span className="sum__figure">
-                    <span className="t-cap">{t('r.scheduled')}</span>
-                    <span className="sum__figureval">{formatTime(scheduledMs)}</span>
+                    <span className="t-cap">{t('sum.allotted')}</span>
+                    <span className="sum__figureval">{formatTime(totals.allotted)}</span>
                   </span>
                   <span className="sum__figure">
-                    <span className="t-cap">{t('sum.actual')}</span>
-                    <span className="sum__figureval">{formatTime(actualMs)}</span>
+                    <span className="t-cap">{t('sum.used')}</span>
+                    <span className="sum__figureval">{formatTime(totals.used)}</span>
                   </span>
-                  <span className="sum__figure sum__delta" data-over={deltaMs > 0 ? '' : undefined}>
-                    <span className="t-cap">
-                      {deltaMs === 0
-                        ? t('r.onSchedule')
-                        : deltaMs > 0
-                          ? t('r.behind')
-                          : t('r.ahead')}
+                  {totals.over > 0 ? (
+                    <span className="sum__figure sum__delta" data-over="">
+                      <span className="t-cap">{t('sum.over')}</span>
+                      <span className="sum__figureval">{formatDelta(totals.over)}</span>
                     </span>
-                    <span className="sum__figureval">{formatDelta(deltaMs)}</span>
-                  </span>
+                  ) : null}
                 </div>
               </div>
 

@@ -72,6 +72,7 @@ function SideBar({
   announce,
   canGive,
   onGive,
+  sizerLabel,
 }: {
   entry: ChessSideView;
   live: boolean;
@@ -79,6 +80,8 @@ function SideBar({
   announce: boolean;
   canGive: boolean;
   onGive: () => void;
+  /** The wider of the two give-floor labels. It sizes this side's slot, never shows. */
+  sizerLabel: string;
 }): JSX.Element {
   const { t } = useLang();
   const digits = useRef<DigitsHandle>(null);
@@ -138,8 +141,14 @@ function SideBar({
         announce={announce}
         className="ubar__digits"
       />
-      {/* One slot under the time, so the bars never jump between states. */}
+      {/* One slot under the time, so the bars never jump between states. Both sides keep room
+          for the wider of the two give-floor buttons, so handing the floor over does not shift
+          the bars sideways either. */}
       <div className="ubar__slot">
+        <span className="tbtn ubar__give ubar__sizer" aria-hidden="true">
+          <span className="tbtn__label">{sizerLabel}</span>
+          <Keycaps caps={capsOf(action)} />
+        </span>
         {live ? (
           <span className="ubar__word">{t('st.floorA', { side: entry.label })}</span>
         ) : canGive ? (
@@ -177,6 +186,11 @@ export function ChessBars({
 }: ChessBarsProps): JSX.Element {
   const { t } = useLang();
   const [a, b] = sides;
+  // Both slots are sized by the longer give-floor label: one font, so more characters is the
+  // wider button.
+  const giveA = t('c.giveFloor', { side: a.label });
+  const giveB = t('c.giveFloor', { side: b.label });
+  const sizerLabel = giveA.length >= giveB.length ? giveA : giveB;
 
   return (
     <div className="ucore ucore--chess">
@@ -188,9 +202,14 @@ export function ChessBars({
           announce={floor !== 'B'}
           canGive={canGiveFloor.A}
           onGive={() => onGiveFloor('A')}
+          sizerLabel={sizerLabel}
         />
 
         <div className="uchess__mid">
+          <span className="uchess__swap uchess__sizer" aria-hidden="true">
+            <span className="uchess__swapicon" />
+            <span className="uchess__swaplabel">{t('t.swap')}</span>
+          </span>
           {/* HIDDEN, not disabled, whenever exactly one side is not running. */}
           {swap ? (
             <button type="button" className="uchess__swap" onClick={onSwap} aria-keyshortcuts="S">
@@ -207,6 +226,7 @@ export function ChessBars({
           announce={floor === 'B'}
           canGive={canGiveFloor.B}
           onGive={() => onGiveFloor('B')}
+          sizerLabel={sizerLabel}
         />
       </div>
 

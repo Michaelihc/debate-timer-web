@@ -130,16 +130,29 @@ export default function Console(): JSX.Element {
   /** Each speaker's number within their own side — what the figure and the pip print. */
   const ordinals = useMemo(() => rosterOrdinals(config.speakers), [config.speakers]);
 
+  /**
+   * The segments behind the cursor that actually ran. One the operator jumped over was never
+   * heard, so the strip does not draw it as done and it counts as nobody's turn.
+   */
+  const ranBefore = useMemo<ReadonlySet<number>>(() => {
+    const n = now();
+    const ran = new Set<number>();
+    const upto = Math.min(state.cursor, plan.segments.length);
+    for (let i = 0; i < upto; i += 1) {
+      if (plan.segments[i]?.clockIds.some((id) => elapsedMs(state, id, n) > 0)) ran.add(i);
+    }
+    return ran;
+  }, [plan.segments, state]);
+
   /** History, not judgement: who has already had the floor at least once. */
   const spokenIds = useMemo<Set<Id>>(() => {
     const ids = new Set<Id>();
-    const upto = Math.min(state.cursor, plan.segments.length);
-    for (let i = 0; i < upto; i += 1) {
+    for (const i of ranBefore) {
       const speaker = plan.segments[i]?.speaker;
       if (speaker) ids.add(speaker.id);
     }
     return ids;
-  }, [plan.segments, state.cursor]);
+  }, [plan.segments, ranBefore]);
 
   const pips = useMemo(() => pipsFromPlan(plan, lang, t), [plan, lang, t]);
 
@@ -517,6 +530,7 @@ export default function Console(): JSX.Element {
         ref={timelineRef}
         pips={pips}
         cursor={state.cursor}
+        ran={ranBefore}
         selected={selected}
         onSelect={setSelected}
         onLoad={loadAt}

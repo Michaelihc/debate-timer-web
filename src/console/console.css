@@ -482,12 +482,24 @@
 }
 
 /* One slot under each side's own time: who has the floor while that side runs,
-   otherwise the button that gives it the floor. Fixed height, so the bars never jump. */
+   otherwise the button that gives it the floor. A hidden copy of the wider give-floor button
+   sizes the slot on both sides, and whatever shows sits in that same cell, so the bars move
+   neither down nor sideways as the floor changes hands. */
 .ubar__slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   min-height: var(--s-8);
+}
+
+.ubar__slot > *,
+.uchess__mid > * {
+  grid-area: 1 / 1;
+}
+
+.ubar__sizer,
+.uchess__sizer {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .ubar__word {
@@ -501,10 +513,11 @@
   font-size: var(--t-meta);
 }
 
+/* The swap control's room is kept while it is hidden, so its coming and going never moves
+   the bars either. */
 .uchess__mid {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   min-width: calc(var(--uc-ring) * 0.28);
   min-height: calc(var(--uc-ring) * 0.4);
 }
@@ -980,14 +993,13 @@
   }
 }
 
-@media (max-width: 720px) {
+/* Where the bands can no longer share one fixed viewport, they stop competing for it and the
+   console scrolls as one column instead: below 720px wide, and on a screen too short for the
+   ring, its controls and the rosters together, such as a phone on its side, where the strip
+   used to cover Start and Reset. A flex column rather than a grid: a grid item can only stick
+   within its own row, and the strip below has to stick to the screen. */
+@media (max-width: 720px), (max-height: 700px) {
   .uconsole {
-    --uc-ring: clamp(150px, 46vw, 260px);
-    --uc-fig: clamp(40px, 7vh, 64px);
-    --uc-pip: 28px;
-    /* Below this width the bands stop competing for a fixed viewport and the console
-       scrolls as one column instead. A flex column rather than a grid: a grid item can
-       only stick within its own row, and the strip below has to stick to the screen. */
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -1008,13 +1020,24 @@
     background: var(--bg-app);
   }
 
+  /* The console scrolls here, so the band keeps its full height instead of being squeezed
+     until the rosters slide under the timeline strip. */
+  .uconsole__main {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .uconsole {
+    --uc-ring: clamp(150px, 46vw, 260px);
+    --uc-fig: clamp(40px, 7vh, 64px);
+    --uc-pip: 28px;
+  }
+
   .uconsole__main {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
     gap: var(--s-4) var(--s-3);
-    /* The console scrolls here, so the band keeps its full height instead of being
-       squeezed until the rosters slide under the timeline strip. */
-    min-height: auto;
     padding: 0 var(--s-4);
   }
 

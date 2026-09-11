@@ -42,6 +42,11 @@ export interface TimelineProps {
   pips: readonly Pip[];
   /** The segment the round is on. */
   cursor: number;
+  /**
+   * Of the segments behind the cursor, the ones that actually ran. A segment the operator
+   * jumped over was never heard, so it keeps its idle face instead of being drawn as done.
+   */
+  ran: ReadonlySet<number>;
   /** The keyboard / selection cursor. */
   selected: number;
   onSelect: (index: number) => void;
@@ -91,6 +96,7 @@ function revealPip(box: HTMLElement, pip: HTMLElement): void {
 export function Timeline({
   pips,
   cursor,
+  ran,
   selected,
   onSelect,
   onLoad,
@@ -204,7 +210,7 @@ export function Timeline({
           aria-orientation="horizontal"
         >
           {pips.map((pip, i) => {
-            const state = i < cursor ? 'done' : i === cursor ? 'current' : 'future';
+            const state = i < cursor ? (ran.has(i) ? 'done' : 'skipped') : i === cursor ? 'current' : 'future';
             return (
               <Fragment key={`${pip.segId}-${i}`}>
                 {i === 0 ? null : (
