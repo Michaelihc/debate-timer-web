@@ -7,16 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import { STRINGS } from './strings';
 
-/**
- * Keys owned by the setup editor that still carry a dash and are being rewritten there.
- * Named one by one, so any other key with a dash, new or old, still fails.
- */
-const EDITOR_PENDING: ReadonlySet<string> = new Set([
-  'v.linkTooLong',
-  'sh.copyFailed',
-  'ed.speakerDeleted',
-]);
-
 /** Em dash, en dash, horizontal bar. `——` is two em dashes. U+2212 minus is not a dash. */
 const DASH = /[–—―]/;
 
@@ -28,7 +18,7 @@ describe('string table', () => {
   for (const lang of ['en', 'zh'] as const) {
     it(`has no dashes in the ${lang} copy`, () => {
       const offenders = Object.entries(STRINGS[lang])
-        .filter(([key, text]) => !EDITOR_PENDING.has(key) && DASH.test(text))
+        .filter(([, text]) => DASH.test(text))
         .map(([key, text]) => `${key}: ${text}`);
       expect(offenders).toEqual([]);
     });

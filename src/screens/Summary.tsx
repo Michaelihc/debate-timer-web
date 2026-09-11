@@ -221,7 +221,7 @@ export default function Summary(): JSX.Element {
 
   const runAgain = useCallback(async (): Promise<void> => {
     if (roundPhase(state, plan) === 'in') {
-      const ok = await ask({ title: t('d.leaveRound'), confirmLabel: t('d.confirm') });
+      const ok = await ask({ title: t('d.restartTitle'), body: t('d.restartBody'), confirmLabel: t('sum.runAgain') });
       if (!ok) return;
     }
     openConfig(config);

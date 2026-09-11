@@ -212,7 +212,6 @@ const EN = {
   // ── Dialogs ──────────────────────────────────────────────────────────────────
   'd.confirm': 'Confirm',
   'd.cancel': 'Cancel',
-  'd.leaveRound': 'Leave this round? Progress is saved.',
   'd.applyPreset': 'Apply this preset over the live round?',
   'd.keepNamesColours': 'Keep existing names and colours?',
   'd.deleteSheet': 'Delete this saved round?',
@@ -245,7 +244,6 @@ const EN = {
   'sh.copyJson': 'Copy JSON',
   'sh.copyFailed': "Couldn't copy. The browser blocked the clipboard.",
   'sh.download': 'Download .debate.json',
-  'sh.import': 'Paste a link or JSON',
   'sh.importLegacy': 'Import legacy save.json',
   'sh.openHeading': 'Load a round someone sent you',
   'sh.readLink': 'Read the link',
@@ -633,7 +631,6 @@ const ZH: Record<StringKey, string> = {
 
   'd.confirm': '确认',
   'd.cancel': '取消',
-  'd.leaveRound': '离开本场比赛？进度已保存。',
   'd.applyPreset': '用该赛制覆盖当前比赛？',
   'd.keepNamesColours': '保留现有姓名和颜色？',
   'd.deleteSheet': '删除该已保存比赛？',
@@ -664,7 +661,6 @@ const ZH: Record<StringKey, string> = {
   'sh.copyJson': '复制 JSON',
   'sh.copyFailed': '无法复制，浏览器没有允许使用剪贴板。',
   'sh.download': '下载 .debate.json',
-  'sh.import': '粘贴链接或 JSON',
   'sh.importLegacy': '导入旧版 save.json',
   'sh.openHeading': '载入别人发来的比赛',
   'sh.readLink': '读取链接',
