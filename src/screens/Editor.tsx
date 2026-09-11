@@ -6,7 +6,10 @@
  * the round as a whole — the motion, side names and colours, cues, display, the two
  * behaviour settings — lives in one Round settings panel off the top bar.
  *
- * The draft autosaves, but a draft is not the round. APPLY hands it to the console, and
+ * The draft autosaves, but a draft is not the round. Opened from the console, APPLY hands
+ * it to the round there and the editor stays open. Opened from anywhere else (a format
+ * card, the summary, a cold load) there is no timer on screen to hand it to, so the one
+ * commit is RUN NOW, as the format card calls it: apply, then open the timer. Either way
  * the top bar always says whether anything is still unapplied. Leaving with unapplied edits
  * — Back, Esc, the browser's Back/Forward, a hand-edited address, closing the tab — asks
  * first: apply and leave, discard, or keep editing. (It used to autosave the draft and
@@ -58,7 +61,8 @@ import { migrate } from '../domain/migrate';
 import type { Problem } from '../domain/validate';
 import { firstError, hasErrors, validate } from '../domain/validate';
 
-import { clearDraft, flushDraft, pushRecent, readDraft, writeDraft } from '../engine/persist';
+import { clearDraft, clearDraftFor, flushDraft, pushRecent, readDraft, writeDraft } from '../engine/persist';
+import { roundPhase } from '../engine/selectors';
 import { reconcileState } from '../engine/state';
 import { replacePlan, useRound } from '../engine/store';
 
@@ -304,6 +308,15 @@ function backRoute(from: Route | null, hasRound: boolean): string {
   }
 }
 
+/** Put the round in Recent rounds under its current title. */
+function listRound(config: RoundConfig): void {
+  pushRecent(
+    config.presetRef === undefined
+      ? { id: config.id, title: config.title }
+      : { id: config.id, title: config.title, presetRef: config.presetRef },
+  );
+}
+
 /**
  * Language mirroring: typing one language also fills the other while the other is empty,
  * or still identical to this one. Once the other half has been written separately it is
@@ -456,6 +469,10 @@ export default function Editor(): JSX.Element {
   // Read once, on the way in: the screen the editor was opened from is where Back goes.
   const [cameFrom] = useState(previousRoute);
   const exitRoute = backRoute(cameFrom, session.plan.segments.length > 0);
+  // Opened from the console, a commit goes to the round on it and the editor stays open.
+  // Opened from anywhere else there is no timer on screen to send it to, so the commit is
+  // the one the format card offers for the same round: Run now.
+  const runsRound = cameFrom?.name !== 'console';
 
   const requestSpeakerFocus = useCallback((id: Id) => {
     focusSeq.current += 1;
@@ -464,9 +481,14 @@ export default function Editor(): JSX.Element {
 
   /* ── persistence: the draft and the URL both follow the config ───────────── */
 
+  // Only edits the round does not have are kept. A draft that matches the round again,
+  // undone or applied, is dropped, so a stored draft always means unapplied work: that is
+  // what lets the launch screen offer it back after the tab was closed.
   useEffect(() => {
-    if (!discarded.current) writeDraft(config);
-  }, [config]);
+    if (discarded.current) return;
+    if (dirty) writeDraft(config);
+    else clearDraftFor(config.id);
+  }, [config, dirty]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -721,19 +743,36 @@ export default function Editor(): JSX.Element {
   const apply = useCallback((): boolean => {
     if (hasErrors(validate(config))) return false;
     if (canonicalJson(config) === canonicalJson(session.config)) return true;
+    // "In progress" only while a segment is loaded. Before the first one, or after the last,
+    // there is no live round to claim.
+    const underWay = roundPhase(session.state, session.plan) === 'in';
     const nextPlan = plan(config);
     const outcome = reconcileState(session.state, nextPlan);
     replacePlan(nextPlan, outcome.state);
-    pushRecent(
-      config.presetRef === undefined
-        ? { id: config.id, title: config.title }
-        : { id: config.id, title: config.title, presetRef: config.presetRef },
+    listRound(config);
+    // The round has these edits now. A draft of them would only be offered back as unapplied.
+    clearDraftFor(config.id);
+    setAnnounce(
+      outcome.droppedRunning ? t('ed.appliedHeld') : underWay ? t('ed.applied') : t('ed.appliedIdle'),
     );
-    flushDraft();
-    setAnnounce(outcome.droppedRunning ? t('ed.appliedHeld') : t('ed.applied'));
     setAppliedFlash(true);
     return true;
-  }, [config, session.config, session.state, t]);
+  }, [config, session.config, session.plan, session.state, t]);
+
+  /** Apply whatever is unapplied, then open the timer on this round. */
+  const runNow = useCallback((): void => {
+    if (!apply()) return;
+    // A round opened from a format card is not listed yet. Running it lists it, the way the
+    // card's own Run now does.
+    listRound(config);
+    navigate(ROUTES.console, { force: true });
+  }, [apply, config]);
+
+  /** What the primary button and ⌘⏎ both do. */
+  const commit = useCallback((): void => {
+    if (runsRound) runNow();
+    else apply();
+  }, [apply, runNow, runsRound]);
 
   useEffect(() => {
     if (!appliedFlash) return;
@@ -846,11 +885,11 @@ export default function Editor(): JSX.Element {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
       e.preventDefault();
-      apply();
+      commit();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [apply]);
+  }, [commit]);
 
   useHotkeys('editor', {
     undo: draft.past.length > 0 ? () => dispatchDraft({ t: 'undo' }) : undefined,
@@ -869,11 +908,16 @@ export default function Editor(): JSX.Element {
 
   /* ── render ─────────────────────────────────────────────────────────────── */
 
-  const applyTitle = blocked
+  // The tooltip says what a press does to what is actually there: a round in progress, a
+  // round that has not started (or has finished), or no timer on screen at all.
+  const underWay = roundPhase(session.state, session.plan) === 'in';
+  const commitTitle = blocked
     ? l10n(firstError(problems)?.message)
-    : dirty
-      ? `${t('ed.applyTitle')} (${APPLY_KEYS})`
-      : t('ed.nothingToApply');
+    : runsRound
+      ? `${dirty ? t('ed.runApplyTitle') : t('ed.runTitle')} (${APPLY_KEYS})`
+      : dirty
+        ? `${underWay ? t('ed.applyTitle') : t('ed.applyIdleTitle')} (${APPLY_KEYS})`
+        : t('ed.nothingToApply');
 
   return (
     <section className="ed">
@@ -951,15 +995,13 @@ export default function Editor(): JSX.Element {
             <button
               type="button"
               className="btn btn--primary ed__apply"
-              disabled={!dirty || blocked}
-              title={applyTitle}
+              disabled={blocked || (!runsRound && !dirty)}
+              title={commitTitle}
               aria-describedby={stateId}
               aria-keyshortcuts="Control+Enter Meta+Enter"
-              onClick={() => {
-                apply();
-              }}
+              onClick={commit}
             >
-              {t('ed.apply')}
+              {runsRound ? t('pr.runNow') : t('ed.apply')}
             </button>
           </div>
         </div>

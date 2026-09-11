@@ -290,6 +290,19 @@ export function clearDraft(): void {
   removeRaw(KEYS.draft);
 }
 
+/**
+ * Drop one round's draft: any write still pending, and the stored draft if it is that
+ * round's. A draft of some other round is left alone, since nothing else holds its edits.
+ */
+export function clearDraftFor(id: string): void {
+  if (draftTimer !== null) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+  draftPending = null;
+  if (readDraft()?.config.id === id) removeRaw(KEYS.draft);
+}
+
 // -------------------------------------------------------------------- recents
 
 export function readRecents(): RecentEntry[] {

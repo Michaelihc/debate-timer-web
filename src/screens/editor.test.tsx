@@ -15,8 +15,8 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import Editor from './Editor';
 import { chinese4v4, instantiateConfig } from '../domain/presets';
 import { plan } from '../domain/plan';
-import { KEYS, clearDraft, flushDraft } from '../engine/persist';
-import { getSession, loadRound } from '../engine/store';
+import { KEYS, clearDraft, flushDraft, readRecents } from '../engine/persist';
+import { dispatch, getSession, loadRound } from '../engine/store';
 import { currentRoute, navigate, replaceRoute } from '../app/router';
 
 beforeEach(() => {
@@ -477,5 +477,117 @@ describe('the ready line', () => {
     expect(screen.getByText('· 2 notes')).toBeInTheDocument();
     // Notes never gate anything.
     expect(applyButton()).toBeEnabled();
+  });
+});
+
+describe('the commit button', () => {
+  function ctrlEnter(): void {
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    });
+  }
+
+  for (const [from, name] of [
+    ['#/', 'a format card'],
+    ['#/summary', 'the summary'],
+  ] as const) {
+    it(`opened from ${name}, is Run now, and opens the timer even with nothing to apply`, () => {
+      replaceRoute(from);
+      navigate('#/edit');
+      render(<Editor />);
+      expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+      const run = screen.getByRole('button', { name: 'Run now' });
+      expect(run).toBeEnabled();
+      expect(run.getAttribute('title')).toMatch(/^Open the timer \(/);
+
+      fireEvent.click(run);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(currentRoute().name).toBe('console');
+    });
+  }
+
+  it('Run now applies the edits first, without asking, and lists the round', () => {
+    replaceRoute('#/');
+    navigate('#/edit');
+    render(<Editor />);
+    fireEvent.change(screen.getByLabelText('Proposition · Speaker 1'), { target: { value: 'Michael Zhao' } });
+    const run = screen.getByRole('button', { name: 'Run now' });
+    expect(run.getAttribute('title')).toMatch(/^Apply your changes and open the timer \(/);
+
+    fireEvent.click(run);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(currentRoute().name).toBe('console');
+    expect(getSession().config.speakers.some((s) => s.name === 'Michael Zhao')).toBe(true);
+    expect(readRecents().map((entry) => entry.id)).toContain(getSession().config.id);
+    // Applied, so nothing is left to offer back as unapplied.
+    flushDraft();
+    expect(localStorage.getItem(KEYS.draft)).toBeNull();
+  });
+
+  it('Run now waits until the round can run', () => {
+    replaceRoute('#/');
+    navigate('#/edit');
+    render(<Editor />);
+    deleteFirstSpeaker();
+    const run = screen.getByRole('button', { name: 'Run now' });
+    expect(run).toBeDisabled();
+    expect(run.getAttribute('title')).toBe('Segment references a deleted speaker');
+    ctrlEnter();
+    expect(currentRoute().name).toBe('edit');
+  });
+
+  it('Ctrl+Enter does what the button does: from a format card it runs the round', () => {
+    replaceRoute('#/');
+    navigate('#/edit');
+    render(<Editor />);
+    add('Break');
+    ctrlEnter();
+    expect(currentRoute().name).toBe('console');
+    expect(getSession().config.segments).toHaveLength(11);
+  });
+
+  it('opened from the console, Ctrl+Enter applies and the editor stays', () => {
+    render(<Editor />);
+    add('Break');
+    ctrlEnter();
+    expect(currentRoute().name).toBe('edit');
+    expect(getSession().config.segments).toHaveLength(11);
+    expect(screen.getByText('Applied')).toBeInTheDocument();
+  });
+
+  it('never claims a round in progress when none is under way', () => {
+    render(<Editor />);
+    add('Break');
+    expect(applyButton().getAttribute('title')).toMatch(/^Apply your changes \(/);
+    fireEvent.click(applyButton());
+    expect(screen.getByText('Changes applied')).toBeInTheDocument();
+    expect(screen.queryByText(/in progress|live round/)).toBeNull();
+
+    add('Break');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText('Until you apply them, the round stays as it was.')).toBeInTheDocument();
+  });
+
+  it('under way, Apply says it reaches the round in progress', () => {
+    dispatch({ t: 'ADVANCE' });
+    render(<Editor />);
+    add('Break');
+    expect(applyButton().getAttribute('title')).toMatch(/^Apply to the round in progress \(/);
+    fireEvent.click(applyButton());
+    expect(screen.getByText('Applied to the round in progress')).toBeInTheDocument();
+  });
+
+  it('keeps a draft only while something is unapplied', () => {
+    render(<Editor />);
+    flushDraft();
+    expect(localStorage.getItem(KEYS.draft)).toBeNull();
+
+    add('Break');
+    flushDraft();
+    expect(localStorage.getItem(KEYS.draft)).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    flushDraft();
+    expect(localStorage.getItem(KEYS.draft)).toBeNull();
   });
 });
