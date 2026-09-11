@@ -439,7 +439,6 @@ export default function Console(): JSX.Element {
 
       <TopBar
         title={l10n(config.title)}
-        subtitle={`${sideLabels.A} · ${sideLabels.B}`}
         segmentIndex={Math.min(Math.max(state.cursor + 1, 0), plan.segments.length)}
         segmentCount={plan.segments.length}
         scheduledMs={plan.totalMs}

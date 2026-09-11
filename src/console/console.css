@@ -111,32 +111,6 @@
   text-transform: uppercase;
 }
 
-.utop__delta {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--s-2);
-  font-size: var(--t-cap);
-  color: var(--text-lo);
-}
-
-.utop__delta[data-schedule='behind'] {
-  color: var(--warn-ink);
-}
-
-.utop__delta[data-schedule='ahead'] {
-  color: var(--ok);
-}
-
-.utop__deltaword {
-  display: none;
-}
-
-.utop__delta[data-schedule='on'] .utop__deltaword[data-w='on'],
-.utop__delta[data-schedule='ahead'] .utop__deltaword[data-w='ahead'],
-.utop__delta[data-schedule='behind'] .utop__deltaword[data-w='behind'] {
-  display: inline;
-}
-
 .utop__chip {
   display: inline-flex;
   align-items: center;
@@ -1058,11 +1032,6 @@
 
   .utop__mid {
     grid-area: mid;
-  }
-
-  .utop__sub,
-  .utop__round {
-    display: none;
   }
 
   /* Back and Next keep their words on a row of their own; the squares get the full

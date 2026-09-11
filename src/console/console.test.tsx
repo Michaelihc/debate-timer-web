@@ -473,6 +473,20 @@ test('a reload puts a running clock back, charged the wall time the page was awa
   expect(clockView(s.state, s.plan, id, back)?.remainingMs).toBe(full - 7_000);
 });
 
+test('the header line says where the round is and how long it has run, and nothing more', () => {
+  render(<Console />);
+  // Skipped segments are exactly what made an ahead-of-schedule verdict meaningless.
+  act(() => {
+    for (let i = 0; i < 6; i += 1) dispatch({ t: 'ADVANCE' });
+  });
+  const meta = el('.utop__meta').textContent ?? '';
+  expect(meta).toContain(`Segment 6 of ${getSession().plan.segments.length}`);
+  expect(meta).toMatch(/Round\d+:\d\d\/\d+:\d\d/);
+  expect(meta).not.toMatch(/schedule|[+−]\d+:\d\d/i);
+  // The rosters carry the side names; the header does not repeat them.
+  for (const side of getSession().config.sides) expect(meta).not.toContain(side.label.en);
+});
+
 test('the console has a way home, and going there keeps the round where it was', () => {
   const i = firstSpeechIndex();
   act(() => {

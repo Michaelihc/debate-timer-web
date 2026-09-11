@@ -205,21 +205,6 @@ export function clockView(
 
 export { roundElapsedMs };
 
-/** Where the run sheet says we should be by now. */
-export function scheduledElapsedMs(s: RoundState, plan: RunPlan, n: Now): number {
-  if (s.cursor < 0) return 0;
-  const ps = currentPlanSegment(s, plan);
-  if (!ps) return plan.totalMs;
-  let used = 0;
-  for (const id of clockIdsOf(ps)) used += elapsedMs(s, id, n);
-  return ps.offsetMs + Math.min(used, ps.allottedMs);
-}
-
-/** Positive = the round is running behind its run sheet; negative = ahead. */
-export function scheduleDelta(s: RoundState, plan: RunPlan, n: Now): number {
-  return roundElapsedMs(s, n) - scheduledElapsedMs(s, plan, n);
-}
-
 /** A bank decrements and persists across the whole round; it never resets (§7.35). */
 export function bankRemaining(s: RoundState, plan: RunPlan, side: SideId, n: Now): number {
   const id = plan.banks[side]?.id;
@@ -251,7 +236,6 @@ export interface RoundView {
   bankDraw: SideId | null;
   roundElapsedMs: number;
   scheduledMs: number;
-  scheduleDeltaMs: number;
   sleepPending: { gapMs: number; clockId: ClockId } | null;
   canUndo: boolean;
   canRedo: boolean;
@@ -289,7 +273,6 @@ export function roundView(s: RoundState, plan: RunPlan, n: Now): RoundView {
     bankDraw: s.bankDraw?.side ?? null,
     roundElapsedMs: roundElapsedMs(s, n),
     scheduledMs: plan.totalMs,
-    scheduleDeltaMs: scheduleDelta(s, plan, n),
     sleepPending: s.sleepPending,
     canUndo: s.undo.length > 0,
     canRedo: s.redo.length > 0,
