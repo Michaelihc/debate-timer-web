@@ -579,10 +579,12 @@
   color: var(--danger);
 }
 
-/* Room for a whole word per line. Squeezed to nothing, a label broke a word per letter. */
+/* The label takes the room the chip leaves, and never less than its longest word, so it
+   wraps by words. Squeezed to nothing, it used to break a word per letter; held to a fixed
+   width instead, it cut short chips like 正一 down to an ellipsis. */
 .step__label {
-  flex: 1 1 auto;
-  min-width: 7rem;
+  flex: 1 1 0;
+  min-width: auto;
   overflow-wrap: break-word;
 }
 

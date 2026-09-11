@@ -479,7 +479,7 @@ const ZH: Record<StringKey, string> = {
   'lc.defaultFormat': '默认',
   'lc.plusMore': '另外{n}位',
   'lc.noStorage': '浏览器存储被禁用，最近比赛和断点恢复不可用。分享链接仍然包含完整的比赛设置。',
-  'lc.trust': '数据只存在本浏览器，无需注册。',
+  'lc.trust': '数据只保存在本浏览器，无需注册。',
   'lc.presetNote': '每个赛制都只是起点：打开后可自由修改辩手、顺序和时长。',
   'lc.draft': '“{title}”有未应用的更改',
   'lc.continueEditing': '继续编辑',

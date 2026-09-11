@@ -48,9 +48,19 @@
   color: var(--text-hi);
 }
 
+/* When the header is narrow the subline wraps in even halves, never leaving a word or
+   two behind on a line of its own. */
 .scr__brandsub {
   color: var(--text-lo);
   font-size: var(--t-meta);
+  text-wrap: balance;
+}
+
+/* Chinese breaks at its punctuation rather than inside a word like 浏览器, and between
+   characters only if a phrase is wider than the header. */
+:lang(zh) .scr__brandsub {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .scr__tools {
