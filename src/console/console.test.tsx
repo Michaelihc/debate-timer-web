@@ -429,6 +429,29 @@ test('the strip numbers the opposition negative, with arrows between squares and
   expect(document.querySelector('.tline__tick')).toBeNull();
 });
 
+test('a strip too long for its box marks which edges hide squares, as it scrolls', () => {
+  render(<Console />);
+  const strip = el('.tline__pips');
+  // jsdom lays nothing out, so every square "fits" and no edge is marked.
+  expect(strip.hasAttribute('data-more')).toBe(false);
+
+  let left = 0;
+  Object.defineProperty(strip, 'scrollWidth', { configurable: true, get: () => 600 });
+  Object.defineProperty(strip, 'clientWidth', { configurable: true, get: () => 376 });
+  Object.defineProperty(strip, 'scrollLeft', { configurable: true, get: () => left });
+  const scrollTo = (next: number): void => {
+    left = next;
+    fireEvent.scroll(strip);
+  };
+
+  scrollTo(0);
+  expect(strip.dataset['more']).toBe('end');
+  scrollTo(100);
+  expect(strip.dataset['more']).toBe('both');
+  scrollTo(224);
+  expect(strip.dataset['more']).toBe('start');
+});
+
 /* ------------------------------------------------------------ reload, home, hold */
 
 import { restoreSession } from '../app/boot';

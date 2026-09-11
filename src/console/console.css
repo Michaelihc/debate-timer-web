@@ -650,6 +650,27 @@
   scrollbar-width: thin;
 }
 
+/* An edge that hides more squares fades out, so a strip too long for the screen never
+   simply stops at its side as if the round ended there. The component writes `data-more`
+   as the strip scrolls; the fade is a mask, so it takes no colour of its own. */
+.tline__pips[data-more='end'] {
+  mask-image: linear-gradient(to right, black calc(100% - var(--s-7)), transparent);
+}
+
+.tline__pips[data-more='start'] {
+  mask-image: linear-gradient(to left, black calc(100% - var(--s-7)), transparent);
+}
+
+.tline__pips[data-more='both'] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--s-7),
+    black calc(100% - var(--s-7)),
+    transparent
+  );
+}
+
 /* 31.3 x 30.7 — a square, white face, #323232 label. */
 .tline__pip {
   position: relative;
@@ -1015,6 +1036,26 @@
 
   .tbtn .keycaps {
     display: none;
+  }
+
+  /* The arrows give up their room before the squares have to scroll: no gap around them,
+     a shorter minimum and a smaller head, so a ten-segment round fits a 400px screen. */
+  .tline__pips {
+    gap: 0;
+  }
+
+  .tline__arrow {
+    min-width: var(--s-3);
+  }
+
+  .tline__arrow::before {
+    left: var(--s-1);
+  }
+
+  .tline__arrow::after {
+    width: calc(var(--s-2) + var(--s-1));
+    height: calc(var(--s-2) + var(--s-1));
+    margin-top: calc((var(--s-2) + var(--s-1)) / -2);
   }
 }
 
