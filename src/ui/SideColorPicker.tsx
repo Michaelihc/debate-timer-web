@@ -121,24 +121,6 @@ export function SideColorPicker({
         <HexField id={`${uid}-b`} label={labelB} value={colorB} onCommit={(v) => setHex('B', v)} />
       </div>
 
-      <ul className="scp__figures t-meta">
-        <li data-flag={check.deltaL < DELTA_L_WARN ? 'warn' : undefined}>
-          {t('ed.lightnessGap', { v: round2(check.deltaL) })}
-        </li>
-        <li data-flag={check.contrastA < MIN_CONTRAST_ON_BLACK ? 'warn' : undefined}>
-          {labelA} · {t('ed.onBlack', { v: round2(check.contrastA) })}
-        </li>
-        <li data-flag={check.contrastB < MIN_CONTRAST_ON_BLACK ? 'warn' : undefined}>
-          {labelB} · {t('ed.onBlack', { v: round2(check.contrastB) })}
-        </li>
-      </ul>
-
-      <div className="scp__cvd">
-        <p className="t-cap scp__cvd-head">{t('ed.cvd')}</p>
-        <CvdRow label={t('ed.deuteranopia')} a={colorA} b={colorB} type="deuteranopia" />
-        <CvdRow label={t('ed.protanopia')} a={colorA} b={colorB} type="protanopia" />
-      </div>
-
       {messages.length === 0 ? (
         <p className="scp__verdict t-meta" data-verdict="ok">
           <Icon name="check" /> {t('ed.pairOk')}
@@ -152,6 +134,28 @@ export function SideColorPicker({
           ))}
         </ul>
       )}
+
+      {/* The verdict above is the answer; the measurements behind it stay one click away. */}
+      <details className="scp__more">
+        <summary className="scp__summary t-meta">{t('ed.contrastFigures')}</summary>
+        <ul className="scp__figures t-meta">
+          <li data-flag={check.deltaL < DELTA_L_WARN ? 'warn' : undefined}>
+            {t('ed.lightnessGap', { v: round2(check.deltaL) })}
+          </li>
+          <li data-flag={check.contrastA < MIN_CONTRAST_ON_BLACK ? 'warn' : undefined}>
+            {labelA} · {t('ed.onBlack', { v: round2(check.contrastA) })}
+          </li>
+          <li data-flag={check.contrastB < MIN_CONTRAST_ON_BLACK ? 'warn' : undefined}>
+            {labelB} · {t('ed.onBlack', { v: round2(check.contrastB) })}
+          </li>
+        </ul>
+
+        <div className="scp__cvd">
+          <p className="t-cap scp__cvd-head">{t('ed.cvd')}</p>
+          <CvdRow label={t('ed.deuteranopia')} a={colorA} b={colorB} type="deuteranopia" />
+          <CvdRow label={t('ed.protanopia')} a={colorA} b={colorB} type="protanopia" />
+        </div>
+      </details>
     </div>
   );
 }

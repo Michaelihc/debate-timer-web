@@ -14,7 +14,16 @@
  * on every edit), so every write goes through `lib/urlState.writeHash`, which remembers
  * the last value it wrote; a `hashchange` matching it is a rewrite echo and is ignored.
  * `pushState`/`replaceState` fire no `hashchange` at all, so navigation notifies
- * subscribers directly, and `popstate` (browser Back) is always honoured.
+ * subscribers directly, and `popstate` (browser Back) is always honoured — unless a
+ * leave guard refuses it.
+ *
+ * ── Leave guard ────────────────────────────────────────────────────────────────
+ * A screen holding work the round does not have yet (the editor's unapplied draft)
+ * installs one guard, and every way off that screen runs through it: `navigate()` asks
+ * before it writes the hash; a Back/Forward press or a hand-edited address — which the
+ * browser has already applied by the time we hear about it — is put back to the guarded
+ * screen's URL while the screen asks the operator. `replaceRoute()` is not guarded: it is
+ * for redirects nobody chose, which never happen while a screen is being edited.
  */
 
 import { useSyncExternalStore } from 'react';
@@ -36,6 +45,19 @@ export const ROUTES: Readonly<Record<Exclude<RouteName, 'share'>, string>> = {
   edit: '#/edit',
   summary: '#/summary',
 };
+
+/**
+ * Asked before the current screen is left for `to` (a normalised hash). Return `true` to
+ * let the navigation happen, `false` to keep the operator where they are — the guard is
+ * then responsible for asking them, and for calling `navigate(to, { force: true })` if
+ * they choose to go.
+ */
+export type LeaveGuard = (to: string) => boolean;
+
+export interface NavigateOptions {
+  /** Skip the leave guard. Only the guard's own "leave anyway" answer passes this. */
+  force?: boolean;
+}
 
 const listeners = new Set<() => void>();
 
@@ -90,20 +112,45 @@ export function mirrorPath(name: Exclude<RouteName, 'share'>, token: string): st
 
 let current: Route = parseRoute(typeof location === 'undefined' ? '' : location.hash);
 
+/** The last address the router knows for the screen on show — where a refused Back returns. */
+let screenHash: string = typeof location === 'undefined' ? '' : location.hash;
+
+let leaveGuard: LeaveGuard | null = null;
+
 function refresh(): void {
+  screenHash = location.hash;
   const next = parseRoute(location.hash);
   if (next.name === current.name && next.path === current.path) return;
   current = next;
   emit();
 }
 
+/** Moving within the same screen is never guarded; leaving it is. */
+function refused(next: Route): boolean {
+  if (leaveGuard === null || next.name === current.name) return false;
+  return !leaveGuard(next.path);
+}
+
 export function currentRoute(): Route {
   return current;
 }
 
+/**
+ * Install the leave guard for the screen on show. Returns the disposer, which only removes
+ * the guard if it is still this one — so it drops straight into a `useEffect` cleanup.
+ */
+export function setLeaveGuard(fn: LeaveGuard | null): () => void {
+  leaveGuard = fn;
+  return () => {
+    if (leaveGuard === fn) leaveGuard = null;
+  };
+}
+
 /** Push: browser Back returns to where the operator was. */
-export function navigate(path: string): void {
-  writeHash(parseRoute(path).path, 'push');
+export function navigate(path: string, opts: NavigateOptions = {}): void {
+  const next = parseRoute(path);
+  if (opts.force !== true && refused(next)) return;
+  writeHash(next.path, 'push');
   refresh();
 }
 
@@ -113,6 +160,15 @@ export function replaceRoute(path: string): void {
   refresh();
 }
 
+/**
+ * A screen writing its own state into the address bar (`#/edit/r/<token>`): same screen,
+ * no new history entry, and remembered as the place a refused Back comes back to.
+ */
+export function mirrorRoute(hash: string): void {
+  writeHash(hash, 'replace');
+  if (parseRoute(hash).name === current.name) screenHash = location.hash;
+}
+
 export function subscribeRoute(fn: () => void): () => void {
   listeners.add(fn);
   return () => {
@@ -120,13 +176,26 @@ export function subscribeRoute(fn: () => void): () => void {
   };
 }
 
+/** Back, Forward, or a hash typed into the address bar: the URL has already moved. */
+function onBrowserMove(): void {
+  const next = parseRoute(location.hash);
+  if (refused(next)) {
+    // Put the guarded screen back as a NEW entry rather than replacing the one the
+    // browser landed on: a second Back press then asks again, instead of each refusal
+    // quietly eating one more step of the operator's history.
+    writeHash(screenHash, 'push');
+    return;
+  }
+  refresh();
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('hashchange', () => {
     // Our own rewrite echoing back; the route did not change.
     if (isSelfWritten(location.hash)) return;
-    refresh();
+    onBrowserMove();
   });
-  window.addEventListener('popstate', refresh);
+  window.addEventListener('popstate', onBrowserMove);
 }
 
 export function useRoute(): Route {
