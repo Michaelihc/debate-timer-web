@@ -24,6 +24,10 @@
  * browser has already applied by the time we hear about it — is put back to the guarded
  * screen's URL while the screen asks the operator. `replaceRoute()` is not guarded: it is
  * for redirects nobody chose, which never happen while a screen is being edited.
+ *
+ * ── Previous screen ────────────────────────────────────────────────────────────
+ * The router also remembers the screen shown before the current one (`previousRoute()`),
+ * so a screen's own Back returns to where the operator came from, not to a fixed screen.
  */
 
 import { useSyncExternalStore } from 'react';
@@ -112,6 +116,13 @@ export function mirrorPath(name: Exclude<RouteName, 'share'>, token: string): st
 
 let current: Route = parseRoute(typeof location === 'undefined' ? '' : location.hash);
 
+/**
+ * The screen shown before the one on show, or null after a cold load straight onto a
+ * screen. Only a change of screen moves it: the editor rewriting its own address on every
+ * edit leaves it where it is.
+ */
+let previous: Route | null = null;
+
 /** The last address the router knows for the screen on show — where a refused Back returns. */
 let screenHash: string = typeof location === 'undefined' ? '' : location.hash;
 
@@ -121,6 +132,7 @@ function refresh(): void {
   screenHash = location.hash;
   const next = parseRoute(location.hash);
   if (next.name === current.name && next.path === current.path) return;
+  if (next.name !== current.name) previous = current;
   current = next;
   emit();
 }
@@ -133,6 +145,15 @@ function refused(next: Route): boolean {
 
 export function currentRoute(): Route {
   return current;
+}
+
+/**
+ * The screen the operator was on before this one. A screen's own Back returns here, so an
+ * editor opened from a format card goes back to launch and one opened from the console goes
+ * back to the console. Null after a cold load straight onto a screen.
+ */
+export function previousRoute(): Route | null {
+  return previous;
 }
 
 /**

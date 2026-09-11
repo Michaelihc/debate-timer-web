@@ -394,10 +394,38 @@
 /* --- TimeField ---------------------------------------------------------- */
 
 .timefield {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   gap: var(--s-1);
   min-width: 0;
+}
+
+/* The one line a time box says about itself: how a bare number reads while it is typed, or
+   that an entry could not be read. It floats under the box, so a row never jumps. */
+.timefield__msg {
+  position: absolute;
+  top: calc(100% + var(--s-1));
+  left: 0;
+  z-index: 4;
+  width: max-content;
+  max-width: 16rem;
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: var(--bg-raised);
+  color: var(--text-hi);
+  text-align: left;
+  pointer-events: none;
+}
+
+.timefield__msg[data-tone='error'] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.timefield__input[aria-invalid='true'] {
+  border-color: var(--danger);
 }
 
 .timefield__label {

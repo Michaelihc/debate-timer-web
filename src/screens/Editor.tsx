@@ -10,7 +10,12 @@
  * the top bar always says whether anything is still unapplied. Leaving with unapplied edits
  * — Back, Esc, the browser's Back/Forward, a hand-edited address, closing the tab — asks
  * first: apply and leave, discard, or keep editing. (It used to autosave the draft and
- * navigate away, so edits silently never reached the round.)
+ * navigate away, so edits silently never reached the round.) Back returns to the screen
+ * the editor was opened from.
+ *
+ * A speaker has ONE time, as in the original app. The roster and every speech row in the
+ * order edit that same number, so the two never disagree. A time for one speech alone is an
+ * exception kept in that row's details, and the row is marked only while it differs.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * THE RULE THIS SCREEN IS BUILT AROUND
@@ -58,7 +63,8 @@ import { reconcileState } from '../engine/state';
 import { replacePlan, useRound } from '../engine/store';
 
 import { useHotkeys } from '../app/hotkeys';
-import { ROUTES, currentRoute, mirrorPath, mirrorRoute, navigate, setLeaveGuard } from '../app/router';
+import type { Route } from '../app/router';
+import { ROUTES, currentRoute, mirrorPath, mirrorRoute, navigate, previousRoute, setLeaveGuard } from '../app/router';
 import { formatTime } from '../lib/format';
 import { encodeSharePlain, tryDecodeShare } from '../lib/urlState';
 import type { TFn } from '../i18n/useLang';
@@ -234,7 +240,7 @@ function makeSegment(pick: ComposerPick, id: Id): Segment {
   }
 }
 
-/** The editable number for a segment: one side's clock for free debate, the allotment otherwise. */
+/** The time a segment runs: one side's clock for free debate, the allotment otherwise. */
 function durationOf(segment: Segment, config: RoundConfig): number {
   if (segment.kind === 'chess') return segment.perSideMs;
   if (segment.kind !== 'speech') return segment.allottedMs;
@@ -244,8 +250,58 @@ function durationOf(segment: Segment, config: RoundConfig): number {
 
 function setDuration(segment: Segment, ms: number): Segment {
   if (segment.kind === 'chess') return { ...segment, perSideMs: ms };
-  if (segment.kind === 'speech') return { ...segment, allottedMs: ms };
   return { ...segment, allottedMs: ms };
+}
+
+/**
+ * A speech's own time when it is a real exception: set, and different from its speaker's.
+ * One that merely equals the speaker's time is no exception and is never marked.
+ */
+function exceptionOf(segment: Segment, speaker: SpeakerCfg | null): number | null {
+  if (segment.kind !== 'speech' || speaker === null || segment.allottedMs === null) return null;
+  return segment.allottedMs === speaker.defaultMs ? null : segment.allottedMs;
+}
+
+/**
+ * Set speakers' times, the way the original app worked: a speaker has ONE time, every speech
+ * they give runs it, and the roster and the order show the same number. A speech whose own
+ * time equalled the speaker's old or new time was never a real exception, so it is cleared
+ * and follows the speaker from now on, instead of staying pinned to a number nobody sees.
+ */
+function withSpeakerTimes(config: RoundConfig, times: ReadonlyMap<Id, number>): RoundConfig {
+  const before = new Map(config.speakers.map((s) => [s.id, s.defaultMs] as const));
+  return {
+    ...config,
+    speakers: config.speakers.map((s) => {
+      const ms = times.get(s.id);
+      return ms === undefined ? s : { ...s, defaultMs: ms };
+    }),
+    segments: config.segments.map((seg) => {
+      if (seg.kind !== 'speech' || seg.allottedMs === null) return seg;
+      const ms = times.get(seg.speakerId);
+      if (ms === undefined) return seg;
+      const pinned = seg.allottedMs === ms || seg.allottedMs === before.get(seg.speakerId);
+      return pinned ? { ...seg, allottedMs: null } : seg;
+    }),
+  };
+}
+
+/**
+ * Where Back goes: the screen the editor was opened from, so a format card's Edit returns to
+ * launch and the console's Edit round returns to the console. A cold load straight onto the
+ * editor has no such screen and falls back to the console when a round is loaded.
+ */
+function backRoute(from: Route | null, hasRound: boolean): string {
+  switch (from?.name) {
+    case 'launch':
+      return ROUTES.launch;
+    case 'console':
+      return ROUTES.console;
+    case 'summary':
+      return ROUTES.summary;
+    default:
+      return hasRound ? ROUTES.console : ROUTES.launch;
+  }
 }
 
 /**
@@ -367,6 +423,8 @@ export default function Editor(): JSX.Element {
   const sheetRef = useRef<HTMLOListElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
+  /** Each side's Add speaker button: where Enter in that side's last name lands. */
+  const addSpeakerRefs = useRef<Record<SideId, HTMLButtonElement | null>>({ A: null, B: null });
   const colourRef = useRef<HTMLDivElement>(null);
   const focusSeq = useRef(0);
   /** Set by "Discard changes": from then on nothing may write the draft back. */
@@ -395,7 +453,9 @@ export default function Editor(): JSX.Element {
   const liveJson = useMemo(() => canonicalJson(session.config), [session.config]);
   const dirty = draftJson !== liveJson;
 
-  const exitRoute = session.plan.segments.length > 0 ? ROUTES.console : ROUTES.launch;
+  // Read once, on the way in: the screen the editor was opened from is where Back goes.
+  const [cameFrom] = useState(previousRoute);
+  const exitRoute = backRoute(cameFrom, session.plan.segments.length > 0);
 
   const requestSpeakerFocus = useCallback((id: Id) => {
     focusSeq.current += 1;
@@ -462,7 +522,7 @@ export default function Editor(): JSX.Element {
   /* ── roster ─────────────────────────────────────────────────────────────── */
 
   const addSpeaker = useCallback(
-    (side: SideId, afterId?: Id) => {
+    (side: SideId) => {
       const list = speakersOf(config, side);
       const last = list[list.length - 1];
       const speaker: SpeakerCfg = {
@@ -471,13 +531,33 @@ export default function Editor(): JSX.Element {
         name: '',
         defaultMs: last?.defaultMs ?? DEFAULT_SPEECH_MS,
       };
-      const at = afterId === undefined ? list.length : list.findIndex((s) => s.id === afterId) + 1;
-      const next = [...list];
-      next.splice(at, 0, speaker);
-      edit(setSideSpeakers(config, side, next));
+      edit(setSideSpeakers(config, side, [...list, speaker]));
       requestSpeakerFocus(speaker.id);
     },
     [config, edit, requestSpeakerFocus],
+  );
+
+  /**
+   * Enter in a name confirms it and moves on: to the next name on the same side, or after the
+   * side's last name to its Add speaker button. It never adds a row itself. (It used to, so
+   * confirming a rename left a blank speaker behind and the side count went up by one.)
+   */
+  const focusNextName = useCallback(
+    (side: SideId, id: Id) => {
+      const list = speakersOf(config, side);
+      const at = list.findIndex((s) => s.id === id);
+      if (at < 0) return;
+      const next = list[at + 1];
+      if (next === undefined) addSpeakerRefs.current[side]?.focus();
+      else requestSpeakerFocus(next.id);
+    },
+    [config, requestSpeakerFocus],
+  );
+
+  /** A speaker's one time, from the roster or from any of their speeches in the order. */
+  const setSpeakerTime = useCallback(
+    (id: Id, ms: number) => edit(withSpeakerTimes(config, new Map([[id, ms]]))),
+    [config, edit],
   );
 
   const patchSpeaker = useCallback(
@@ -910,14 +990,13 @@ export default function Editor(): JSX.Element {
             {SIDES.map((side) => {
               const cfg = sideCfg(config, side);
               const list = speakersOf(config, side);
-              const total = list.reduce((sum, s) => sum + s.defaultMs, 0);
+              // No time total in the head: the one set of side totals is the strip's floor
+              // time, which counts what will actually run. A sum of roster times never matched it.
               return (
                 <div className="team" key={side} style={{ borderLeftColor: cfg.color }}>
                   <h3 className="team__head">
                     <span className="team__name t-row">{l10n(cfg.label)}</span>
-                    <span className="team__meta t-meta num">
-                      {t('ed.sideTotalLine', { n: list.length, len: formatTime(total, { secondsOnly }) })}
-                    </span>
+                    <span className="team__meta t-meta num">{t('ed.sideCount', { n: list.length })}</span>
                   </h3>
 
                   <ul className="team__list">
@@ -934,7 +1013,8 @@ export default function Editor(): JSX.Element {
                         )}
                         focus={focusSpeaker}
                         onPatch={(patch) => patchSpeaker(speaker.id, patch, `speaker-${speaker.id}`)}
-                        onEnter={() => addSpeaker(side, speaker.id)}
+                        onTime={(ms) => setSpeakerTime(speaker.id, ms)}
+                        onEnter={() => focusNextName(side, speaker.id)}
                         onDuplicate={() => duplicateSpeaker(side, speaker.id)}
                         onDelete={() => deleteSpeaker(speaker.id)}
                         onMoveSide={() =>
@@ -947,11 +1027,7 @@ export default function Editor(): JSX.Element {
                         }
                         onSetAllOnSide={() =>
                           edit(
-                            setSideSpeakers(
-                              config,
-                              side,
-                              list.map((s) => ({ ...s, defaultMs: speaker.defaultMs })),
-                            ),
+                            withSpeakerTimes(config, new Map(list.map((s) => [s.id, speaker.defaultMs] as const))),
                           )
                         }
                         onMove={(delta) => reorderSpeaker(side, i, i + delta)}
@@ -960,7 +1036,14 @@ export default function Editor(): JSX.Element {
                     ))}
                   </ul>
 
-                  <button type="button" className="btn btn--quiet team__add" onClick={() => addSpeaker(side)}>
+                  <button
+                    type="button"
+                    ref={(el) => {
+                      addSpeakerRefs.current[side] = el;
+                    }}
+                    className="btn btn--quiet team__add"
+                    onClick={() => addSpeaker(side)}
+                  >
                     <Icon name="plus" /> {t('ed.addSpeaker')}
                   </button>
                 </div>
@@ -995,6 +1078,9 @@ export default function Editor(): JSX.Element {
                   const side =
                     ps.speaker?.side ?? (ps.liveSides.length === 1 ? (ps.liveSides[0] ?? null) : null);
                   const open = expanded === ps.segId;
+                  // A speech's box is its speaker's one time; every other row edits its own.
+                  const speaker = segment.kind === 'speech' ? ps.speaker : null;
+                  const speakerName = speaker === null ? null : speakerDisplay(config, speaker, lang);
                   return (
                     <SegmentCard
                       key={ps.segId}
@@ -1005,14 +1091,20 @@ export default function Editor(): JSX.Element {
                       who={whoOf(ps, config, lang, t)}
                       missing={ps.missingSpeakerIds.length > 0}
                       color={side === null ? null : sideCfg(config, side).color}
-                      durationMs={durationOf(segment, config)}
+                      durationMs={speaker === null ? durationOf(segment, config) : speaker.defaultMs}
                       perSide={segment.kind === 'chess'}
-                      custom={segment.kind === 'speech' && segment.allottedMs !== null}
+                      customMs={exceptionOf(segment, speaker)}
+                      timeLabel={speakerName === null ? undefined : t('ed.speakerTime', { name: speakerName })}
+                      timeHint={speakerName === null ? undefined : t('ed.speakerTimeHint', { name: speakerName })}
+                      timeDisabled={segment.kind === 'speech' && speaker === null}
                       expanded={open}
                       secondsOnly={secondsOnly}
                       hintId={hintId}
                       onToggle={() => setExpanded((cur) => (cur === ps.segId ? null : ps.segId))}
-                      onDuration={(ms) => patchSegment(ps.index, setDuration(segment, ms))}
+                      onDuration={(ms) => {
+                        if (speaker === null) patchSegment(ps.index, setDuration(segment, ms));
+                        else setSpeakerTime(speaker.id, ms);
+                      }}
                       onDuplicate={() => duplicateSegment(ps.index)}
                       onDelete={() => deleteSegment(ps.index)}
                       onMove={(delta) => reorderSegment(ps.index, ps.index + delta)}
@@ -1024,6 +1116,7 @@ export default function Editor(): JSX.Element {
                           ps={ps}
                           secondsOnly={secondsOnly}
                           onPatch={(next, merge) => patchSegment(ps.index, next, merge)}
+                          onSpeakerTime={setSpeakerTime}
                         />
                       ) : null}
                     </SegmentCard>
@@ -1046,6 +1139,7 @@ export default function Editor(): JSX.Element {
         totalMs={draftPlan.totalMs}
         speakingMs={draftPlan.speakingMs}
         sideLabels={{ A: l10n(config.sides[0].label), B: l10n(config.sides[1].label) }}
+        hasFreeDebate={config.segments.some((s) => s.kind === 'chess')}
         secondsOnly={secondsOnly}
         danglingCount={dangling.length}
         onRemoveDangling={removeDangling}
@@ -1088,13 +1182,16 @@ export default function Editor(): JSX.Element {
                 colors={{ A: config.sides[0].color, B: config.sides[1].color }}
                 className="presets__ribbon"
               />
-              <p className="t-meta num">
-                {t('lc.structure', {
-                  sides: `${meta.speakersPerSide.A}v${meta.speakersPerSide.B}`,
-                  n: meta.segmentCount,
-                  len: formatTime(meta.totalMs, { showHours: meta.totalMs >= 3_600_000 }),
-                })}
-              </p>
+              {/* The blank format has no structure to describe: "0v0 · 0 segments · 0:00" said nothing. */}
+              {meta.segmentCount === 0 && meta.speakerCount === 0 ? null : (
+                <p className="t-meta num">
+                  {t('lc.structure', {
+                    sides: `${meta.speakersPerSide.A}v${meta.speakersPerSide.B}`,
+                    n: meta.segmentCount,
+                    len: formatTime(meta.totalMs, { showHours: meta.totalMs >= 3_600_000 }),
+                  })}
+                </p>
+              )}
               <p className="t-meta presets__note">{t('pr.basedOn')}</p>
               <button type="button" className="btn" onClick={() => setPresetPending(meta.key)}>
                 {t('ed.usePreset')}
@@ -1145,9 +1242,11 @@ interface SegmentDetailsProps {
   ps: SegmentPlan;
   secondsOnly: boolean;
   onPatch: (next: Segment, merge?: string) => void;
+  /** A speaker's one time, shared with the roster and with every speech they give. */
+  onSpeakerTime: (id: Id, ms: number) => void;
 }
 
-function SegmentDetails({ config, ps, secondsOnly, onPatch }: SegmentDetailsProps): JSX.Element {
+function SegmentDetails({ config, ps, secondsOnly, onPatch, onSpeakerTime }: SegmentDetailsProps): JSX.Element {
   const { t, lang } = useLang();
   const segment = ps.segment;
   const duration = durationOf(segment, config);
@@ -1198,29 +1297,14 @@ function SegmentDetails({ config, ps, secondsOnly, onPatch }: SegmentDetailsProp
         labelHidden
         secondsOnly={secondsOnly}
       />
-      {segment.kind === 'speech' && ps.speaker !== null ? (
-        segment.allottedMs === null ? (
-          <span className="fld__hint t-meta">
-            {t('ed.followsSpeaker', { name: speakerDisplay(config, ps.speaker, lang) })}
-          </span>
-        ) : (
-          <button
-            type="button"
-            className="btn btn--quiet fld__inline t-meta"
-            onClick={() => onPatch({ ...segment, allottedMs: null })}
-          >
-            {t('ed.useSpeakerTime', {
-              name: speakerDisplay(config, ps.speaker, lang),
-              time: formatTime(ps.speaker.defaultMs, { secondsOnly }),
-            })}
-          </button>
-        )
-      ) : null}
     </TimeRow>
   );
 
   switch (segment.kind) {
-    case 'speech':
+    case 'speech': {
+      const speaker = ps.speaker;
+      const name = speaker === null ? '' : speakerDisplay(config, speaker, lang);
+      const exception = exceptionOf(segment, speaker);
       return (
         <div className="det">
           <Field label={t('ed.pickSpeaker')}>
@@ -1239,7 +1323,41 @@ function SegmentDetails({ config, ps, secondsOnly, onPatch }: SegmentDetailsProp
               )}
             </select>
           </Field>
-          {time}
+          {speaker === null ? null : (
+            <TimeRow label={t('ed.speakerTime', { name })} hint={t('ed.speakerTimeHint', { name })}>
+              <TimeField
+                className="fld__time"
+                valueMs={speaker.defaultMs}
+                onChange={(ms) => onSpeakerTime(speaker.id, ms)}
+                label={t('ed.speakerTime', { name })}
+                labelHidden
+                secondsOnly={secondsOnly}
+              />
+            </TimeRow>
+          )}
+          {/* The per-speech exception: the one place a speech can run something other than its
+              speaker's time, and it says it affects this speech alone. */}
+          <TimeRow label={t('ed.thisSpeechOnly')} hint={t('ed.thisSpeechHint')}>
+            <TimeField
+              className="fld__time"
+              valueMs={duration}
+              onChange={(ms) =>
+                onPatch({ ...segment, allottedMs: speaker !== null && ms === speaker.defaultMs ? null : ms })
+              }
+              label={t('ed.thisSpeechOnly')}
+              labelHidden
+              secondsOnly={secondsOnly}
+            />
+            {exception === null || speaker === null ? null : (
+              <button
+                type="button"
+                className="btn btn--quiet fld__inline t-meta"
+                onClick={() => onPatch({ ...segment, allottedMs: null })}
+              >
+                {t('ed.useSpeakerTime', { name, time: formatTime(speaker.defaultMs, { secondsOnly }) })}
+              </button>
+            )}
+          </TimeRow>
           <TimeRow label={t('ed.protectedTime')} hint={t('ed.protectedHelp')}>
             <TimeField
               className="fld__time"
@@ -1262,6 +1380,7 @@ function SegmentDetails({ config, ps, secondsOnly, onPatch }: SegmentDetailsProp
           {cues}
         </div>
       );
+    }
 
     case 'prep':
       return (

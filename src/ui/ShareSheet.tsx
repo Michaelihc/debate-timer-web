@@ -10,7 +10,7 @@
  */
 
 import type { DragEvent as ReactDragEvent, JSX } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { RoundConfig } from '../domain/config';
 import { canonicalJson } from '../domain/config';
 import type { MigrationProblem } from '../domain/migrate';
@@ -48,6 +48,7 @@ export function ShareSheet({ open, onClose, config, onImport }: ShareSheetProps)
   const [staged, setStaged] = useState<Staged | null>(null);
   const [problems, setProblems] = useState<MigrationProblem[]>([]);
   const [dragging, setDragging] = useState(false);
+  const openId = useId();
 
   // The link is rebuilt whenever the sheet is open and the config moves; encoding is
   // async because the deflate codec is.
@@ -105,13 +106,9 @@ export function ShareSheet({ open, onClose, config, onImport }: ShareSheetProps)
 
   return (
     <Overlay open={open} onClose={onClose} title={t('sh.title')} size="lg" className="sheet">
+      {/* Sending. The dialog title already says what these buttons are for, and the link's
+          length is only worth a line when it is too long to use. */}
       <section className="sheet__block">
-        <h3 className="t-cap">{t('sh.copyLink')}</h3>
-        <p className="sheet__link t-meta num" data-over={link?.over === true ? '' : undefined}>
-          {link === null
-            ? t('ui.loading')
-            : `${t('sh.chars', { n: link.length })}${link.over ? ` · ${t('v.linkTooLong')}` : ''}`}
-        </p>
         <div className="sheet__actions">
           <button
             type="button"
@@ -129,13 +126,16 @@ export function ShareSheet({ open, onClose, config, onImport }: ShareSheetProps)
           </button>
         </div>
         {copied === 'failed' ? <p className="sheet__warn t-meta">{t('sh.copyFailed')}</p> : null}
-        {link !== null && link.length > LINK_BUDGET ? (
-          <p className="sheet__warn t-meta">{t('v.linkTooLong')}</p>
+        {link?.over === true ? (
+          <p className="sheet__warn t-meta num">{t('v.linkTooLong', { n: link.length, max: LINK_BUDGET })}</p>
         ) : null}
       </section>
 
-      <section className="sheet__block">
-        <h3 className="t-cap">{t('sh.import')}</h3>
+      {/* Bringing a round in, said once and in plain words: a file, or a link someone sent. */}
+      <section className="sheet__block" aria-labelledby={openId}>
+        <h3 id={openId} className="t-cap">
+          {t('sh.openHeading')}
+        </h3>
         <div
           className="sheet__drop"
           data-dragging={dragging ? '' : undefined}
@@ -165,21 +165,19 @@ export function ShareSheet({ open, onClose, config, onImport }: ShareSheetProps)
           </label>
         </div>
 
-        <label className="sheet__paste">
-          <span className="sr-only">{t('sh.import')}</span>
-          <textarea
-            className="sheet__textarea t-meta"
-            rows={4}
-            value={text}
-            spellCheck={false}
-            placeholder={t('ed.importPlaceholder')}
-            onChange={(e) => setText(e.target.value)}
-          />
-        </label>
+        <textarea
+          className="sheet__textarea t-meta"
+          rows={3}
+          value={text}
+          spellCheck={false}
+          placeholder={t('ed.importPlaceholder')}
+          aria-label={t('ed.importPlaceholder')}
+          onChange={(e) => setText(e.target.value)}
+        />
 
         <div className="sheet__actions">
           <button type="button" className="btn" disabled={text.trim() === ''} onClick={() => void stage(text)}>
-            {t('sh.import')}
+            {t('sh.readLink')}
           </button>
           {staged === null ? null : (
             <>

@@ -5,9 +5,14 @@
  * Name and role stack, so a role like 总结陈词 or "Opening Constructive" is always read in
  * full rather than cut to 总结陈. The grip shows while the row is hovered or focused.
  *
- * The keyboard is the primary path. Enter in the name field creates the next row and
- * focuses it — eight speakers are eight names and eight Enters. Alt+↑/↓ reorders, ⌘D
- * duplicates, ⌘⌫ deletes, Tab walks name → role → time → ⋯.
+ * The keyboard is the primary path. Enter in the name field confirms it and moves on to the
+ * next name on the same side; after the side's last name it lands on that side's Add
+ * speaker button, so a new row is always its own deliberate press and never a side effect
+ * of confirming a rename. An Enter that ends an IME composition does nothing. Alt+↑/↓
+ * reorders, ⌘D duplicates, ⌘⌫ deletes, Tab walks name → role → time → ⋯.
+ *
+ * The time is the speaker's one time. Every speech they give in the order runs it, and the
+ * order's rows edit the same number.
  *
  * The role field edits the current language and fills the other half while that half is
  * still empty (or still the copy this field put there), so an operator working in one
@@ -43,6 +48,9 @@ export interface SpeakerRowProps {
   flagged: boolean;
   focus: FocusRequest | null;
   onPatch: (patch: Partial<SpeakerCfg>) => void;
+  /** The speaker's one time. Every speech that follows it changes with it. */
+  onTime: (ms: number) => void;
+  /** Enter in the name: the editor moves focus on. It never adds a row. */
   onEnter: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -61,6 +69,7 @@ export function SpeakerRow({
   flagged,
   focus,
   onPatch,
+  onTime,
   onEnter,
   onDuplicate,
   onDelete,
@@ -75,7 +84,10 @@ export function SpeakerRow({
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (focus !== null && focus.id === speaker.id) nameRef.current?.focus();
+    if (focus === null || focus.id !== speaker.id) return;
+    // Focus the way Tab would: the whole name selected, so typing replaces it.
+    nameRef.current?.focus();
+    nameRef.current?.select();
   }, [focus, speaker.id]);
 
   function onRowKeyDown(e: ReactKeyboardEvent<HTMLLIElement>): void {
@@ -175,7 +187,8 @@ export function SpeakerRow({
           autoComplete="off"
           onChange={(e) => onPatch({ name: e.target.value })}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            // 229 is the Enter some engines still send as an IME composition ends.
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
             e.preventDefault();
             onEnter();
           }}
@@ -195,7 +208,7 @@ export function SpeakerRow({
       <TimeField
         className="person__time"
         valueMs={speaker.defaultMs}
-        onChange={(ms) => onPatch({ defaultMs: ms })}
+        onChange={onTime}
         label={`${who} · ${t('ed.time')}`}
         labelHidden
         secondsOnly={secondsOnly}

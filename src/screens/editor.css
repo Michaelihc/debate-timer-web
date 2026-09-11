@@ -249,6 +249,19 @@
   background: var(--bg-sunken);
 }
 
+/* An unreadable entry keeps its red edge while the box still has focus. */
+.ed .timefield__input[aria-invalid='true'],
+.rs .timefield__input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+/* Boxes at a row's right edge open their note leftwards, inside the row. */
+.step__time .timefield__msg,
+.person__time .timefield__msg {
+  right: 0;
+  left: auto;
+}
+
 /* --- Roster ------------------------------------------------------------- */
 
 .team {
@@ -1079,8 +1092,15 @@ select.in {
   color: var(--danger);
 }
 
+/* keep-all: a narrow strip wraps at the spaces, never between the characters of 反方. */
 .vstrip__facts {
   color: var(--text-mid);
+  word-break: keep-all;
+}
+
+/* "· 1 note" is read with the ready line, so Ready never sits alone beside a chip. */
+.vstrip__notes {
+  color: var(--text-hi);
 }
 
 .vstrip__chips {
@@ -1134,14 +1154,6 @@ select.in {
   color: var(--text-lo);
 }
 
-.sheet__link {
-  color: var(--text-mid);
-}
-
-.sheet__link[data-over] {
-  color: var(--warn-ink);
-}
-
 .sheet__actions {
   display: flex;
   gap: var(--s-2);
@@ -1171,10 +1183,6 @@ select.in {
 
 .sheet__file {
   cursor: pointer;
-}
-
-.sheet__paste {
-  display: block;
 }
 
 .sheet__textarea {

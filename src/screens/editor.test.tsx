@@ -17,11 +17,13 @@ import { chinese4v4, instantiateConfig } from '../domain/presets';
 import { plan } from '../domain/plan';
 import { KEYS, clearDraft, flushDraft } from '../engine/persist';
 import { getSession, loadRound } from '../engine/store';
-import { currentRoute, replaceRoute } from '../app/router';
+import { currentRoute, navigate, replaceRoute } from '../app/router';
 
 beforeEach(() => {
   clearDraft();
   localStorage.clear();
+  // Opened from the console unless a test says otherwise: Back returns to where it came from.
+  replaceRoute('#/console');
   replaceRoute('#/edit');
   loadRound(plan(instantiateConfig(chinese4v4)), { markApplied: false });
 });
@@ -45,6 +47,14 @@ function add(name: string): void {
 
 function applyButton(): HTMLElement {
   return screen.getByRole('button', { name: 'Apply' });
+}
+
+/** Type into a time box the way the operator does: focus, replace the text, commit. */
+function typeTime(field: HTMLElement, text: string, commit: 'blur' | 'enter' = 'blur'): void {
+  fireEvent.focus(field);
+  fireEvent.change(field, { target: { value: text } });
+  if (commit === 'enter') fireEvent.keyDown(field, { key: 'Enter' });
+  else fireEvent.blur(field);
 }
 
 function deleteFirstSpeaker(): void {
@@ -101,13 +111,50 @@ describe('Editor', () => {
     expect(screen.getByText('Moved to position 2 of 10')).toBeInTheDocument();
   });
 
-  it('creates the next roster row from Enter in a name field', () => {
+  it('Enter in a name confirms it and moves to the next name on that side, adding nobody', () => {
     render(<Editor />);
     fireEvent.click(screen.getByRole('tab', { name: 'Roster' }));
     const roster = screen.getByRole('region', { name: 'Roster' });
     const before = within(roster).getAllByRole('listitem').length;
-    fireEvent.keyDown(within(roster).getByLabelText('Proposition · Speaker 1'), { key: 'Enter' });
+
+    const name = within(roster).getByLabelText('Opposition · Speaker 2');
+    fireEvent.change(name, { target: { value: 'Michael Zhao' } });
+    fireEvent.keyDown(name, { key: 'Enter' });
+
+    expect(within(roster).getAllByRole('listitem')).toHaveLength(before);
+    expect(within(roster).getAllByText('4 speakers')).toHaveLength(2);
+    expect(within(roster).getByLabelText('Opposition · Speaker 2')).toHaveValue('Michael Zhao');
+    expect(document.activeElement).toBe(within(roster).getByLabelText('Opposition · Speaker 3'));
+  });
+
+  it("Enter on a side's last name lands on its Add speaker, and adding stays its own press", () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Roster' }));
+    const roster = screen.getByRole('region', { name: 'Roster' });
+    const before = within(roster).getAllByRole('listitem').length;
+
+    fireEvent.keyDown(within(roster).getByLabelText('Proposition · Speaker 4'), { key: 'Enter' });
+    expect(within(roster).getAllByRole('listitem')).toHaveLength(before);
+    const addProposition = within(roster).getAllByRole('button', { name: 'Add speaker' })[0] as HTMLElement;
+    expect(document.activeElement).toBe(addProposition);
+
+    fireEvent.click(addProposition);
     expect(within(roster).getAllByRole('listitem')).toHaveLength(before + 1);
+    expect(document.activeElement).toBe(within(roster).getByLabelText('Proposition · Speaker 5'));
+  });
+
+  it('an Enter that ends an IME composition does nothing', () => {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Roster' }));
+    const roster = screen.getByRole('region', { name: 'Roster' });
+    const name = within(roster).getByLabelText('Opposition · Speaker 2');
+    name.focus();
+
+    fireEvent.keyDown(name, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(name, { key: 'Enter', keyCode: 229 });
+
+    expect(document.activeElement).toBe(name);
+    expect(within(roster).getAllByText('4 speakers')).toHaveLength(2);
   });
 
   it('undoes an edit with its own stack', () => {
@@ -118,7 +165,22 @@ describe('Editor', () => {
     expect(rows()).toHaveLength(10);
   });
 
-  it('opens a segment in place, and marks a time only when it overrides the speaker', () => {
+  it("a speech row's time is its speaker's, so the roster and every speech by them agree", () => {
+    render(<Editor />);
+    add('正一'); // the same speaker again, as row 11
+    const opening = rows()[1] as HTMLElement;
+    typeTime(within(opening).getByLabelText("Segment 2 · 正一's time"), '3:30', 'enter');
+
+    const roster = screen.getByRole('region', { name: 'Roster' });
+    expect(within(roster).getByLabelText('Proposition · Speaker 1 · Time')).toHaveValue('3:30');
+    expect(within(rows()[10] as HTMLElement).getByLabelText("Segment 11 · 正一's time")).toHaveValue('3:30');
+    // No speech has a time of its own, so nothing is marked.
+    expect(opening.querySelector('.step__note')).toBeNull();
+    // 14:30 before; +0:30 on the opening, +3:30 for the repeat.
+    expect(screen.getByText('Floor time with free debate: Proposition 18:30 · Opposition 14:30')).toBeInTheDocument();
+  });
+
+  it('a time for one speech lives in its details, and is marked only while it differs', () => {
     render(<Editor />);
     const row = rows()[1] as HTMLElement;
     const toggle = row.querySelector('.step__toggle') as HTMLElement;
@@ -127,16 +189,51 @@ describe('Editor', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(within(row).getByRole('combobox', { name: 'Speaker' })).toBeInTheDocument();
-    expect(within(row).getByText("Follows 正一's time")).toBeInTheDocument();
+    expect(
+      within(row).getByText('A different time for this one speech. The roster stays as it is.'),
+    ).toBeInTheDocument();
 
-    const time = within(row).getByLabelText('Time');
-    fireEvent.focus(time);
-    fireEvent.change(time, { target: { value: '3:30' } });
-    fireEvent.blur(time);
-    expect(row.querySelector('.step__note')?.textContent).toBe('Custom');
+    typeTime(within(row).getByLabelText('This speech only'), '4:00');
+    expect(row.querySelector('.step__note')?.textContent).toBe('Custom 4:00');
+    // The speaker keeps their time, in the roster and in the row's own box.
+    const roster = screen.getByRole('region', { name: 'Roster' });
+    expect(within(roster).getByLabelText('Proposition · Speaker 1 · Time')).toHaveValue('3:00');
+    expect(within(row).getByLabelText("Segment 2 · 正一's time")).toHaveValue('3:00');
 
+    // Set back to the speaker's own time, it is no exception and the mark goes.
+    typeTime(within(row).getByLabelText('This speech only'), '3:00');
+    expect(row.querySelector('.step__note')).toBeNull();
+
+    typeTime(within(row).getByLabelText('This speech only'), '4:30');
+    expect(row.querySelector('.step__note')?.textContent).toBe('Custom 4:30');
     fireEvent.click(within(row).getByRole('button', { name: "Use 正一's time (3:00)" }));
     expect(row.querySelector('.step__note')).toBeNull();
+  });
+
+  it('an old per-speech time that only matched the speaker follows the speaker from then on', () => {
+    const config = instantiateConfig(chinese4v4);
+    const opening = config.segments.find((s) => s.kind === 'speech');
+    if (opening?.kind === 'speech') opening.allottedMs = 180_000;
+    loadRound(plan(config), { markApplied: false });
+    render(<Editor />);
+
+    const row = rows()[1] as HTMLElement;
+    expect(row.querySelector('.step__note')).toBeNull();
+    typeTime(within(row).getByLabelText("Segment 2 · 正一's time"), '3:30', 'enter');
+    expect(row.querySelector('.step__note')).toBeNull();
+    expect(screen.getByText('Floor time with free debate: Proposition 15:00 · Opposition 14:30')).toBeInTheDocument();
+  });
+
+  it('the roster heads count speakers only; the strip has the one set of side totals, and says what it counts', () => {
+    render(<Editor />);
+    const roster = screen.getByRole('region', { name: 'Roster' });
+    for (const head of within(roster).getAllByRole('heading', { level: 3 })) {
+      expect(head.textContent).not.toMatch(/\d:\d\d/);
+    }
+    expect(screen.getByText('Floor time with free debate: Proposition 14:30 · Opposition 14:30')).toHaveAttribute(
+      'title',
+      "Each side's speeches plus its free-debate clock. Prep, shared clocks and breaks are not counted.",
+    );
   });
 
   it('keeps prep banks out of the round settings, and the two behaviours neutral', () => {
@@ -300,5 +397,85 @@ describe('leaving the editor', () => {
     const dirty = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(dirty);
     expect(dirty.defaultPrevented).toBe(true);
+  });
+
+  it('Back returns to launch when the editor was opened from a format card', () => {
+    replaceRoute('#/');
+    navigate('#/edit');
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(currentRoute().name).toBe('launch');
+  });
+
+  it('Back to launch still asks first when edits are unapplied', () => {
+    replaceRoute('#/');
+    navigate('#/edit');
+    render(<Editor />);
+    add('Break');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(currentRoute().name).toBe('edit');
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Apply and leave' }));
+    expect(getSession().config.segments).toHaveLength(11);
+    expect(currentRoute().name).toBe('launch');
+  });
+
+  it('Back returns to the console when the editor was opened from the console', () => {
+    replaceRoute('#/console');
+    navigate('#/edit');
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(currentRoute().name).toBe('console');
+  });
+});
+
+describe('time boxes', () => {
+  it('an unreadable time says so, marks the box invalid, and puts the old value back', () => {
+    render(<Editor />);
+    const box = within(rows()[5] as HTMLElement).getByLabelText("Segment 6 · 正三's time");
+    typeTime(box, 'abc', 'enter');
+
+    expect(box).toHaveValue('2:00');
+    expect(box).toHaveAttribute('aria-invalid', 'true');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent("Couldn't read that, try 3:00 or 180");
+    expect(box).toHaveAttribute('aria-describedby', alert.id);
+
+    // Typing again clears the notice.
+    fireEvent.change(box, { target: { value: '2' } });
+    expect(box).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says how a bare number will be read before it is committed', () => {
+    render(<Editor />);
+    const box = within(rows()[5] as HTMLElement).getByLabelText("Segment 6 · 正三's time");
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: '150' } });
+    expect(screen.getByText('150 sec → 2:30')).toBeInTheDocument();
+    fireEvent.change(box, { target: { value: '3' } });
+    expect(screen.getByText('3 min → 3:00')).toBeInTheDocument();
+
+    fireEvent.change(box, { target: { value: '150' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(box).toHaveValue('2:30');
+  });
+});
+
+describe('the ready line', () => {
+  it('counts its notes instead of sitting silently beside them', () => {
+    render(<Editor />);
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ notes?$/)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Opposition · Speaker 2'), { target: { value: '' } });
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.getByText('· 1 note')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speaker has no name' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Proposition · Speaker 2'), { target: { value: '' } });
+    expect(screen.getByText('· 2 notes')).toBeInTheDocument();
+    // Notes never gate anything.
+    expect(applyButton()).toBeEnabled();
   });
 });

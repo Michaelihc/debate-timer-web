@@ -1,11 +1,14 @@
 /**
  * One step of the run order:
  *
- *   ⠿ │ 2 ▌ [正一]  开篇立论 ……………………… Custom │ 3:00 │ ⋯
+ *   ⠿ │ 2 ▌ [正一]  开篇立论 ……………… Custom 4:00 │ 3:00 │ ⋯
  *
- * Who, what, how long. Everything else about a segment — its speaker, the choice between
- * the speaker's time and its own, protected time, cues, its label in both languages —
- * opens in place under the row when the row is clicked, and closes the same way (or Esc).
+ * Who, what, how long. For a speech, "how long" is the speaker's one time: the box edits the
+ * same number the roster shows, so roster and order never disagree, however many times that
+ * speaker appears. Everything else about a segment (its speaker, a time for this speech
+ * alone, protected time, cues, its label in both languages) opens in place under the row
+ * when the row is clicked, and closes the same way (or Esc). A speech with a time of its own
+ * says so beside the box, with that time, and only while it differs from the speaker's.
  * The grip only shows while the row is hovered or focused.
  *
  * The run order is the operator's. A speaker may appear here once, five times, or never;
@@ -48,11 +51,23 @@ export interface SegmentCardProps {
   missing: boolean;
   /** Side colour for the spine; null when the clock is not one side's. */
   color: string | null;
-  /** The number the operator edits: `perSideMs` for free debate, the allotment otherwise. */
+  /**
+   * The number in the row's time box. For a speech it is the SPEAKER's time, the same number
+   * the roster shows, so the two can never disagree. Free debate edits one side's clock;
+   * prep, shared clocks and breaks edit their own allotment.
+   */
   durationMs: number;
   perSide: boolean;
-  /** A speech carrying its own time instead of following its speaker's. */
-  custom: boolean;
+  /**
+   * A speech that runs its own time instead of its speaker's: that time, set in the row's
+   * details. Null while there is no such exception, or while it equals the speaker's time.
+   */
+  customMs: number | null;
+  /** The time box's name and hover text when it is more than "Time" (a speaker's time). */
+  timeLabel?: string | undefined;
+  timeHint?: string | undefined;
+  /** Nothing to edit in the box: a speech whose speaker was deleted. */
+  timeDisabled?: boolean;
   expanded: boolean;
   secondsOnly: boolean;
   /** Id of the screen's one line explaining Alt+↑ / Alt+↓. */
@@ -77,7 +92,10 @@ export function SegmentCard({
   color,
   durationMs,
   perSide,
-  custom,
+  customMs,
+  timeLabel,
+  timeHint,
+  timeDisabled = false,
   expanded,
   secondsOnly,
   hintId,
@@ -138,12 +156,16 @@ export function SegmentCard({
   }
 
   const time = formatTime(durationMs, { secondsOnly });
+  const customTime = customMs === null ? null : formatTime(customMs, { secondsOnly });
   const name = [
     t('ed.segmentN', { i: index + 1 }),
     missing ? t('ed.speakerDeleted') : who?.text,
     label,
-    perSide ? `${time} ${t('ed.perSide')}` : time,
-    custom ? t('ed.customTime') : undefined,
+    customTime !== null
+      ? t('ed.customTime', { time: customTime })
+      : perSide
+        ? `${time} ${t('ed.perSide')}`
+        : time,
   ]
     .filter((part): part is string => part !== undefined && part !== '')
     .join(' · ');
@@ -230,9 +252,12 @@ export function SegmentCard({
 
         {perSide ? (
           <span className="step__note t-meta">{t('ed.perSide')}</span>
-        ) : custom ? (
-          <span className="step__note step__note--custom t-meta" title={t('ed.customTimeHint')}>
-            {t('ed.customTime')}
+        ) : customTime !== null ? (
+          <span
+            className="step__note step__note--custom t-meta num"
+            title={t('ed.customTimeHint', { time: customTime, name: who?.text ?? '', base: time })}
+          >
+            {t('ed.customTime', { time: customTime })}
           </span>
         ) : null}
 
@@ -240,8 +265,10 @@ export function SegmentCard({
           className="step__time"
           valueMs={durationMs}
           onChange={onDuration}
-          label={`${t('ed.segmentN', { i: index + 1 })} · ${perSide ? `${t('ed.time')} · ${t('ed.perSide')}` : t('ed.time')}`}
+          label={`${t('ed.segmentN', { i: index + 1 })} · ${timeLabel ?? (perSide ? `${t('ed.time')} · ${t('ed.perSide')}` : t('ed.time'))}`}
           labelHidden
+          title={timeHint}
+          disabled={timeDisabled}
           secondsOnly={secondsOnly}
         />
 
