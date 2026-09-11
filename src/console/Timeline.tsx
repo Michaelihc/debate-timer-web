@@ -14,8 +14,10 @@
  * Enter) LOADS, arrow-key focus walks the strip, and the live square fills to what has
  * ACTUALLY been consumed. A stray click can never restart a leg.
  *
- * On a screen too narrow for every square, the squares scroll on their own, and the square
- * the round moves to is brought into view.
+ * On a narrow screen the arrows shrink first, so a normal round still fits. When even that
+ * is too wide, the squares scroll on their own, the square the round moves to is brought
+ * into view, and an edge that hides more squares fades out, so the strip never simply stops
+ * at the side of the screen as if the round ended there.
  *
  * The run order is the operator's — drawn verbatim, with nothing flagged, sorted or deduped.
  */
@@ -53,11 +55,27 @@ export interface TimelineProps {
   ref?: Ref<TimelineHandle>;
 }
 
-/** Scroll `box` sideways just enough to centre `pip`, and only if it is out of view. */
+/** The fade drawn over an edge that hides squares: `--s-7`, as `.tline__pips` draws it. */
+const EDGE_FADE_PX = 32;
+
+/** Which edges of the strip hide squares right now, or null when every square shows. */
+function hiddenEdges(box: HTMLElement): 'start' | 'end' | 'both' | null {
+  const max = box.scrollWidth - box.clientWidth;
+  if (max <= 1) return null;
+  const start = box.scrollLeft > 1;
+  const end = box.scrollLeft < max - 1;
+  return start && end ? 'both' : start ? 'start' : end ? 'end' : null;
+}
+
+/**
+ * Scroll `box` sideways just enough to centre `pip`, and only if it is out of view. A square
+ * under an edge fade counts as out of view: it is there, but it does not read.
+ */
 function revealPip(box: HTMLElement, pip: HTMLElement): void {
   const boxRect = box.getBoundingClientRect();
   const pipRect = pip.getBoundingClientRect();
-  if (pipRect.left >= boxRect.left && pipRect.right <= boxRect.right) return;
+  const inset = box.scrollWidth > box.clientWidth ? EDGE_FADE_PX : 0;
+  if (pipRect.left >= boxRect.left + inset && pipRect.right <= boxRect.right - inset) return;
   const left =
     box.scrollLeft + (pipRect.left - boxRect.left) - (boxRect.width - pipRect.width) / 2;
   const still =
@@ -107,6 +125,27 @@ export function Timeline({
     const pip = box?.querySelector<HTMLElement>('[aria-current="step"]');
     if (box && pip) revealPip(box, pip);
   }, [cursor, pips.length]);
+
+  // `data-more` names the edges hiding squares, for the stylesheet's fade. It is written
+  // straight to the DOM as the strip scrolls or resizes, so scrolling costs no renders.
+  useEffect(() => {
+    const box = strip.current;
+    if (!box) return undefined;
+    const update = (): void => {
+      const next = hiddenEdges(box);
+      if (next === (box.dataset['more'] ?? null)) return;
+      if (next === null) delete box.dataset['more'];
+      else box.dataset['more'] = next;
+    };
+    update();
+    box.addEventListener('scroll', update, { passive: true });
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+    resize?.observe(box);
+    return () => {
+      box.removeEventListener('scroll', update);
+      resize?.disconnect();
+    };
+  }, [pips.length]);
 
   function activate(index: number): void {
     if (selected === index) onLoad(index);

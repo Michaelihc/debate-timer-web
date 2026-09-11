@@ -188,14 +188,10 @@ function apply(s: RoundState, cmd: Command, ctx: ReduceCtx): RoundState {
       const phase = roundPhase(s, plan);
       if (phase === 'pre') return enterSegment(s, plan, 0, n, plan.advanceStartsClock);
       if (phase === 'complete') return s;
-      const kind = currentPlanSegment(s, plan)?.kind;
-      const live = runningClockIds(s).length > 0;
-      // Space hands off in chess only while SWAP is actually defined (exactly one side
-      // live). With both running it falls through and pauses them, instead of no-opping.
-      if (kind === 'chess' && cmd.pauseInChess !== true && canSwap(s, plan)) {
-        return apply(s, { t: 'SWAP' }, ctx);
-      }
-      return live ? fold(s, n) : startPrimary(s, plan, n);
+      // Start, pause and resume, in every kind of segment. In free debate that pauses
+      // whichever side is running and resumes the side holding the floor, which stays
+      // where it was. Handing the floor over is GIVE_FLOOR and SWAP, on keys of their own.
+      return runningClockIds(s).length > 0 ? fold(s, n) : startPrimary(s, plan, n);
     }
 
     case 'ADVANCE': {

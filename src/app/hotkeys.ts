@@ -35,7 +35,6 @@ export type HotkeyContext = 'launch' | 'console' | 'editor' | 'summary';
 export type HotkeyAction =
   // transport
   | 'toggle'
-  | 'togglePause'
   | 'advance'
   | 'advanceStart'
   | 'prev'
@@ -112,15 +111,6 @@ export const KEYMAP: readonly KeyBinding[] = [
     caps: ['Space'],
     label: 'kb.spaceContext',
     contexts: CONSOLE_ONLY,
-  },
-  {
-    action: 'togglePause',
-    group: 'transport',
-    chords: [C(' ', { shift: true })],
-    caps: ['⇧', 'Space'],
-    label: 'kb.chessPause',
-    contexts: CONSOLE_ONLY,
-    chessOnly: true,
   },
   {
     action: 'swap',

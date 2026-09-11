@@ -8,7 +8,7 @@
  */
 
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { openConfig } from '../app/boot';
 import { bindingsFor } from '../app/hotkeys';
@@ -111,6 +111,28 @@ test('nothing is printed beside the figures, and no speaker name under the ring'
   expect(caption).not.toContain(next);
   // The next segment is still named, by its own label and length.
   expect(el('.ucore__next').textContent ?? '').toMatch(/\d:\d\d/);
+});
+
+test('before the round the ring holds the first segment’s time, and Start arms it there', () => {
+  const { segments, totalMs } = getSession().plan;
+  // The preset opens on its 5:00 prep phase, in a 34:00 round.
+  expect(segments[0]?.allottedMs).toBe(300_000);
+  expect(totalMs).toBe(2_040_000);
+  render(<Console />);
+
+  expect(el('.ucore__ring').textContent).toContain('5:00');
+  expect(el('.ucore__ring').textContent).not.toContain('34:00');
+  const caption = el('.ucore__caption').textContent ?? '';
+  expect(caption).toContain('Begins shortly');
+  // "Up next" names the segment; its length is already the big number in the ring.
+  expect(el('.ucore__next').textContent).toContain('Preparation');
+  expect(caption).not.toMatch(/\d:\d\d/);
+
+  // The first press arms segment 1 (the owner's rule), and the ring reads the same time.
+  key({ key: ' ' });
+  expect(getSession().state.cursor).toBe(0);
+  expect(getSession().state.run).toBeNull();
+  expect(el('.ucore__ring').textContent).toContain('5:00');
 });
 
 test('every control stays live past zero', () => {
@@ -407,6 +429,29 @@ test('the strip numbers the opposition negative, with arrows between squares and
   expect(document.querySelector('.tline__tick')).toBeNull();
 });
 
+test('a strip too long for its box marks which edges hide squares, as it scrolls', () => {
+  render(<Console />);
+  const strip = el('.tline__pips');
+  // jsdom lays nothing out, so every square "fits" and no edge is marked.
+  expect(strip.hasAttribute('data-more')).toBe(false);
+
+  let left = 0;
+  Object.defineProperty(strip, 'scrollWidth', { configurable: true, get: () => 600 });
+  Object.defineProperty(strip, 'clientWidth', { configurable: true, get: () => 376 });
+  Object.defineProperty(strip, 'scrollLeft', { configurable: true, get: () => left });
+  const scrollTo = (next: number): void => {
+    left = next;
+    fireEvent.scroll(strip);
+  };
+
+  scrollTo(0);
+  expect(strip.dataset['more']).toBe('end');
+  scrollTo(100);
+  expect(strip.dataset['more']).toBe('both');
+  scrollTo(224);
+  expect(strip.dataset['more']).toBe('start');
+});
+
 /* ------------------------------------------------------------ reload, home, hold */
 
 import { restoreSession } from '../app/boot';
@@ -473,6 +518,20 @@ test('a reload puts a running clock back, charged the wall time the page was awa
   expect(clockView(s.state, s.plan, id, back)?.remainingMs).toBe(full - 7_000);
 });
 
+test('the header line says where the round is and how long it has run, and nothing more', () => {
+  render(<Console />);
+  // Skipped segments are exactly what made an ahead-of-schedule verdict meaningless.
+  act(() => {
+    for (let i = 0; i < 6; i += 1) dispatch({ t: 'ADVANCE' });
+  });
+  const meta = el('.utop__meta').textContent ?? '';
+  expect(meta).toContain(`Segment 6 of ${getSession().plan.segments.length}`);
+  expect(meta).toMatch(/Round\d+:\d\d\/\d+:\d\d/);
+  expect(meta).not.toMatch(/schedule|[+−]\d+:\d\d/i);
+  // The rosters carry the side names; the header does not repeat them.
+  for (const side of getSession().config.sides) expect(meta).not.toContain(side.label.en);
+});
+
 test('the console has a way home, and going there keeps the round where it was', () => {
   const i = firstSpeechIndex();
   act(() => {
@@ -495,25 +554,91 @@ test('a held round offers one way to resume it, not two', () => {
   expect(screen.queryByRole('button', { name: /pause round/i })).toBeNull();
 });
 
-test('the free-debate primary button prints the key that does what the button does', () => {
+test('in free debate Space pauses and resumes the side with the floor, as the button does', () => {
+  const i = chessIndex();
   act(() => {
-    dispatch({ t: 'LOAD', cursor: chessIndex() });
+    dispatch({ t: 'LOAD', cursor: i });
   });
   render(<Console />);
+  const segId = getSession().plan.segments[i]?.segId ?? '';
   const primary = (): HTMLElement => el('.transport__main .tbtn--primary');
   const caps = (): string[] =>
     [...primary().querySelectorAll('.keycap')].map((k) => k.textContent ?? '');
 
+  // Space is one binding with one meaning; there is no Shift Space variant to learn.
+  expect(bindingsFor('console').filter((b) => b.chords.some((c) => c.key === ' '))).toHaveLength(1);
+
   // Nobody running: Space starts the floor, exactly as the button does.
   expect(primary().textContent).toMatch(/Start/);
   expect(caps()).toEqual(['Space']);
+  key({ key: ' ' });
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'A'));
 
-  // One side running: Space would hand the floor over, so the button's pause is Shift Space.
-  act(() => {
-    dispatch({ t: 'START' });
-  });
+  // One side running: the button pauses it, and so does Space. The floor stays put.
   expect(primary().textContent).toMatch(/Pause/);
-  expect(caps()).toEqual(['Shift', 'Space']);
+  expect(caps()).toEqual(['Space']);
+  key({ key: ' ' });
+  expect(getSession().state.run).toBeNull();
+  expect(getSession().state.floor).toBe('A');
+  expect(primary().textContent).not.toMatch(/Pause/);
+  expect(caps()).toEqual(['Space']);
+
+  // Shift Space is not a second pause key any more.
+  const paused = getSession().state;
+  key({ key: ' ', shiftKey: true });
+  expect(getSession().state).toBe(paused);
+
+  // Space resumes the same side; handing the floor over is the arrow keys' job.
+  key({ key: ' ' });
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'A'));
+  key({ key: 'ArrowRight' });
+  expect(getSession().state.floor).toBe('B');
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'B'));
+});
+
+test('fullscreen is a button in the top bar as well as F, and it follows the real state', async () => {
+  // jsdom has no Fullscreen API, which is also what a phone without one looks like.
+  render(<Console />);
+  expect(within(el('.utop')).queryByRole('button', { name: /fullscreen/i })).toBeNull();
+  cleanup();
+
+  let element: Element | null = null;
+  const changed = (next: Element | null): void => {
+    element = next;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  };
+  Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, get: () => true });
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element });
+  const request = vi.fn(async () => {
+    changed(document.documentElement);
+  });
+  document.documentElement.requestFullscreen = request;
+  document.exitFullscreen = vi.fn(async () => {
+    changed(null);
+  });
+  try {
+    render(<Console />);
+    const enter = within(el('.utop')).getByRole('button', { name: 'Fullscreen' });
+    expect(enter).toHaveAttribute('aria-keyshortcuts', 'F');
+    expect(enter.getAttribute('title')).toBe('Fullscreen · F');
+
+    await act(async () => {
+      fireEvent.click(enter);
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(within(el('.utop')).getByRole('button', { name: 'Exit fullscreen' })).toBeTruthy();
+
+    // Leaving with Esc goes through the browser, not the button, and still shows.
+    act(() => {
+      changed(null);
+    });
+    expect(within(el('.utop')).getByRole('button', { name: 'Fullscreen' })).toBeTruthy();
+  } finally {
+    for (const prop of ['fullscreenEnabled', 'fullscreenElement', 'exitFullscreen']) {
+      Reflect.deleteProperty(document, prop);
+    }
+    Reflect.deleteProperty(document.documentElement, 'requestFullscreen');
+  }
 });
 
 test('the keyboard legend speaks the interface language, one row per binding', () => {

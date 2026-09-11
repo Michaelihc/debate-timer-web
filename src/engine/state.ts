@@ -56,8 +56,8 @@ export type Command =
   | { t: 'START' }
   | { t: 'PAUSE' }
   | { t: 'RESUME' }
-  /** Context-sensitive Space/PageDown: start, pause, resume, or hand off in chess. */
-  | { t: 'TOGGLE'; pauseInChess?: boolean }
+  /** Space/PageDown: arm the first segment, then start, pause or resume. Never a hand-off. */
+  | { t: 'TOGGLE' }
   | { t: 'ADVANCE'; start?: boolean }
   | { t: 'PREV' }
   | { t: 'RESET_SEGMENT' }

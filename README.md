@@ -58,8 +58,7 @@ On Windows and Linux `⇧` is Shift and `⌥` is Alt; the app prints the names y
 
 | Key | Action |
 |---|---|
-| `Space` | Start · Pause · Hand off floor |
-| `⇧ Space` | Pause or resume the side that has the floor *(free debate)* |
+| `Space` | Start · Pause · Resume (in free debate, the side that has the floor) |
 | `S` | Hand the floor to the other side *(free debate)* |
 | `←` `→` | Give the floor to a side *(free debate)* |
 | `N` | Next segment, without starting its clock |

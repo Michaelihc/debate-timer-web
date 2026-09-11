@@ -30,8 +30,8 @@ import { Keycaps } from '../ui/KeyLegendOverlay';
 import './console.css';
 
 export interface TransportHandlers {
+  /** Start, pause or resume: Space, in every kind of segment. */
   toggle: () => void;
-  togglePause: () => void;
   reset: () => void;
   hold: () => void;
   adjust: (deltaMs: number) => void;
@@ -41,13 +41,6 @@ export interface TransportProps {
   phase: RoundPhase;
   transport: TransportState;
   hold: boolean;
-  chess: boolean;
-  /**
-   * Free debate with exactly one side running (`canSwap`). Plain Space hands the floor
-   * over then, so the primary button, which pauses, is the Shift Space key. Everywhere
-   * else Space does exactly what the primary button does.
-   */
-  spaceHandsOff: boolean;
   /** Space is inert until a side is picked (`firstFloor: 'operator'`). */
   canStart: boolean;
   /** There is a clock for ±15s to act on, and the round is not held. */
@@ -100,8 +93,6 @@ export function Transport({
   phase,
   transport,
   hold,
-  chess,
-  spaceHandsOff,
   canStart,
   canAdjust,
   canReset,
@@ -124,13 +115,9 @@ export function Transport({
   const mainIcon: IconName = hold ? 'hold' : running ? 'pause' : 'play';
   // While held the one thing the round accepts is its release, so that is what the
   // primary button does, in free debate too.
-  const onMain = hold ? on.hold : chess ? on.togglePause : on.toggle;
+  const onMain = hold ? on.hold : on.toggle;
   // The keycap on the button is the key that does what the button does right now.
-  const mainKeys: HotkeyAction = hold
-    ? 'hold'
-    : chess && spaceHandsOff
-      ? 'togglePause'
-      : 'toggle';
+  const mainKeys: HotkeyAction = hold ? 'hold' : 'toggle';
 
   return (
     <div className="transport" role="group" aria-label={t('nav.console')}>

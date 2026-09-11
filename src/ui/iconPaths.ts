@@ -32,7 +32,9 @@ export type IconName =
   | 'copy'
   | 'download'
   | 'edit'
-  | 'share';
+  | 'share'
+  | 'maximize'
+  | 'minimize';
 
 export const PATHS: Record<IconName, string> = {
   play: 'M5.25 3.5 12.5 8 5.25 12.5Z',
@@ -62,6 +64,9 @@ export const PATHS: Record<IconName, string> = {
   download: 'M8 2.75v7.75M4.75 7.25 8 10.5l3.25-3.25M2.75 13.25h10.5',
   edit: 'M3 13v-2.75L10.75 2.5l2.75 2.75L5.75 13zM9.25 4 12 6.75',
   share: 'M8 12.5V3.25M4.75 6.5 8 3.25l3.25 3.25M3 10v3.25h10V10',
+  // Four corners pointing out to go fullscreen, and in to come back.
+  maximize: 'M2.75 6.25v-3.5h3.5M9.75 2.75h3.5v3.5M13.25 9.75v3.5h-3.5M6.25 13.25h-3.5v-3.5',
+  minimize: 'M6.25 2.75v3.5h-3.5M13.25 6.25h-3.5v-3.5M9.75 13.25v-3.5h3.5M2.75 9.75h3.5v3.5',
 };
 
 export const ICON_NAMES = Object.keys(PATHS) as IconName[];

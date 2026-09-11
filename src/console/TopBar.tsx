@@ -9,36 +9,36 @@
  * Home sits beside the lime button as a quiet outline: the way back to the formats and
  * recent rounds, without competing with the one loud action in the corner.
  *
+ * Under the motion, one quiet line: which segment the round is on, and how long the round
+ * has run against its scheduled length. The side names are not repeated there, since the
+ * rosters already carry them, and there is no ahead-or-behind verdict: skipping segments
+ * makes one meaningless.
+ *
  * The audio state stays permanently visible rather than buried: a muted or un-armed
  * AudioContext is the commonest reason a venue hears no bells, and finding that out at the
  * first speech is too late. The round readout ticks from the frame loop, so this component
  * renders only when the segment or the chrome state actually changes.
+ *
+ * The console is what goes on the projector, so fullscreen is a button in the same corner
+ * as well as the `F` key. Where the page cannot go fullscreen at all, there is no button.
  */
 
 import type { JSX } from 'react';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Lang } from '../domain/config';
-import { getLastRemoteKey, subscribeRemote } from '../app/hotkeys';
+import { ariaShortcut, getLastRemoteKey, shortcutText, subscribeRemote } from '../app/hotkeys';
 import { registerTick } from '../engine/loop';
-import { roundElapsedMs, scheduleDelta } from '../engine/selectors';
+import { roundElapsedMs } from '../engine/selectors';
 import type { AudioState } from '../engine/sound';
 import { getSession } from '../engine/store';
 import { useLang } from '../i18n/useLang';
-import { formatDelta, formatTime } from '../lib/format';
+import { formatTime } from '../lib/format';
 import { Icon } from '../ui/Icons';
 
 import './console.css';
 
-/**
- * Deadband before the bar claims a round is running early or late. The delta itself stays
- * exact; this only governs when it is worth saying so. Half a minute is the point at which
- * a chair would actually adjust — a second would light amber while a speaker walked up.
- */
-const ON_SCHEDULE_MS = 30_000;
-
 export interface TopBarProps {
   title: string;
-  subtitle: string;
   /** 1-based for display; pass 0 before the round starts. */
   segmentIndex: number;
   segmentCount: number;
@@ -47,20 +47,17 @@ export interface TopBarProps {
   onLang: () => void;
   audio: AudioState;
   onAudio: () => void;
+  /** Whether the document is fullscreen right now. */
+  fullscreen: boolean;
+  /** Omitted where the page cannot go fullscreen at all, which hides the button. */
+  onFullscreen?: (() => void) | undefined;
   onEditor: () => void;
   /** Back to the launch screen. The round keeps its place. */
   onHome: () => void;
 }
 
-function scheduleWord(deltaMs: number): 'ahead' | 'behind' | 'on' {
-  if (deltaMs <= -ON_SCHEDULE_MS) return 'ahead';
-  if (deltaMs >= ON_SCHEDULE_MS) return 'behind';
-  return 'on';
-}
-
 export function TopBar({
   title,
-  subtitle,
   segmentIndex,
   segmentCount,
   scheduledMs,
@@ -68,37 +65,22 @@ export function TopBar({
   onLang,
   audio,
   onAudio,
+  fullscreen,
+  onFullscreen,
   onEditor,
   onHome,
 }: TopBarProps): JSX.Element {
   const { t } = useLang();
   const elapsedEl = useRef<HTMLSpanElement>(null);
-  const deltaEl = useRef<HTMLSpanElement>(null);
-  const chipEl = useRef<HTMLSpanElement>(null);
   const remote = useSyncExternalStore(subscribeRemote, getLastRemoteKey, getLastRemoteKey);
 
   useEffect(() => {
     let lastElapsed = '';
-    let lastDelta = '';
-    let lastWord = '';
     return registerTick((n) => {
-      const s = getSession();
-      const elapsed = formatTime(roundElapsedMs(s.state, n));
-      if (elapsed !== lastElapsed) {
-        lastElapsed = elapsed;
-        if (elapsedEl.current) elapsedEl.current.textContent = elapsed;
-      }
-      const deltaMs = scheduleDelta(s.state, s.plan, n);
-      const delta = formatDelta(deltaMs);
-      if (delta !== lastDelta) {
-        lastDelta = delta;
-        if (deltaEl.current) deltaEl.current.textContent = delta;
-      }
-      const word = scheduleWord(deltaMs);
-      if (word !== lastWord) {
-        lastWord = word;
-        if (chipEl.current) chipEl.current.dataset['schedule'] = word;
-      }
+      const elapsed = formatTime(roundElapsedMs(getSession().state, n));
+      if (elapsed === lastElapsed) return;
+      lastElapsed = elapsed;
+      if (elapsedEl.current) elapsedEl.current.textContent = elapsed;
     });
   }, []);
 
@@ -108,6 +90,9 @@ export function TopBar({
       : audio.status === 'muted'
         ? t('au.muted')
         : t('au.enable');
+
+  // Named for what a press does now, so the projector operator knows which way it goes.
+  const fullscreenLabel = fullscreen ? t('t.exitFullscreen') : t('t.fullscreen');
 
   return (
     <header className="utop">
@@ -124,8 +109,6 @@ export function TopBar({
       <div className="utop__mid">
         <h1 className="utop__title">{title}</h1>
         <p className="utop__meta">
-          <span className="utop__sub">{subtitle}</span>
-          <span className="utop__dot utop__sub" aria-hidden="true">·</span>
           <span>{t('r.segmentOf', { i: segmentIndex, n: segmentCount })}</span>
           <span className="utop__dot" aria-hidden="true">·</span>
           <span className="utop__round">
@@ -135,20 +118,6 @@ export function TopBar({
             </span>
             <span className="utop__slash" aria-hidden="true">/</span>
             <span data-numeric="">{formatTime(scheduledMs)}</span>
-          </span>
-          <span ref={chipEl} className="utop__delta" data-schedule="on">
-            <span ref={deltaEl} data-numeric="">
-              {formatDelta(0)}
-            </span>
-            <span className="utop__deltaword" data-w="ahead">
-              {t('r.ahead')}
-            </span>
-            <span className="utop__deltaword" data-w="behind">
-              {t('r.behind')}
-            </span>
-            <span className="utop__deltaword" data-w="on">
-              {t('r.onSchedule')}
-            </span>
           </span>
         </p>
       </div>
@@ -174,6 +143,19 @@ export function TopBar({
         <button type="button" className="ubtn" onClick={onLang} aria-label={t('kb.langToggle')}>
           {lang === 'zh' ? '中文' : 'EN'}
         </button>
+
+        {onFullscreen === undefined ? null : (
+          <button
+            type="button"
+            className="ubtn ubtn--icon"
+            onClick={onFullscreen}
+            aria-label={fullscreenLabel}
+            title={`${fullscreenLabel} · ${shortcutText('fullscreen')}`}
+            aria-keyshortcuts={ariaShortcut('fullscreen')}
+          >
+            <Icon name={fullscreen ? 'minimize' : 'maximize'} size={14} />
+          </button>
+        )}
       </div>
     </header>
   );

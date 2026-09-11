@@ -28,6 +28,7 @@ import type { JSX } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { armAudioNow, useAudio } from '../app/boot';
+import { fullscreenSupported, toggleFullscreen, useFullscreen } from '../app/fullscreen';
 import { useHotkeys } from '../app/hotkeys';
 import { ROUTES, navigate } from '../app/router';
 import type { Id, SideId, SpeakerCfg } from '../domain/config';
@@ -93,6 +94,7 @@ export default function Console(): JSX.Element {
   const { t, l10n, lang, toggleLang } = useLang();
   const session = useRound();
   const audio = useAudio();
+  const fullscreen = useFullscreen();
   const { state, plan, config } = session;
 
   const timelineRef = useRef<TimelineHandle>(null);
@@ -242,7 +244,6 @@ export default function Console(): JSX.Element {
 
   useHotkeys('console', {
     toggle: () => dispatch({ t: 'TOGGLE' }),
-    togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
     advance: () => dispatch({ t: 'ADVANCE' }),
     advanceStart: () => dispatch({ t: 'ADVANCE', start: true }),
     prev: () => dispatch({ t: 'PREV' }),
@@ -346,13 +347,14 @@ export default function Console(): JSX.Element {
         : '';
 
   // The next segment by its own label and length. Who gives it is on the figures already:
-  // their arrow says so.
+  // their arrow says so. Before the round that length is already the time in the ring, so
+  // the line names the segment alone rather than printing the same number twice.
   const upNext =
     nextPs === null ? null : (
       <p className="ucore__next" data-urgent={expired ? '' : undefined}>
         <span className="ucore__nextlabel">{t('st.upNext')}</span>
         <span className="ucore__nextrole">{l10n(nextPs.label)}</span>
-        <span data-numeric="">{formatTime(nextPs.allottedMs)}</span>
+        {mode === 'pre' ? null : <span data-numeric="">{formatTime(nextPs.allottedMs)}</span>}
       </p>
     );
 
@@ -393,15 +395,21 @@ export default function Console(): JSX.Element {
       </RingCore>
     );
   } else {
-    // Pre-round and end-of-round: the ring still holds the screen, showing the round's
-    // scheduled length rather than going blank.
+    // Before the round the ring already holds the first segment's time, dimmed and still:
+    // that is the clock Start puts up, so the first press does not make the ring jump. At
+    // the end of the round there is nothing left to count, and the empty ring reads 0:00.
     const pre = mode === 'pre';
+    const first = pre && nextPs ? clockView(state, plan, nextPs.primaryClockId, now()) : null;
     core = (
       <div className="ucore ucore--idle">
         <div className="ucore__ring">
-          <RingTimer fraction={pre ? 1 : 0} state="normal" label={t('a11y.timerRegion')}>
+          <RingTimer
+            fraction={pre ? (first?.fill ?? 1) : 0}
+            state="normal"
+            label={t('a11y.timerRegion')}
+          >
             <span className="ucore__static" data-numeric="">
-              {formatTime(plan.totalMs)}
+              {formatTime(first?.remainingMs ?? 0, { secondsOnly })}
             </span>
           </RingTimer>
         </div>
@@ -440,7 +448,6 @@ export default function Console(): JSX.Element {
 
       <TopBar
         title={l10n(config.title)}
-        subtitle={`${sideLabels.A} · ${sideLabels.B}`}
         segmentIndex={Math.min(Math.max(state.cursor + 1, 0), plan.segments.length)}
         segmentCount={plan.segments.length}
         scheduledMs={plan.totalMs}
@@ -451,6 +458,8 @@ export default function Console(): JSX.Element {
           if (!audio.armed) void armAudioNow();
           else toggleMuted();
         }}
+        fullscreen={fullscreen}
+        onFullscreen={fullscreenSupported() ? toggleFullscreen : undefined}
         onEditor={() => navigate(ROUTES.edit)}
         onHome={() => navigate(ROUTES.launch)}
       />
@@ -477,14 +486,11 @@ export default function Console(): JSX.Element {
             phase={view.phase}
             transport={view.transport}
             hold={view.hold}
-            chess={isChess}
-            spaceHandsOff={swapAllowed}
             canStart={canStart}
             canAdjust={can.adjust}
             canReset={view.phase === 'in' && !view.hold}
             on={{
               toggle: () => dispatch({ t: 'TOGGLE' }),
-              togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
               reset: resetSegment,
               hold: toggleHold,
               adjust,

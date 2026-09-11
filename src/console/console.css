@@ -111,32 +111,6 @@
   text-transform: uppercase;
 }
 
-.utop__delta {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--s-2);
-  font-size: var(--t-cap);
-  color: var(--text-lo);
-}
-
-.utop__delta[data-schedule='behind'] {
-  color: var(--warn-ink);
-}
-
-.utop__delta[data-schedule='ahead'] {
-  color: var(--ok);
-}
-
-.utop__deltaword {
-  display: none;
-}
-
-.utop__delta[data-schedule='on'] .utop__deltaword[data-w='on'],
-.utop__delta[data-schedule='ahead'] .utop__deltaword[data-w='ahead'],
-.utop__delta[data-schedule='behind'] .utop__deltaword[data-w='behind'] {
-  display: inline;
-}
-
 .utop__chip {
   display: inline-flex;
   align-items: center;
@@ -188,6 +162,13 @@
   background: var(--lime-dim);
   border-color: var(--lime-dim);
   color: var(--text-inv);
+}
+
+/* An icon and nothing else (fullscreen): square, the height of its neighbours. */
+.ubtn--icon {
+  justify-content: center;
+  min-width: var(--s-7);
+  padding: 0;
 }
 
 /* Sound that is muted, or not yet switched on (after a reload nothing may play until the
@@ -669,6 +650,27 @@
   scrollbar-width: thin;
 }
 
+/* An edge that hides more squares fades out, so a strip too long for the screen never
+   simply stops at its side as if the round ended there. The component writes `data-more`
+   as the strip scrolls; the fade is a mask, so it takes no colour of its own. */
+.tline__pips[data-more='end'] {
+  mask-image: linear-gradient(to right, black calc(100% - var(--s-7)), transparent);
+}
+
+.tline__pips[data-more='start'] {
+  mask-image: linear-gradient(to left, black calc(100% - var(--s-7)), transparent);
+}
+
+.tline__pips[data-more='both'] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--s-7),
+    black calc(100% - var(--s-7)),
+    transparent
+  );
+}
+
 /* 31.3 x 30.7 — a square, white face, #323232 label. */
 .tline__pip {
   position: relative;
@@ -1035,6 +1037,26 @@
   .tbtn .keycaps {
     display: none;
   }
+
+  /* The arrows give up their room before the squares have to scroll: no gap around them,
+     a shorter minimum and a smaller head, so a ten-segment round fits a 400px screen. */
+  .tline__pips {
+    gap: 0;
+  }
+
+  .tline__arrow {
+    min-width: var(--s-3);
+  }
+
+  .tline__arrow::before {
+    left: var(--s-1);
+  }
+
+  .tline__arrow::after {
+    width: calc(var(--s-2) + var(--s-1));
+    height: calc(var(--s-2) + var(--s-1));
+    margin-top: calc((var(--s-2) + var(--s-1)) / -2);
+  }
 }
 
 @media (max-width: 460px) {
@@ -1058,11 +1080,6 @@
 
   .utop__mid {
     grid-area: mid;
-  }
-
-  .utop__sub,
-  .utop__round {
-    display: none;
   }
 
   /* Back and Next keep their words on a row of their own; the squares get the full
