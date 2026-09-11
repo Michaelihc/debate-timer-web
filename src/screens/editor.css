@@ -4,8 +4,8 @@
    The roster on the left, the run order on the right. A segment's details open
    under its own row; round-wide settings live in one overlay. The identity is the
    console's: a near-black ground, square corners, hairline rules, and lime spent on
-   exactly one thing — APPLY, the only control here that changes the round the room
-   is about to hear.
+   exactly one thing — the commit (APPLY, or RUN NOW when no timer is on screen), the
+   only control here that changes the round the room is about to hear.
 
    It still says NOTHING about the run order — repeats, omissions and out-of-sequence
    speakers are the operator's sheet, and no rule in this file badges, tints or
@@ -352,7 +352,10 @@
   border-radius: var(--r-1);
 }
 
+/* At rest a name still reads as a field: one quiet rule under it, which firms up on
+   hover and focus. The role beneath stays bare, so the row does not turn into a form. */
 .person__name {
+  border-bottom-color: var(--rule-strong);
   color: var(--text-hi);
 }
 
@@ -363,6 +366,10 @@
 .person__name:hover,
 .person__role:hover {
   border-color: var(--rule);
+}
+
+.person__name:hover {
+  border-bottom-color: var(--text-lo);
 }
 
 .person__name:focus,
@@ -531,19 +538,31 @@
   background: var(--rule-strong);
 }
 
-/* Wide enough for the longest chip either language prints ("BOTH SIDES"), so every
-   label in the column starts on the same line. */
+/* Wide enough that the labels behind short chips (正一, Both sides) start on one line,
+   and never more than 40% of the row: a long name gives way, not the label beside it. */
 .step__who {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   min-width: var(--s-10);
+  max-width: 40%;
 }
 
 .step__chip,
 .step__missing {
+  min-width: 0;
   padding: var(--s-2) var(--s-3);
   border: 1px solid transparent;
   border-radius: var(--r-1);
+}
+
+/* A name prints as it was typed, on one line. A long one ends in an ellipsis, and the
+   chip's title holds all of it. */
+.step__chip {
+  overflow: hidden;
+  font-size: var(--t-meta);
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -560,10 +579,13 @@
   color: var(--danger);
 }
 
+/* The label takes the room the chip leaves, and never less than its longest word, so it
+   wraps by words. Squeezed to nothing, it used to break a word per letter; held to a fixed
+   width instead, it cut short chips like 正一 down to an ellipsis. */
 .step__label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
+  flex: 1 1 0;
+  min-width: auto;
+  overflow-wrap: break-word;
 }
 
 .step__caret {

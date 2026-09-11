@@ -29,6 +29,16 @@ describe('Launch', () => {
     expect(cards[0]?.textContent).toContain('Chinese Academic 4v4');
   });
 
+  it('spends lime on the default format alone, and says up top that nothing leaves the browser', () => {
+    render(<Launch />);
+    const primaries = document.querySelectorAll('.lc__card .btn--primary');
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]?.closest('.lc__card')?.hasAttribute('data-default')).toBe(true);
+    expect(document.querySelector('.scr__bar')?.textContent).toContain(
+      'Stays in this browser. No account needed.',
+    );
+  });
+
   it('states the shape of a format before it is chosen', () => {
     render(<Launch />);
     // 4v4 · 10 segments · 34:00 — speaker count, structure and length, on the card.
@@ -220,5 +230,179 @@ describe('Launch, when another round replaces the loaded one', () => {
     const banner = screen.getByRole('region', { name: 'Round in progress' });
     expect(banner.textContent).toContain('segment 2 of 10');
     expect(banner.textContent).toContain('3:00 remaining');
+  });
+});
+
+/* ------------------------------------------------ editor changes never applied */
+
+import type { RoundConfig } from '../domain/config';
+import { clearDraft, flushDraft, readDraft, writeDraft } from '../engine/persist';
+import { replaceRoute } from '../app/router';
+import Editor from './Editor';
+
+function renamed(config: RoundConfig, name: string): RoundConfig {
+  const copy = structuredClone(config);
+  const first = copy.speakers[0];
+  if (!first) throw new Error('preset changed');
+  first.name = name;
+  return copy;
+}
+
+/** What a tab closed in the middle of an edit leaves behind. */
+function leaveDraft(config: RoundConfig): void {
+  writeDraft(config);
+  flushDraft();
+}
+
+function draftBanner(): HTMLElement {
+  return screen.getByRole('region', { name: 'Unapplied changes' });
+}
+
+describe('Launch, with editor changes that were never applied', () => {
+  beforeEach(() => {
+    clearDraft();
+    localStorage.clear();
+    replaceRoute('#/');
+  });
+
+  it('offers them back, and Continue editing reopens the editor on them', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { route: '#/edit', recent: false });
+    leaveDraft(renamed(config, 'Michael'));
+    replaceRoute('#/');
+    render(<Launch />);
+    expect(draftBanner().textContent).toContain('Unapplied changes to “Chinese Academic Debate”');
+
+    await act(async () => {
+      fireEvent.click(within(draftBanner()).getByRole('button', { name: 'Continue editing' }));
+    });
+    expect(location.hash.startsWith('#/edit')).toBe(true);
+    // Its own round is loaded, so nothing is replaced: the editor picks the draft up.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(getSession().config.id).toBe(config.id);
+
+    cleanup();
+    render(<Editor />);
+    expect(screen.getByLabelText('Proposition · Speaker 1')).toHaveValue('Michael');
+    expect(screen.getByText('Unapplied changes')).toBeInTheDocument();
+  });
+
+  it('says nothing when the draft matches the loaded round', () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false });
+    leaveDraft(config);
+    render(<Launch />);
+    expect(screen.queryByRole('region', { name: 'Unapplied changes' })).toBeNull();
+  });
+
+  it('asks before Discard throws them away', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false });
+    leaveDraft(renamed(config, 'Michael'));
+    render(<Launch />);
+
+    await act(async () => {
+      fireEvent.click(within(draftBanner()).getByRole('button', { name: 'Discard' }));
+    });
+    const dialog = screen.getByRole('dialog', { name: 'Discard these changes?' });
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    });
+    expect(readDraft()).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.click(within(draftBanner()).getByRole('button', { name: 'Discard' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    });
+    expect(readDraft()).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Unapplied changes' })).toBeNull();
+  });
+
+  it('a draft of a round that is not loaded is opened, and the editor has it', async () => {
+    const other = renamed(instantiatePreset('bp'), 'Michael');
+    leaveDraft(other);
+    openConfig(instantiatePreset('chinese4v4'), { recent: false });
+    render(<Launch />);
+
+    await act(async () => {
+      fireEvent.click(within(draftBanner()).getByRole('button', { name: 'Continue editing' }));
+    });
+    expect(getSession().config.id).toBe(other.id);
+    expect(getSession().config.speakers[0]?.name).toBe('Michael');
+    expect(location.hash.startsWith('#/edit')).toBe(true);
+  });
+
+  it('replacing the round keeps its unapplied changes in Recent rounds', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false });
+    leaveDraft(renamed(config, 'Michael'));
+    render(<Launch />);
+
+    await act(async () => {
+      fireEvent.click(runNowOn(1));
+    });
+    // Never applied, but edited all the same: asked.
+    expect(screen.getByText('Start a different round?')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Start the new round' }));
+    });
+    expect(getSession().config.presetRef).toBe('bp');
+    expect(readLibrary()[config.id]?.config.speakers[0]?.name).toBe('Michael');
+    expect(readRecents().map((entry) => entry.id)).toContain(config.id);
+    expect(readDraft()).toBeNull();
+  });
+
+  it('says so when unapplied changes cannot run and so cannot be kept', async () => {
+    const config = instantiatePreset('chinese4v4');
+    openConfig(config, { recent: false });
+    leaveDraft({ ...config, segments: [] });
+    render(<Launch />);
+
+    await act(async () => {
+      fireEvent.click(runNowOn(1));
+    });
+    expect(
+      screen.getByText('Unapplied changes that still have problems cannot be kept, and will be lost.'),
+    ).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Start the new round' }));
+    });
+    // The round is kept as it was applied.
+    expect(readLibrary()[config.id]?.config.segments).toHaveLength(10);
+    expect(readDraft()).toBeNull();
+  });
+
+  it("asks before a card's Edit leaves a draft of some other round to be written over", async () => {
+    const stray = renamed(instantiatePreset('wsdc'), 'Michael');
+    leaveDraft(stray);
+    openConfig(instantiatePreset('chinese4v4'), { recent: false });
+    render(<Launch />);
+    const editCard = (i: number): HTMLElement => {
+      const button = screen.getAllByRole('button', { name: 'Edit' })[i];
+      if (!button) throw new Error(`no Edit button ${i}`);
+      return button;
+    };
+
+    await act(async () => {
+      fireEvent.click(editCard(1));
+    });
+    expect(screen.getByRole('dialog', { name: 'Discard these changes?' })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    });
+    expect(readDraft()?.config.id).toBe(stray.id);
+    expect(getSession().config.presetRef).toBe('chinese4v4');
+
+    await act(async () => {
+      fireEvent.click(editCard(1));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    });
+    expect(readDraft()).toBeNull();
+    expect(getSession().config.presetRef).toBe('bp');
+    expect(location.hash.startsWith('#/edit')).toBe(true);
   });
 });

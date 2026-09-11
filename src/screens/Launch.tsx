@@ -1,16 +1,18 @@
 /**
  * LAUNCH `#/` — cold URL to a running round in well under a minute.
  *
- * The order of the page is the order of the operator's urgency:
+ * The header says, before anything is chosen, that nothing leaves this browser. Below it,
+ * the order of the page is the order of the operator's urgency:
  *   1. an interrupted live round (< 8h) — losing your place mid-round is the one
- *      failure this app may never commit, so the offer sits above everything,
+ *      failure this app may never commit, so the offer sits above everything — and
+ *      beside it any editor changes a closed tab never applied,
  *   2. the seven formats, each showing its roster as figures and its Ribbon as the
  *      timeline strip, so the SHAPE of the round — who is in the room, and how the
- *      time is divided — is legible before you commit to it,
+ *      time is divided — is legible before you commit to it. Only the default format's
+ *      Run now is lime,
  *   3. rounds this browser has run before,
  *   4. a paste-or-drop field for a share link, a `.debate.json`, or a legacy Unity
- *      `save.json`,
- *   5. a plain description of what this is.
+ *      `save.json`.
  *
  * A format is a starting point and nothing more: opening one never locks the roster,
  * the order or the times, and nothing on this screen compares a round back against
@@ -21,8 +23,10 @@ import type { ChangeEvent, CSSProperties, DragEvent, JSX } from 'react';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Lang, RoundConfig } from '../domain/config';
+import { canonicalJson } from '../domain/config';
 import type { MigrationProblem } from '../domain/migrate';
 import { plan as buildPlan } from '../domain/plan';
+import { hasErrors, validate } from '../domain/validate';
 import type { PresetKey, PresetMeta } from '../domain/presets';
 import {
   DEFAULT_PRESET,
@@ -33,10 +37,13 @@ import {
 import type { Now } from '../engine/chronometer';
 import { now } from '../engine/chronometer';
 import { registerTick } from '../engine/loop';
-import type { RecentEntry } from '../engine/persist';
+import type { DraftRecord, RecentEntry } from '../engine/persist';
 import {
+  clearDraft,
+  clearDraftFor,
   clearRecents,
   readApplied,
+  readDraft,
   readLibrary,
   readLive,
   readRecents,
@@ -183,6 +190,27 @@ export default function Launch(): JSX.Element {
 
   const underWay = roundPhase(session.state, session.plan) === 'in';
 
+  // The editor's draft, read once per visit like the recents. It is offered back only while
+  // it differs from the loaded round: a draft that matches it has nothing unapplied in it.
+  const [draft, setDraft] = useState<DraftRecord | null>(() => readDraft());
+  const unapplied = useMemo(
+    () =>
+      draft !== null && canonicalJson(draft.config) !== canonicalJson(session.config) ? draft : null,
+    [draft, session.config],
+  );
+
+  /** A draft is the only copy of its changes, so throwing one away is asked, never done. */
+  const confirmDiscard = useCallback(
+    (record: DraftRecord): Promise<boolean> =>
+      ask({
+        title: t('lc.discardDraftTitle'),
+        body: t('lc.discardDraftBody', { title: l10n(record.config.title) || t('lc.untitled') }),
+        confirmLabel: t('d.discardChanges'),
+        tone: 'danger',
+      }),
+    [ask, l10n, t],
+  );
+
   /**
    * Open a round. The only thing worth a dialog on this screen is what that does to the
    * round already loaded: under way or edited, the operator is asked first. Either way it
@@ -202,14 +230,24 @@ export default function Launch(): JSX.Element {
         navigate(opts.route ?? ROUTES.console);
         return;
       }
+      // A draft of a round that is neither loaded nor the one being opened: nothing else
+      // holds those changes, and the next round's editor would write over them.
+      const stray = readDraft();
+      if (stray !== null && stray.config.id !== current.config.id && stray.config.id !== config.id) {
+        if (!(await confirmDiscard(stray))) return;
+        clearDraft();
+        setDraft(null);
+      }
       const outgoing = outgoingRound();
       if (outgoing !== null && (outgoing.progress || outgoing.edited)) {
         const title = l10n(outgoing.config.title) || t('lc.untitled');
+        const lost = outgoing.draft !== null && hasErrors(validate(outgoing.draft));
         const ok = await ask({
           title: t('d.replaceTitle'),
           body: (
             <>
               <p>{t('d.replaceKept', { title })}</p>
+              {lost ? <p>{t('d.replaceDraftBlocked')}</p> : null}
               {outgoing.progress ? <p>{t('d.replaceRestart')}</p> : null}
             </>
           ),
@@ -218,7 +256,11 @@ export default function Launch(): JSX.Element {
         });
         if (!ok) return;
       }
-      if (outgoing?.keep === true) keepRound(outgoing.config);
+      if (outgoing !== null) {
+        if (outgoing.keep) keepRound(outgoing.config);
+        // Anything its draft still held was asked about above; the draft goes with it.
+        clearDraftFor(outgoing.config.id);
+      }
       if (opts.recent !== false) {
         // Recents store only a title; the config itself lives in the library, which is
         // what makes a recent row re-openable on the next visit.
@@ -226,8 +268,30 @@ export default function Launch(): JSX.Element {
       }
       dismissResume();
       openConfig(config, opts);
+      setDraft(readDraft());
     },
-    [ask, l10n, t],
+    [ask, confirmDiscard, l10n, t],
+  );
+
+  /** Back into the editor on the draft: straight there for the loaded round, else by opening it. */
+  const continueDraft = useCallback(
+    (record: DraftRecord): void => {
+      if (record.config.id === getSession().config.id) {
+        navigate(ROUTES.edit);
+        return;
+      }
+      void openWith(record.config, { route: ROUTES.edit, recent: false });
+    },
+    [openWith],
+  );
+
+  const discardDraft = useCallback(
+    async (record: DraftRecord): Promise<void> => {
+      if (!(await confirmDiscard(record))) return;
+      clearDraft();
+      setDraft(null);
+    },
+    [confirmDiscard],
   );
 
   /** Starting the loaded round over throws its clocks away, so it is asked, not done. */
@@ -325,7 +389,8 @@ export default function Launch(): JSX.Element {
           <span id="lc-title" className="scr__brandname t-name">
             {t('app.name')}
           </span>
-          <span className="scr__brandsub">{t('app.tagline')}</span>
+          {/* What a first-time visitor wants settled before choosing anything. */}
+          <span className="scr__brandsub">{t('lc.trust')}</span>
         </div>
         <div className="scr__tools">
           <button type="button" className="btn btn--quiet" onClick={toggleLang}>
@@ -350,12 +415,24 @@ export default function Launch(): JSX.Element {
 
       <div className="scr__scroll">
         <div className="scr__inner">
-          {underWay ? (
-            <ResumeBanner
-              updatedAt={boot.resume?.updatedAt ?? null}
-              listedAt={listedAt}
-              onRestart={() => void restart()}
-            />
+          {underWay || unapplied !== null ? (
+            <div className="lc__banners">
+              {underWay ? (
+                <ResumeBanner
+                  updatedAt={boot.resume?.updatedAt ?? null}
+                  listedAt={listedAt}
+                  onRestart={() => void restart()}
+                />
+              ) : null}
+              {unapplied === null ? null : (
+                <DraftBanner
+                  record={unapplied}
+                  listedAt={listedAt}
+                  onContinue={() => continueDraft(unapplied)}
+                  onDiscard={() => void discardDraft(unapplied)}
+                />
+              )}
+            </div>
           ) : null}
 
           {boot.shareError === null ? null : (
@@ -540,15 +617,6 @@ export default function Launch(): JSX.Element {
               )}
             </div>
           </section>
-
-          <section className="scr__sec" aria-labelledby="lc-about">
-            <div className="scr__sechead">
-              <h2 id="lc-about" className="scr__sectitle t-row">
-                {t('app.name')}
-              </h2>
-            </div>
-            <p className="scr__note">{t('lc.about')}</p>
-          </section>
         </div>
       </div>
 
@@ -615,6 +683,46 @@ function ResumeBanner({ updatedAt, listedAt, onRestart }: ResumeBannerProps): JS
         </button>
         <button type="button" className="btn btn--quiet" onClick={onRestart}>
           {t('d.discard')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------ unapplied editor changes */
+
+interface DraftBannerProps {
+  record: DraftRecord;
+  /** The one wall-clock reading this visit uses for every "updated" phrase. */
+  listedAt: number;
+  onContinue: () => void;
+  onDiscard: () => void;
+}
+
+/**
+ * Changes the editor saved and nobody applied, usually from a tab closed mid-edit. Lighter
+ * than the round in progress: nothing is running, but nothing else holds these edits.
+ */
+function DraftBanner({ record, listedAt, onContinue, onDiscard }: DraftBannerProps): JSX.Element {
+  const { t, l10n, lang } = useLang();
+  return (
+    <div className="lc__draft" role="region" aria-label={t('ed.unapplied')}>
+      <p className="lc__draftmain">
+        <span className="lc__draftdot" aria-hidden="true" />
+        <span>
+          {t('lc.draft', { title: l10n(record.config.title) || t('lc.untitled') })}
+          <span className="lc__draftage">
+            {' · '}
+            {updatedPhrase(listedAt - record.updatedAt, lang, t)}
+          </span>
+        </span>
+      </p>
+      <div className="scr__acts">
+        <button type="button" className="btn btn--primary" onClick={onContinue}>
+          {t('lc.continueEditing')}
+        </button>
+        <button type="button" className="btn btn--quiet" onClick={onDiscard}>
+          {t('ed.discard')}
         </button>
       </div>
     </div>
@@ -717,9 +825,11 @@ function PresetCard({ meta, onRun, onEdit }: PresetCardProps): JSX.Element {
           <Icon name="edit" />
           {t('pr.editIt')}
         </button>
+        {/* Lime for the format the operator runs. Seven lime buttons in a grid all
+            competed for the same glance. */}
         <button
           type="button"
-          className="btn btn--primary"
+          className={isDefault ? 'btn btn--primary' : 'btn'}
           onClick={() => onRun(instantiateConfig(meta.config))}
         >
           {t('pr.runNow')}
