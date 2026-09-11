@@ -39,7 +39,10 @@ export interface RingCoreProps {
   label: string;
   /** The state word: RUNNING / PAUSED / ARMED / HOLD / OVER TIME. Never colour alone. */
   status: string;
-  /** Whose clock this is: the speaker, the side drawing prep, or the room. */
+  /**
+   * Whose clock this is, for the digits' screen-reader announcement only. It is not
+   * printed: the speech bubble on the figure already says who has the floor.
+   */
   name: string;
   secondsOnly: boolean;
   /** ARMED is loud: the digits sit back and the ring is full and static. */
@@ -119,7 +122,6 @@ export function RingCore({
       </div>
 
       <div className="ucore__caption">
-        {name === '' ? null : <p className="ucore__name">{name}</p>}
         <p className="ucore__label">
           <span>{label}</span>
           <span className="ucore__status" data-transport={transport} data-band={band}>

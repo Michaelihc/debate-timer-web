@@ -17,7 +17,7 @@ import { TimeField } from '../ui/TimeField';
 import App from './App';
 import { openConfig } from './boot';
 import type { HotkeyHandlers } from './hotkeys';
-import { KEYMAP, useHotkeys } from './hotkeys';
+import { KEYMAP, capsOf, displayCaps, shortcutText, useHotkeys } from './hotkeys';
 import { navigate, parseRoute, replaceRoute } from './router';
 
 beforeEach(() => {
@@ -122,26 +122,28 @@ test('SWAP is inert exactly when the console withholds its handler', () => {
   expect(swap).toHaveBeenCalledTimes(1);
 });
 
-test('RESET needs the key held for 600ms', () => {
-  vi.useFakeTimers();
+test('RESET fires on a single press, like the original Reset button', () => {
+  const reset = vi.fn();
+  render(<Keys handlers={{ reset }} />);
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
+  });
+  expect(reset).toHaveBeenCalledTimes(1);
+});
+
+test('keycaps print the keyboard in front of the operator: Ctrl and Shift off a Mac', () => {
+  expect(capsOf('advanceStart')).toEqual(['Shift', 'N']);
+  expect(displayCaps(['⌘', '⇧', 'Z'])).toEqual(['Ctrl', 'Shift', 'Z']);
+  expect(shortcutText('advanceStart')).toBe('Shift+N');
+  expect(shortcutText('hold')).toBe('B / .');
+
+  const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
   try {
-    const reset = vi.fn();
-    render(<Keys handlers={{ reset }} />);
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
-    });
-    act(() => {
-      vi.advanceTimersByTime(400);
-      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'r' }));
-    });
-    expect(reset).not.toHaveBeenCalled();
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
-      vi.advanceTimersByTime(700);
-    });
-    expect(reset).toHaveBeenCalledTimes(1);
+    expect(capsOf('advanceStart')).toEqual(['⇧', 'N']);
+    expect(displayCaps(['⌘', 'Z'])).toEqual(['⌘', 'Z']);
+    expect(shortcutText('advanceStart')).toBe('⇧N');
   } finally {
-    vi.useRealTimers();
+    platform.mockRestore();
   }
 });
 

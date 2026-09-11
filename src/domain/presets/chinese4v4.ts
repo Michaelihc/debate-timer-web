@@ -8,7 +8,7 @@ import { COLOR_A, COLOR_B, CUES_SHORT, FREE_DEBATE, PREP, rulesStd, side } from 
  * It opens on a scheduled 5:00 preparation phase, as the Unity app's default and the
  * operator's own save file both do — every figure holds a clipboard while it runs.
  * Free debate sits between the rebuttals and the closing summaries, and Pro closes
- * last. The 1:00 per-side banks are extra, drawn on demand with Q / W.
+ * last.
  *
  * This order is a starting point, not a rule. Reorder, repeat or drop any speaker.
  */
@@ -18,8 +18,8 @@ export const chinese4v4: RoundConfig = {
   presetRef: 'chinese4v4',
   title: { en: 'Chinese Academic Debate', zh: '华语辩论赛' },
   sides: [
-    side('A', 'Proposition', '正方', COLOR_A, 60_000),
-    side('B', 'Opposition', '反方', COLOR_B, 60_000),
+    side('A', 'Proposition', '正方', COLOR_A),
+    side('B', 'Opposition', '反方', COLOR_B),
   ],
   speakers: [
     { id: 'a1', side: 'A', name: '正一', role: { en: 'Opening Constructive', zh: '开篇立论' }, defaultMs: 180_000 },

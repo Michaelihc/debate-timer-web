@@ -27,8 +27,12 @@ export function rulesStd(over: Partial<Rules> = {}): Rules {
   return { ...defaultRules(), cues: [...CUES_STD], ...over };
 }
 
-export function side(id: SideId, en: string, zh: string, color: Hex, prepBankMs = 0): SideCfg {
-  return { id, label: { en, zh }, color, prepBankMs };
+/**
+ * A side as every preset ships it. Prep is a scheduled segment in the run order, as the
+ * Unity app has it; no preset carries an on-demand prep bank.
+ */
+export function side(id: SideId, en: string, zh: string, color: Hex): SideCfg {
+  return { id, label: { en, zh }, color, prepBankMs: 0 };
 }
 
 export const CX: L10n = { en: 'Cross-Examination', zh: '质询' };

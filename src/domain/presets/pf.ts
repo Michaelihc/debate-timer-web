@@ -15,7 +15,7 @@ export const pf: RoundConfig = {
   id: 'pf',
   presetRef: 'pf',
   title: { en: 'Public Forum', zh: '公众论坛制' },
-  sides: [side('A', 'Pro', '正方', COLOR_A, 180_000), side('B', 'Con', '反方', COLOR_B, 180_000)],
+  sides: [side('A', 'Pro', '正方', COLOR_A), side('B', 'Con', '反方', COLOR_B)],
   speakers: [
     { id: 'a1', side: 'A', name: 'Pro 1', role: { en: 'Constructive', zh: '立论' }, defaultMs: 240_000 },
     { id: 'a2', side: 'A', name: 'Pro 2', role: { en: 'Rebuttal', zh: '驳论' }, defaultMs: 240_000 },

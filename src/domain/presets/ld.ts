@@ -5,8 +5,7 @@ import { COLOR_A, COLOR_B, CUES_SHORT, rulesStd, side } from './common';
 /**
  * One debater per side. The three Aff entries are the same person with different
  * allocations, which is exactly why a speech carries its own speaker reference
- * rather than a signed roster index. Prep is a 4:00 bank per side, drawn with Q/W
- * before any of their own speeches.
+ * rather than a signed roster index.
  */
 export const ld: RoundConfig = {
   v: SCHEMA_VERSION,
@@ -14,8 +13,8 @@ export const ld: RoundConfig = {
   presetRef: 'ld',
   title: { en: 'Lincoln-Douglas', zh: '林肯-道格拉斯制' },
   sides: [
-    side('A', 'Affirmative', '正方', COLOR_A, 240_000),
-    side('B', 'Negative', '反方', COLOR_B, 240_000),
+    side('A', 'Affirmative', '正方', COLOR_A),
+    side('B', 'Negative', '反方', COLOR_B),
   ],
   speakers: [
     { id: 'ac', side: 'A', name: 'Aff', role: { en: 'Affirmative Constructive (AC)', zh: '正方立论' }, defaultMs: 360_000 },

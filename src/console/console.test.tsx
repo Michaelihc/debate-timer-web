@@ -2,19 +2,22 @@
  * The console's own promises.
  *
  * These are the assertions that would be expensive to discover at a tournament: that SWAP
- * is gone rather than dead, that nothing is disabled in overtime, that going back is a
- * control and not a menu item, and that the run order is drawn exactly as the operator
- * arranged it — repeats, omissions and all.
+ * is gone rather than dead, that nothing is disabled in overtime, that a button does what
+ * its label says on one click, that going back is a control on the timeline strip, and that
+ * the run order is drawn exactly as the operator arranged it — repeats, omissions and all.
  */
 
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 
-import { instantiatePreset } from '../domain/presets';
-import { chessClockId } from '../domain/plan';
 import { openConfig } from '../app/boot';
+import { bindingsFor } from '../app/hotkeys';
 import type { RoundConfig } from '../domain/config';
-import { canSwap } from '../engine/selectors';
+import { chessClockId } from '../domain/plan';
+import { PRESET_KEYS, instantiatePreset } from '../domain/presets';
+import { now } from '../engine/chronometer';
+import { paintSoon } from '../engine/loop';
+import { canSwap, clockView } from '../engine/selectors';
 import { dispatch, getSession } from '../engine/store';
 import Console from '../screens/Console';
 
@@ -22,6 +25,24 @@ function key(init: KeyboardEventInit): void {
   act(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, ...init }));
     window.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, ...init }));
+  });
+}
+
+function el(selector: string): HTMLElement {
+  const found = document.querySelector<HTMLElement>(selector);
+  if (!found) throw new Error(`nothing matches ${selector}`);
+  return found;
+}
+
+/** Let the frame loop paint, the way it does after every command and every frame. */
+async function frames(): Promise<void> {
+  await act(async () => {
+    paintSoon();
+    for (let i = 0; i < 2; i += 1) {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    }
   });
 }
 
@@ -43,6 +64,15 @@ function firstSpeechIndex(): number {
   return getSession().plan.segments.findIndex((s) => s.kind === 'speech');
 }
 
+function remainingOf(index: number): number {
+  const s = getSession();
+  const id = s.plan.segments[index]?.primaryClockId;
+  if (id === undefined) throw new Error(`no segment ${index}`);
+  const view = clockView(s.state, s.plan, id, now());
+  if (!view) throw new Error(`no clock for segment ${index}`);
+  return view.remainingMs;
+}
+
 beforeEach(() => {
   openChinese();
 });
@@ -51,20 +81,39 @@ afterEach(() => {
   cleanup();
 });
 
-test('a speech names the person, never a bare index', () => {
+test('nothing is printed beside the figures, and no speaker name under the ring', () => {
   const i = firstSpeechIndex();
   act(() => {
     dispatch({ t: 'LOAD', cursor: i });
+    dispatch({ t: 'START' });
   });
   render(<Console />);
 
-  const speaker = getSession().plan.segments[i]?.speaker;
-  expect(speaker).toBeDefined();
-  // The nameplate, plus the roster row on the rail.
-  expect(screen.getAllByText(speaker?.name ?? '—').length).toBeGreaterThan(0);
+  const figures = [...document.querySelectorAll<HTMLElement>('.uteam .udeb')];
+  expect(figures).toHaveLength(getSession().config.speakers.length);
+  expect(document.querySelector('.udeb__name')).toBeNull();
+  for (const figure of figures) {
+    // The figure draws its number and nothing else; the name is read to assistive tech.
+    expect(figure.querySelector('.udeb__stack')?.textContent ?? '').toMatch(/^\d+$/);
+    const drawnOutsideTheFigure = [...figure.children].filter(
+      (child) => !child.classList.contains('udeb__stack') && !child.classList.contains('u-sr'),
+    );
+    expect(drawnOutsideTheFigure).toHaveLength(0);
+  }
+
+  const { segments } = getSession().plan;
+  const speaking = segments[i]?.speaker?.name ?? '';
+  const next = segments[i + 1]?.speaker?.name ?? '';
+  expect(speaking).not.toBe('');
+  expect(next).not.toBe('');
+  const caption = el('.ucore__caption').textContent ?? '';
+  expect(caption).not.toContain(speaking);
+  expect(caption).not.toContain(next);
+  // The next segment is still named, by its own label and length.
+  expect(el('.ucore__next').textContent ?? '').toMatch(/\d:\d\d/);
 });
 
-test('the transport row is always visible and stays live past zero', () => {
+test('every control stays live past zero', () => {
   act(() => {
     dispatch({ t: 'LOAD', cursor: 1 });
     dispatch({ t: 'START' });
@@ -73,11 +122,206 @@ test('the transport row is always visible and stays live past zero', () => {
   });
   render(<Console />);
 
-  for (const label of ['Pause', 'Next', 'Back', '15s', 'Hold round']) {
-    for (const button of screen.getAllByRole('button', { name: new RegExp(label, 'i') })) {
-      expect(button).toBeEnabled();
-    }
+  for (const label of ['Pause', 'Reset', 'Next', 'Back', '15s', 'Hold round']) {
+    const buttons = screen.getAllByRole('button', { name: new RegExp(label, 'i') });
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) expect(button).toBeEnabled();
   }
+});
+
+test('timer controls sit under the ring; Back and Next sit on the timeline strip', () => {
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: firstSpeechIndex() });
+  });
+  render(<Console />);
+
+  const transport = el('.transport');
+  const underRing = within(transport)
+    .getAllByRole('button')
+    .map((b) => b.textContent ?? '');
+  expect(underRing.some((text) => /start|pause|resume/i.test(text))).toBe(true);
+  expect(underRing.some((text) => /reset/i.test(text))).toBe(true);
+  expect(underRing.some((text) => /back|next/i.test(text))).toBe(false);
+
+  const strip = el('.tline');
+  expect(within(strip).getByRole('button', { name: /back/i })).toBeEnabled();
+  expect(within(strip).getByRole('button', { name: /next/i })).toBeEnabled();
+  // One Next on the whole screen, not one per band.
+  expect(screen.getAllByRole('button', { name: /next/i })).toHaveLength(1);
+});
+
+test('Back takes a mistaken advance back, at the remembered time, from a click', () => {
+  const i = firstSpeechIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+    dispatch({ t: 'ADJUST', deltaMs: -42_000 });
+  });
+  const before = remainingOf(i);
+  render(<Console />);
+  const strip = el('.tline');
+
+  fireEvent.click(within(strip).getByRole('button', { name: /next/i }));
+  expect(getSession().state.cursor).toBe(i + 1);
+
+  fireEvent.click(within(strip).getByRole('button', { name: /back/i }));
+  expect(getSession().state.cursor).toBe(i);
+  expect(remainingOf(i)).toBe(before);
+});
+
+test('Reset puts the segment back to full time on a single click', () => {
+  const i = firstSpeechIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+    dispatch({ t: 'START' });
+    dispatch({ t: 'ADJUST', deltaMs: -60_000 });
+  });
+  render(<Console />);
+  const full = getSession().plan.segments[i]?.allottedMs ?? 0;
+  expect(remainingOf(i)).toBeLessThanOrEqual(full - 60_000);
+
+  // A plain click: no press-and-hold, no confirm.
+  fireEvent.click(within(el('.transport')).getByRole('button', { name: /reset/i }));
+
+  expect(remainingOf(i)).toBe(full);
+  expect(getSession().state.run).toBeNull();
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+test('R resets on one press, too', () => {
+  const i = firstSpeechIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+    dispatch({ t: 'ADJUST', deltaMs: -30_000 });
+  });
+  render(<Console />);
+  key({ key: 'r' });
+  expect(remainingOf(i)).toBe(getSession().plan.segments[i]?.allottedMs);
+});
+
+test('the console has no undo or redo: no buttons, no chip, and Ctrl+Z does nothing', () => {
+  const consoleActions = bindingsFor('console').map((b): string => b.action);
+  expect(consoleActions).not.toContain('undo');
+  expect(consoleActions).not.toContain('redo');
+  // The editor keeps its draft history.
+  const editorActions = bindingsFor('editor').map((b): string => b.action);
+  expect(editorActions).toEqual(expect.arrayContaining(['undo', 'redo']));
+
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: 0 });
+  });
+  render(<Console />);
+  expect(screen.queryByRole('button', { name: /undo|redo/i })).toBeNull();
+
+  // An advance raises nothing.
+  key({ key: 'n' });
+  expect(document.querySelector('.undochip')).toBeNull();
+
+  act(() => {
+    dispatch({ t: 'ADJUST', deltaMs: -15_000 });
+  });
+  const before = getSession().state;
+  key({ key: 'z', ctrlKey: true });
+  key({ key: 'z', ctrlKey: true, shiftKey: true });
+  key({ key: 'z', metaKey: true });
+  expect(getSession().state).toBe(before);
+});
+
+test('each side’s give-floor button sits under its own time and hides while that side runs', () => {
+  const i = chessIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+  });
+  render(<Console />);
+  const barA = el('.ubar[data-side="A"]');
+  const barB = el('.ubar[data-side="B"]');
+
+  const giveA = within(barA).getByRole('button', { name: /give floor to proposition/i });
+  expect(within(barB).getByRole('button', { name: /give floor to opposition/i })).toBeEnabled();
+  // Below that side's own digits — and nowhere in the row under the ring.
+  const digitsA = el('.ubar[data-side="A"] .ubar__digits');
+  expect(digitsA.compareDocumentPosition(giveA) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(el('.transport')).queryByRole('button', { name: /give floor/i })).toBeNull();
+
+  // Proposition opens. Giving it the floor again would do nothing, so its button goes.
+  act(() => {
+    dispatch({ t: 'START' });
+  });
+  expect(getSession().state.floor).toBe('A');
+  expect(within(barA).queryByRole('button', { name: /give floor/i })).toBeNull();
+
+  // Opposition's hands over, from a click, and then it is Opposition's that goes.
+  fireEvent.click(within(barB).getByRole('button', { name: /give floor to opposition/i }));
+  const segId = getSession().plan.segments[i]?.segId ?? '';
+  expect(getSession().state.floor).toBe('B');
+  expect(getSession().state.run?.clockId).toBe(chessClockId(segId, 'B'));
+  expect(within(barB).queryByRole('button', { name: /give floor/i })).toBeNull();
+  expect(within(barA).getByRole('button', { name: /give floor to proposition/i })).toBeEnabled();
+});
+
+test('the on-deck figure waits half-lit, then steps up once the live clock runs out', async () => {
+  // No bell at zero, so nothing but the passage of time can change the figure.
+  const config = instantiatePreset('chinese4v4');
+  config.rules = { ...config.rules, cues: [] };
+  act(() => {
+    openConfig(config, { recent: false });
+  });
+  const i = firstSpeechIndex();
+  const full = getSession().plan.segments[i]?.allottedMs ?? 0;
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+    dispatch({ t: 'START' });
+    dispatch({ t: 'ADJUST', deltaMs: -(full - 400) });
+  });
+  render(<Console />);
+  await frames();
+
+  const onDeck = (): HTMLElement => el('.uteam .udeb[data-state="next"]');
+  expect(onDeck().hasAttribute('data-urgent')).toBe(false);
+
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 700);
+    });
+  });
+  await frames();
+  expect(onDeck().hasAttribute('data-urgent')).toBe(true);
+
+  // Time back on the clock: the next speaker waits again.
+  act(() => {
+    dispatch({ t: 'ADJUST', deltaMs: 60_000 });
+  });
+  await frames();
+  expect(onDeck().hasAttribute('data-urgent')).toBe(false);
+});
+
+test('there is no prep bank on the console: no chip under a roster, and Q and W do nothing', () => {
+  for (const presetKey of PRESET_KEYS) {
+    for (const side of instantiatePreset(presetKey).sides) expect(side.prepBankMs).toBe(0);
+  }
+
+  // Even a round saved with banks shows no control for them, and the keys stay dead.
+  const config = instantiatePreset('chinese4v4');
+  config.sides = [
+    { ...config.sides[0], prepBankMs: 60_000 },
+    { ...config.sides[1], prepBankMs: 60_000 },
+  ];
+  act(() => {
+    openConfig(config, { recent: false });
+  });
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: firstSpeechIndex() });
+  });
+  render(<Console />);
+  expect(document.querySelector('.uteam__bank')).toBeNull();
+  expect(screen.queryByText(/prep bank/i)).toBeNull();
+
+  const actions = bindingsFor('console').map((b): string => b.action);
+  expect(actions).not.toContain('bankA');
+  expect(actions).not.toContain('bankB');
+  const before = getSession().state;
+  key({ key: 'q' });
+  key({ key: 'w' });
+  expect(getSession().state).toBe(before);
 });
 
 test('SWAP is hidden — not disabled — whenever canSwap is false, and its key is inert', () => {
@@ -122,19 +366,6 @@ test('SWAP survives overtime — the control and the key both keep working', () 
   expect(getSession().state.floor).toBe('B');
 });
 
-test('an advance raises the undo chip, naming where it landed', () => {
-  act(() => {
-    dispatch({ t: 'LOAD', cursor: 0 });
-  });
-  render(<Console />);
-  key({ key: 'n' });
-
-  const landed = getSession().plan.segments[1]?.speaker?.name ?? '';
-  const status = screen.getByRole('status');
-  expect(within(status).getByText(new RegExp(landed))).toBeInTheDocument();
-  expect(within(status).getByRole('button', { name: /undo/i })).toBeInTheDocument();
-});
-
 test('the Ribbon draws the operator’s order verbatim and flags nothing about it', () => {
   // Speaker 3 before speaker 2, speaker 2 twice, speaker 1 never: all intentional.
   const config = instantiatePreset('chinese4v4');
@@ -174,22 +405,4 @@ test('the strip numbers the opposition negative, with arrows between squares and
   expect(checked).toBeGreaterThan(0);
   expect(document.querySelectorAll('.tline__arrow')).toHaveLength(pips.length - 1);
   expect(document.querySelector('.tline__tick')).toBeNull();
-});
-
-test('a prep bank draw takes over the core and Escape ends it', () => {
-  const i = firstSpeechIndex();
-  act(() => {
-    dispatch({ t: 'LOAD', cursor: i });
-    dispatch({ t: 'START' });
-  });
-  render(<Console />);
-
-  key({ key: 'q' });
-  expect(getSession().state.bankDraw?.side).toBe('A');
-  expect(screen.getAllByText(/prep bank/i).length).toBeGreaterThan(0);
-
-  key({ key: 'Escape' });
-  expect(getSession().state.bankDraw).toBeNull();
-  // The speech it interrupted is running again, because it was running when we drew.
-  expect(getSession().state.run?.clockId).toBe(getSession().plan.segments[i]?.primaryClockId);
 });

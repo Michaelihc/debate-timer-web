@@ -1,27 +1,28 @@
 /**
- * The transport row. Always visible, and every control stays live at and past zero.
+ * The timer controls under the ring — and only the timer controls.
  *
- * The original hid START, PAUSE *and* RESUME the instant a clock reached zero, stranding
- * the operator during exactly the grace-period overrun that every format tolerates. Here
- * a clock at zero keeps counting up and every button keeps working: the human decides
- * when a speech is over.
+ * The Unity scene puts exactly two buttons here, a blue Pause and a coral Reset, and this
+ * row keeps that pair as its loud half. Under it sit the ±15s nudges and, quieter still,
+ * Hold round. Moving between segments is not a timer control: Back and Next live on the
+ * timeline strip, beside the green ▶▶ the original had there.
  *
- * BACK is a first-class control sitting next to ADVANCE, not an item in a menu. Going
- * backwards is a normal thing to do at a debate.
+ * An enabled button always does what its label says. ±15s is live exactly when there is a
+ * clock to nudge and the round is not held (the console asks the reducer); Reset is live
+ * whenever a segment is loaded and the round is not held. A clock at or past zero changes
+ * none of that: the human decides when a speech is over.
  *
- * SWAP is not here. It lives between the two free-debate bars, where the original put it,
- * and it is HIDDEN — not disabled — whenever `canSwap()` is false, so the control and its
- * keybinding appear and disappear together.
+ * Reset is one click, like the original's Reset button: no press-and-hold, no confirm.
+ *
+ * SWAP and the give-floor buttons are not here. They live with the free-debate bars they
+ * act on, and are HIDDEN — not disabled — whenever they could not act.
  */
 
-import type { JSX, ReactNode } from 'react';
-import type { SideId } from '../domain/config';
-import type { Chord, HotkeyAction } from '../app/hotkeys';
-import { bindingOf, capsOf } from '../app/hotkeys';
+import type { JSX } from 'react';
+import type { HotkeyAction } from '../app/hotkeys';
+import { ariaShortcut, capsOf, shortcutText } from '../app/hotkeys';
 import type { RoundPhase } from '../engine/selectors';
 import type { Transport as TransportState } from '../engine/state';
 import { useLang } from '../i18n/useLang';
-import { HoldButton } from '../ui/HoldButton';
 import type { IconName } from '../ui/Icons';
 import { Icon } from '../ui/Icons';
 import { Keycaps } from '../ui/KeyLegendOverlay';
@@ -31,14 +32,9 @@ import './console.css';
 export interface TransportHandlers {
   toggle: () => void;
   togglePause: () => void;
-  advance: () => void;
-  prev: () => void;
   reset: () => void;
   hold: () => void;
   adjust: (deltaMs: number) => void;
-  floor: (side: SideId) => void;
-  undo: () => void;
-  redo: () => void;
 }
 
 export interface TransportProps {
@@ -48,67 +44,48 @@ export interface TransportProps {
   chess: boolean;
   /** Space is inert until a side is picked (`firstFloor: 'operator'`). */
   canStart: boolean;
-  sideLabels: Record<SideId, string>;
-  canPrev: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-  /** 0..1 while R is held on the keyboard, so both routes drive one arc. */
-  resetProgress: number;
+  /** There is a clock for ±15s to act on, and the round is not held. */
+  canAdjust: boolean;
+  /** A segment is loaded and the round is not held. */
+  canReset: boolean;
   on: TransportHandlers;
 }
 
 const STEP_MS = 15_000;
 
-const APPLE = /Mac|iPhone|iPad|iPod/i;
-
-/** `aria-keyshortcuts` wants real key names joined by `+`, not the legend's glyphs. */
-function ariaShortcut(action: HotkeyAction): string | undefined {
-  const chord: Chord | undefined = bindingOf(action)?.chords[0];
-  if (!chord) return undefined;
-  const parts: string[] = [];
-  if (chord.mod === true) {
-    const apple =
-      typeof navigator !== 'undefined' && APPLE.test(navigator.platform || navigator.userAgent);
-    parts.push(apple ? 'Meta' : 'Control');
-  }
-  if (chord.shift === true) parts.push('Shift');
-  if (chord.alt === true) parts.push('Alt');
-  parts.push(chord.key === ' ' ? 'Space' : chord.key.length === 1 ? chord.key.toUpperCase() : chord.key);
-  return parts.join('+');
-}
-
-function Cap({ action }: { action: HotkeyAction }): JSX.Element {
-  return <Keycaps caps={capsOf(action)} />;
-}
+type Tone = 'primary' | 'reset' | 'step' | 'quiet';
 
 function Key({
   onClick,
   icon,
   label,
   action,
-  primary = false,
+  tone,
+  caps = false,
   disabled = false,
-  hint,
 }: {
   onClick: () => void;
-  icon?: IconName;
+  icon: IconName;
   label: string;
-  action?: HotkeyAction;
-  primary?: boolean;
+  action: HotkeyAction;
+  tone: Tone;
+  /** Print the keycaps on the face. Only the loud pair does. */
+  caps?: boolean;
   disabled?: boolean;
-  hint?: ReactNode;
 }): JSX.Element {
+  const small = tone === 'step' || tone === 'quiet';
   return (
     <button
       type="button"
-      className={primary ? 'tbtn tbtn--primary' : 'tbtn'}
+      className={`tbtn tbtn--${tone}`}
       onClick={onClick}
       disabled={disabled}
-      aria-keyshortcuts={action === undefined ? undefined : ariaShortcut(action)}
+      aria-keyshortcuts={ariaShortcut(action)}
+      title={`${label} · ${shortcutText(action)}`}
     >
-      {icon === undefined ? null : <Icon name={icon} size={18} />}
+      <Icon name={icon} size={small ? 14 : 18} />
       <span className="tbtn__label">{label}</span>
-      {hint ?? (action === undefined ? null : <Cap action={action} />)}
+      {caps ? <Keycaps caps={capsOf(action)} /> : null}
     </button>
   );
 }
@@ -119,11 +96,8 @@ export function Transport({
   hold,
   chess,
   canStart,
-  sideLabels,
-  canPrev,
-  canUndo,
-  canRedo,
-  resetProgress,
+  canAdjust,
+  canReset,
   on,
 }: TransportProps): JSX.Element {
   const { t } = useLang();
@@ -141,58 +115,31 @@ export function Transport({
           : t('t.start');
 
   const mainIcon: IconName = hold ? 'hold' : running ? 'pause' : 'play';
+  // While held the one thing the round accepts is its release, so that is what the
+  // primary button does — in free debate too.
+  const mainAction: HotkeyAction = hold ? 'hold' : chess ? 'togglePause' : 'toggle';
+  const onMain = hold ? on.hold : chess ? on.togglePause : on.toggle;
 
   return (
     <div className="transport" role="group" aria-label={t('nav.console')}>
       <div className="transport__main">
         <Key
-          onClick={on.prev}
-          icon="prev"
-          label={t('t.back')}
-          action="prev"
-          disabled={!canPrev}
+          onClick={onMain}
+          icon={mainIcon}
+          label={mainLabel}
+          action={mainAction}
+          tone="primary"
+          caps
+          disabled={!hold && (complete || !canStart)}
         />
-
-        {chess ? (
-          <>
-            <Key
-              onClick={() => on.floor('A')}
-              icon="prev"
-              label={t('c.giveFloor', { side: sideLabels.A })}
-              action="floorA"
-            />
-            <Key
-              onClick={() => on.floor('B')}
-              icon="next"
-              label={t('c.giveFloor', { side: sideLabels.B })}
-              action="floorB"
-            />
-            <Key
-              onClick={on.togglePause}
-              icon={mainIcon}
-              label={mainLabel}
-              action="togglePause"
-              primary
-              disabled={!canStart && !hold}
-            />
-          </>
-        ) : (
-          <Key
-            onClick={hold ? on.hold : on.toggle}
-            icon={mainIcon}
-            label={mainLabel}
-            action={hold ? 'hold' : 'toggle'}
-            primary
-            disabled={complete || (!canStart && !hold)}
-          />
-        )}
-
         <Key
-          onClick={on.advance}
-          icon="next"
-          label={t('t.next')}
-          action="advance"
-          disabled={complete}
+          onClick={on.reset}
+          icon="reset"
+          label={t('t.reset')}
+          action="reset"
+          tone="reset"
+          caps
+          disabled={!canReset}
         />
       </div>
 
@@ -202,34 +149,25 @@ export function Transport({
           icon="minus"
           label={t('t.minus15')}
           action="minus15"
+          tone="step"
+          disabled={!canAdjust}
         />
         <Key
           onClick={() => on.adjust(STEP_MS)}
           icon="plus"
           label={t('t.plus15')}
           action="plus15"
+          tone="step"
+          disabled={!canAdjust}
         />
-
-        <HoldButton
-          className="tbtn--hold"
-          onConfirm={on.reset}
-          description={t('t.resetHold')}
-          progress={resetProgress}
-          tone="danger"
-        >
-          <span className="tbtn__label">{t('t.reset')}</span>
-          <Cap action="reset" />
-        </HoldButton>
-
+        <span className="transport__rule" aria-hidden="true" />
         <Key
           onClick={on.hold}
           icon="hold"
           label={hold ? t('t.release') : t('t.hold')}
           action="hold"
+          tone="quiet"
         />
-
-        <Key onClick={on.undo} icon="undo" label={t('t.undo')} action="undo" disabled={!canUndo} />
-        <Key onClick={on.redo} icon="redo" label={t('t.redo')} action="redo" disabled={!canRedo} />
       </div>
     </div>
   );

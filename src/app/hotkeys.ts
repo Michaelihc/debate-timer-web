@@ -6,13 +6,18 @@
  * 1. **Nothing fires while the operator is typing.** Focus inside an
  *    `input` / `textarea` / `[contenteditable]` suppresses every binding.
  * 2. **Nothing fires during IME composition.** A Chinese operator typing 赵一鸣 sends
- *    `n`, `p`, `q`, `w`, `b` and `r` as composition input; firing ADVANCE or a bank draw
- *    off those keystrokes would be catastrophic. `compositionstart`/`compositionend`,
+ *    `n`, `p`, `b` and `r` as composition input; firing ADVANCE or RESET off those
+ *    keystrokes would be catastrophic. `compositionstart`/`compositionend`,
  *    `event.isComposing` and the legacy `keyCode === 229` are all honoured.
  * 3. **An action with no handler is inert** — no default is prevented, nothing happens.
  *    That is how SWAP is made honest: the console simply omits `swap` from its handler
  *    map whenever `canSwap(state, plan)` is false, and the binding goes dead in exactly
  *    the same breath as the control disappears.
+ *
+ * Keycaps are declared once, in Apple's glyphs, and printed the way the keyboard in front
+ * of the operator labels its keys: `⌘ ⇧ ⌥ ⏎` on a Mac, `Ctrl Shift Alt Enter` everywhere
+ * else. `capsOf`, `displayCaps` and `shortcutText` do that translation, so neither a button
+ * nor the legend ever tells a Windows operator to press ⌘.
  *
  * Several components may register for the same context at once (the shell owns the chrome
  * bindings, the console owns transport). Registrations are searched newest-first, so a
@@ -22,6 +27,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { StringKey } from '../i18n/strings';
 
+/** The press-and-hold threshold for the on-screen buttons that still ask for one. */
 export const HOLD_MS = 600;
 
 export type HotkeyContext = 'launch' | 'console' | 'editor' | 'summary';
@@ -46,8 +52,6 @@ export type HotkeyAction =
   | 'minus5'
   | 'floorA'
   | 'floorB'
-  | 'bankA'
-  | 'bankB'
   | 'undo'
   | 'redo'
   // navigation & chrome
@@ -82,13 +86,11 @@ export interface KeyBinding {
   action: HotkeyAction;
   group: HotkeyGroup;
   chords: Chord[];
-  /** Keycaps as the legend prints them. */
+  /** Keycaps in Apple glyphs. Print them through `displayCaps`, never raw. */
   caps: string[];
   /** The description, in `strings.ts`, rendered in both languages by the legend. */
   label: StringKey;
   contexts: HotkeyContext[];
-  /** Hold-to-confirm: the key must be down this long before the action fires. */
-  holdMs?: number;
   /** Only meaningful inside a free-debate segment; the legend marks it. */
   chessOnly?: boolean;
 }
@@ -178,13 +180,13 @@ export const KEYMAP: readonly KeyBinding[] = [
     contexts: CONSOLE_ONLY,
   },
   {
+    // One press, like the original's Reset button. No hold, no confirm.
     action: 'reset',
     group: 'transport',
     chords: [C('r')],
     caps: ['R'],
-    label: 'kb.holdReset',
+    label: 'kb.reset',
     contexts: CONSOLE_ONLY,
-    holdMs: HOLD_MS,
   },
   {
     action: 'plus15',
@@ -253,28 +255,14 @@ export const KEYMAP: readonly KeyBinding[] = [
     chessOnly: true,
   },
   {
-    action: 'bankA',
-    group: 'transport',
-    chords: [C('q')],
-    caps: ['Q'],
-    label: 'kb.bankDraw',
-    contexts: CONSOLE_ONLY,
-  },
-  {
-    action: 'bankB',
-    group: 'transport',
-    chords: [C('w')],
-    caps: ['W'],
-    label: 'kb.bankDraw',
-    contexts: CONSOLE_ONLY,
-  },
-  {
+    // The editor's draft history. A running round has no undo: going back a segment is
+    // how the console recovers from a mistaken advance.
     action: 'undo',
     group: 'transport',
     chords: [C('z', { mod: true })],
     caps: ['⌘', 'Z'],
     label: 'kb.undoRedo',
-    contexts: ['console', 'editor'],
+    contexts: ['editor'],
   },
   {
     action: 'redo',
@@ -282,7 +270,7 @@ export const KEYMAP: readonly KeyBinding[] = [
     chords: [C('z', { mod: true, shift: true })],
     caps: ['⌘', '⇧', 'Z'],
     label: 'kb.undoRedo',
-    contexts: ['console', 'editor'],
+    contexts: ['editor'],
   },
   {
     action: 'loadCursored',
@@ -364,11 +352,6 @@ export function bindingOf(action: HotkeyAction): KeyBinding | undefined {
   return BY_ACTION.get(action);
 }
 
-/** The keycaps for one action, for a button's `title` or a legend row. */
-export function capsOf(action: HotkeyAction): string[] {
-  return BY_ACTION.get(action)?.caps ?? [];
-}
-
 export function bindingsFor(context: HotkeyContext): KeyBinding[] {
   return KEYMAP.filter((b) => b.contexts.includes(context));
 }
@@ -377,13 +360,76 @@ export function bindingsForGroup(context: HotkeyContext, group: HotkeyGroup): Ke
   return bindingsFor(context).filter((b) => b.group === group);
 }
 
-/* --------------------------------------------------------------- chord matching */
+/* ------------------------------------------------------------- platform labels */
 
 const APPLE = /Mac|iPhone|iPad|iPod/i;
 
 function isApple(): boolean {
   return typeof navigator !== 'undefined' && APPLE.test(navigator.platform || navigator.userAgent);
 }
+
+/** What a non-Apple keyboard prints on the keys the map declares in Apple glyphs. */
+const PC_CAPS: Readonly<Record<string, string>> = {
+  '⌘': 'Ctrl',
+  '⇧': 'Shift',
+  '⌥': 'Alt',
+  '⏎': 'Enter',
+};
+
+/** Keycaps as this platform's keyboard labels them. */
+export function displayCaps(caps: readonly string[]): string[] {
+  if (isApple()) return [...caps];
+  return caps.map((cap) => PC_CAPS[cap] ?? cap);
+}
+
+/** The keycaps for one action, for a legend row or a button. */
+export function capsOf(action: HotkeyAction): string[] {
+  return displayCaps(BY_ACTION.get(action)?.caps ?? []);
+}
+
+const KEY_NAMES: Readonly<Record<string, string>> = {
+  ' ': 'Space',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  PageUp: 'PgUp',
+  PageDown: 'PgDn',
+  Escape: 'Esc',
+};
+
+/** One chord in words: `⌘Z` on a Mac, `Ctrl+Z` elsewhere. */
+export function chordText(chord: Chord): string {
+  const apple = isApple();
+  const parts: string[] = [];
+  if (chord.mod === true) parts.push(apple ? '⌘' : 'Ctrl');
+  if (chord.shift === true) parts.push(apple ? '⇧' : 'Shift');
+  if (chord.alt === true) parts.push(apple ? '⌥' : 'Alt');
+  const named = chord.key === 'Enter' ? (apple ? '⏎' : 'Enter') : KEY_NAMES[chord.key];
+  parts.push(named ?? (chord.key.length === 1 ? chord.key.toUpperCase() : chord.key));
+  return parts.join(apple ? '' : '+');
+}
+
+/** Every chord bound to an action, for a `title`: `P`, `B / .`, `Shift+N`. */
+export function shortcutText(action: HotkeyAction): string {
+  return (BY_ACTION.get(action)?.chords ?? []).map(chordText).join(' / ');
+}
+
+/** `aria-keyshortcuts` wants real key names joined by `+`, not the legend's glyphs. */
+export function ariaShortcut(action: HotkeyAction): string | undefined {
+  const chord = BY_ACTION.get(action)?.chords[0];
+  if (!chord) return undefined;
+  const parts: string[] = [];
+  if (chord.mod === true) parts.push(isApple() ? 'Meta' : 'Control');
+  if (chord.shift === true) parts.push('Shift');
+  if (chord.alt === true) parts.push('Alt');
+  parts.push(
+    chord.key === ' ' ? 'Space' : chord.key.length === 1 ? chord.key.toUpperCase() : chord.key,
+  );
+  return parts.join('+');
+}
+
+/* --------------------------------------------------------------- chord matching */
 
 function normKey(key: string): string {
   return key.length === 1 ? key.toLowerCase() : key;
@@ -448,7 +494,6 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 interface Registration {
   context: HotkeyContext;
   handlers: HotkeyHandlers;
-  onHoldProgress: ((action: HotkeyAction, progress: number) => void) | undefined;
   enabled: boolean;
 }
 
@@ -470,17 +515,6 @@ function anyEnabled(context: HotkeyContext): boolean {
 
 /* ------------------------------------------------------------ the one listener */
 
-interface HoldRun {
-  action: HotkeyAction;
-  binding: KeyBinding;
-  reg: Registration;
-  timer: number;
-  raf: number;
-  event: KeyboardEvent;
-}
-
-let hold: HoldRun | null = null;
-const down = new Set<string>();
 let listening = 0;
 let lastRemoteKey: string | null = null;
 const remoteListeners = new Set<() => void>();
@@ -505,35 +539,6 @@ export function subscribeRemote(fn: () => void): () => void {
   };
 }
 
-function endHold(fire: boolean): void {
-  if (!hold) return;
-  const run = hold;
-  hold = null;
-  clearTimeout(run.timer);
-  cancelAnimationFrame(run.raf);
-  run.reg.onHoldProgress?.(run.action, fire ? 1 : 0);
-  if (fire) run.reg.handlers[run.action]?.(run.event);
-}
-
-function beginHold(binding: KeyBinding, reg: Registration, e: KeyboardEvent): void {
-  const holdMs = binding.holdMs ?? HOLD_MS;
-  const started = performance.now();
-  const tick = (): void => {
-    if (!hold) return;
-    const p = Math.min(1, (performance.now() - started) / holdMs);
-    reg.onHoldProgress?.(binding.action, p);
-    if (p < 1) hold.raf = requestAnimationFrame(tick);
-  };
-  hold = {
-    action: binding.action,
-    binding,
-    reg,
-    timer: window.setTimeout(() => endHold(true), holdMs),
-    raf: requestAnimationFrame(tick),
-    event: e,
-  };
-}
-
 function onKeyDown(e: KeyboardEvent): void {
   if (isComposing(e)) return;
   if (isTypingTarget(e.target)) return;
@@ -551,27 +556,8 @@ function onKeyDown(e: KeyboardEvent): void {
   // exactly the state SWAP occupies whenever `canSwap` is false.
   if (!reg) return;
 
-  if (binding.holdMs !== undefined) {
-    e.preventDefault();
-    if (down.has(e.key)) return; // OS auto-repeat, not a second press
-    down.add(e.key);
-    beginHold(binding, reg, e);
-    return;
-  }
-
-  down.add(e.key);
   e.preventDefault();
   reg.handlers[binding.action]?.(e);
-}
-
-function onKeyUp(e: KeyboardEvent): void {
-  down.delete(e.key);
-  if (hold && hold.binding.chords.some((c) => c.key === normKey(e.key))) endHold(false);
-}
-
-function onBlur(): void {
-  down.clear();
-  endHold(false);
 }
 
 let contextResolver: (() => HotkeyContext | null) | null = null;
@@ -602,23 +588,16 @@ export function setContextResolver(fn: () => HotkeyContext | null): () => void {
 function attach(): void {
   if (listening++ > 0) return;
   window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('blur', onBlur);
 }
 
 function detach(): void {
   if (--listening > 0) return;
   window.removeEventListener('keydown', onKeyDown);
-  window.removeEventListener('keyup', onKeyUp);
-  window.removeEventListener('blur', onBlur);
-  onBlur();
 }
 
 export interface HotkeyOptions {
   /** Default true. False parks the registration without unmounting it. */
   enabled?: boolean;
-  /** 0 → 1 while a hold-to-confirm key is down; 1 on fire, 0 on an early release. */
-  onHoldProgress?: (action: HotkeyAction, progress: number) => void;
 }
 
 /**
@@ -634,19 +613,13 @@ export function useHotkeys(
   options: HotkeyOptions = {},
 ): void {
   const enabled = options.enabled !== false;
-  const reg = useRef<Registration>({
-    context,
-    handlers,
-    onHoldProgress: options.onHoldProgress,
-    enabled,
-  });
+  const reg = useRef<Registration>({ context, handlers, enabled });
   // Synced in a layout effect, not during render: a render can be thrown away, and a
   // discarded render must not leave a live keystroke pointing at handlers that were
   // never committed. Commit is still long before any key can arrive.
   useLayoutEffect(() => {
     reg.current.context = context;
     reg.current.handlers = handlers;
-    reg.current.onHoldProgress = options.onHoldProgress;
     reg.current.enabled = enabled;
   });
 
@@ -657,7 +630,6 @@ export function useHotkeys(
     return () => {
       const i = registrations.indexOf(entry);
       if (i >= 0) registrations.splice(i, 1);
-      if (hold?.reg === entry) endHold(false);
       detach();
     };
   }, []);

@@ -2,11 +2,11 @@
  * `#/console` — the operator's instrument, in the original's layout.
  *
  * The Unity app is one picture: the motion across the top, the two teams facing each other
- * as rows of person-shaped figures, a radial countdown ring between them, and a strip of
- * small square events along the bottom. This screen is that picture, with the operator's
- * controls added underneath rather than pushed into the middle of it.
+ * as columns of person-shaped figures, a radial countdown ring between them, and a strip of
+ * small square events along the bottom. This screen is that picture. Under the ring sit the
+ * timer controls and nothing else; moving between segments lives on the strip.
  *
- * Two rules it exists to keep honest:
+ * Three rules it exists to keep honest:
  *
  *   PERIPHERY / CORE. Identity colour is confined to the figures, the team names and the
  *   floor bars; clock-state colour is confined to the ring, the digits and the free-debate
@@ -17,23 +17,28 @@
  *   1 never — all of it is data, drawn exactly as arranged. Nothing on this screen warns,
  *   badges, reorders, dedupes or "suggests fixing" a run order.
  *
+ *   AN ENABLED CONTROL DOES WHAT IT SAYS. Whether a command would change the round is asked
+ *   of the reducer itself, not re-derived here; a control that could not act is disabled,
+ *   and one that cannot act at all in this state (SWAP, a side's give-floor) is hidden.
+ *
  * Every clock number on screen comes from `engine/selectors`; nothing here recomputes one.
  */
 
 import type { JSX } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { armAudioNow, useAudio } from '../app/boot';
-import type { HotkeyAction } from '../app/hotkeys';
 import { useHotkeys } from '../app/hotkeys';
 import { ROUTES, navigate } from '../app/router';
 import type { Id, SideId, SpeakerCfg } from '../domain/config';
 import { chessClockId } from '../domain/plan';
 import { elapsedMs, now } from '../engine/chronometer';
 import { onCue, registerTick } from '../engine/loop';
-import { canSwap, clockView, roundView } from '../engine/selectors';
+import { reduce } from '../engine/reducer';
+import { canSwap, clockView, primaryClockId, roundView } from '../engine/selectors';
 import { toggleMuted } from '../engine/sound';
-import { dispatch, getSession, redo, undo, useRound } from '../engine/store';
+import type { Command } from '../engine/state';
+import { dispatch, getSession, useRound } from '../engine/store';
 import { useLang } from '../i18n/useLang';
 import { formatTime } from '../lib/format';
 import type { DebaterOverlay } from '../ui/unity/Debater';
@@ -50,14 +55,39 @@ import { Timeline } from '../console/Timeline';
 import { pipsFromPlan, rosterOrdinals } from '../console/timelineData';
 import { TopBar } from '../console/TopBar';
 import { Transport } from '../console/Transport';
-import { UndoChip } from '../console/UndoChip';
 import '../console/console.css';
 
 const STEP_15 = 15_000;
 const STEP_60 = 60_000;
 const STEP_5 = 5_000;
 
-type CoreMode = 'pre' | 'complete' | 'bank' | 'chess' | 'speech' | 'shared';
+type CoreMode = 'pre' | 'complete' | 'chess' | 'speech' | 'shared';
+
+/**
+ * True once the clock the transport acts on has run out — `AnimationController`'s
+ * `RemainingTime < 0.1` test. Read every frame rather than off the last render, so the
+ * on-deck figure steps up and its arrow starts to bob at the instant of expiry, even in a
+ * format whose cue ladder has no bell at zero to force a render.
+ */
+function useExpired(): boolean {
+  const [expired, setExpired] = useState(false);
+  const last = useRef(false);
+  useEffect(
+    () =>
+      registerTick((n) => {
+        const s = getSession();
+        const id = primaryClockId(s.state, s.plan);
+        const v = id === null ? null : clockView(s.state, s.plan, id, n);
+        const next = v !== null && v.remainingMs <= 0;
+        if (next !== last.current) {
+          last.current = next;
+          setExpired(next);
+        }
+      }),
+    [],
+  );
+  return expired;
+}
 
 export default function Console(): JSX.Element {
   const { t, l10n, lang, toggleLang } = useLang();
@@ -68,8 +98,7 @@ export default function Console(): JSX.Element {
   const timelineRef = useRef<TimelineHandle>(null);
   const flashRef = useRef<HTMLSpanElement>(null);
   const [selected, setSelected] = useState(0);
-  const [advancedTo, setAdvancedTo] = useState<string | null>(null);
-  const [resetProgress, setResetProgress] = useState(0);
+  const expired = useExpired();
 
   // One `roundView` per discrete change. The ticking numbers never come through here —
   // they are written straight to the DOM by the band components' frame writers.
@@ -110,55 +139,40 @@ export default function Console(): JSX.Element {
     return ids;
   }, [plan.segments, state.cursor]);
 
-  const hasBank = useMemo<Record<SideId, boolean>>(
-    () => ({ A: plan.banks.A !== null, B: plan.banks.B !== null }),
-    [plan.banks],
-  );
-
   const pips = useMemo(() => pipsFromPlan(plan, lang, t), [plan, lang, t]);
 
   const mode: CoreMode =
-    view.bankDraw !== null
-      ? 'bank'
-      : view.phase === 'pre'
-        ? 'pre'
-        : view.phase === 'complete' || ps === null
-          ? 'complete'
-          : ps.kind === 'chess'
-            ? 'chess'
-            : ps.kind === 'speech'
-              ? 'speech'
-              : 'shared';
+    view.phase === 'pre'
+      ? 'pre'
+      : view.phase === 'complete' || ps === null
+        ? 'complete'
+        : ps.kind === 'chess'
+          ? 'chess'
+          : ps.kind === 'speech'
+            ? 'speech'
+            : 'shared';
 
   /**
    * The phase overlay EVERY figure carries at once, exactly as `AnimationController` does
    * it: clipboards during prep, the group icon during free debate.
    */
-  const overlay: DebaterOverlay =
-    view.bankDraw !== null || ps?.kind === 'prep' ? 'prep' : isChess ? 'free' : 'none';
+  const overlay: DebaterOverlay = ps?.kind === 'prep' ? 'prep' : isChess ? 'free' : 'none';
 
-  /* ------------------------------------------------------------------ commands */
-
-  const raiseChip = useCallback(() => {
-    const s = getSession();
-    const landed = s.plan.segments[s.state.cursor] ?? null;
-    setAdvancedTo(
-      landed === null ? t('st.complete') : (landed.speaker?.name ?? l10n(landed.label)),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
-
-  const doAdvance = useCallback(
-    (start?: boolean) => {
-      dispatch(start === true ? { t: 'ADVANCE', start: true } : { t: 'ADVANCE' });
-      raiseChip();
-    },
-    [raiseChip],
-  );
-
-  const loadAt = useCallback((index: number) => {
-    dispatch({ t: 'LOAD', cursor: index });
-  }, []);
+  /** Which commands would change the round right now, asked of the reducer itself. */
+  const can = useMemo(() => {
+    const ctx = { plan, now: now() };
+    const would = (cmd: Command): boolean => reduce(state, cmd, ctx) !== state;
+    const floor: Record<SideId, boolean> = {
+      A: would({ t: 'GIVE_FLOOR', side: 'A' }),
+      B: would({ t: 'GIVE_FLOOR', side: 'B' }),
+    };
+    return {
+      prev: would({ t: 'PREV' }),
+      advance: would({ t: 'ADVANCE' }),
+      adjust: would({ t: 'ADJUST', deltaMs: STEP_15 }),
+      floor,
+    };
+  }, [state, plan]);
 
   /* -------------------------------------------------------------------- effects */
 
@@ -195,11 +209,24 @@ export default function Console(): JSX.Element {
     });
   }, []);
 
-  /* ------------------------------------------------------------------- hotkeys */
+  /* ------------------------------------------------------------------- commands */
 
-  const onHoldProgress = useCallback((action: HotkeyAction, progress: number) => {
-    if (action === 'reset') setResetProgress(progress);
-  }, []);
+  const loadAt = (index: number): void => {
+    dispatch({ t: 'LOAD', cursor: index });
+  };
+
+  const adjust = (deltaMs: number): void => {
+    dispatch({ t: 'ADJUST', deltaMs });
+  };
+
+  const toggleHold = (): void => {
+    dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' });
+  };
+
+  /** One click, like the original's Reset: the segment is back at full time, stopped. */
+  const resetSegment = (): void => {
+    dispatch({ t: 'RESET_SEGMENT' });
+  };
 
   const go = (): void => {
     if (view.hold) {
@@ -207,57 +234,41 @@ export default function Console(): JSX.Element {
       return;
     }
     if (view.phase === 'in' && view.transport === 'running') {
-      doAdvance();
+      dispatch({ t: 'ADVANCE' });
       return;
     }
     dispatch({ t: 'TOGGLE' });
   };
 
-  const adjust = (deltaMs: number): void => {
-    dispatch({ t: 'ADJUST', deltaMs });
-  };
-
-  useHotkeys(
-    'console',
-    {
-      toggle: () => dispatch({ t: 'TOGGLE' }),
-      togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
-      advance: () => doAdvance(),
-      advanceStart: () => doAdvance(true),
-      prev: () => dispatch({ t: 'PREV' }),
-      go,
-      goBack: () => dispatch({ t: 'PREV' }),
-      hold: () => dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' }),
-      reset: () => dispatch({ t: 'RESET_SEGMENT' }),
-      // SWAP is hidden and its binding goes inert in the same breath: an omitted handler
-      // prevents no default and does nothing at all.
-      swap: swapAllowed ? () => dispatch({ t: 'SWAP' }) : undefined,
-      plus15: () => adjust(STEP_15),
-      minus15: () => adjust(-STEP_15),
-      plus60: () => adjust(STEP_60),
-      minus60: () => adjust(-STEP_60),
-      plus5: () => adjust(STEP_5),
-      minus5: () => adjust(-STEP_5),
-      floorA: isChess ? () => dispatch({ t: 'GIVE_FLOOR', side: 'A' }) : undefined,
-      floorB: isChess ? () => dispatch({ t: 'GIVE_FLOOR', side: 'B' }) : undefined,
-      bankA: hasBank.A ? () => dispatch({ t: 'BANK_DRAW', side: 'A' }) : undefined,
-      bankB: hasBank.B ? () => dispatch({ t: 'BANK_DRAW', side: 'B' }) : undefined,
-      undo: () => undo(),
-      redo: () => redo(),
-      loadCursored: () => loadAt(selected),
-      editor: () => navigate(ROUTES.edit),
-      escape: view.bankDraw === null ? undefined : () => dispatch({ t: 'BANK_END' }),
-    },
-    { onHoldProgress },
-  );
+  useHotkeys('console', {
+    toggle: () => dispatch({ t: 'TOGGLE' }),
+    togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
+    advance: () => dispatch({ t: 'ADVANCE' }),
+    advanceStart: () => dispatch({ t: 'ADVANCE', start: true }),
+    prev: () => dispatch({ t: 'PREV' }),
+    go,
+    goBack: () => dispatch({ t: 'PREV' }),
+    hold: toggleHold,
+    reset: resetSegment,
+    // SWAP is hidden and its binding goes inert in the same breath: an omitted handler
+    // prevents no default and does nothing at all.
+    swap: swapAllowed ? () => dispatch({ t: 'SWAP' }) : undefined,
+    plus15: () => adjust(STEP_15),
+    minus15: () => adjust(-STEP_15),
+    plus60: () => adjust(STEP_60),
+    minus60: () => adjust(-STEP_60),
+    plus5: () => adjust(STEP_5),
+    minus5: () => adjust(-STEP_5),
+    floorA: isChess ? () => dispatch({ t: 'GIVE_FLOOR', side: 'A' }) : undefined,
+    floorB: isChess ? () => dispatch({ t: 'GIVE_FLOOR', side: 'B' }) : undefined,
+    loadCursored: () => loadAt(selected),
+    editor: () => navigate(ROUTES.edit),
+  });
 
   /* ----------------------------------------------------------------------- teams */
 
   const floorLevels = useMemo<Record<SideId, FloorLevel>>(() => {
     const off: Record<SideId, FloorLevel> = { A: 'off', B: 'off' };
-    if (view.bankDraw !== null) {
-      return view.bankDraw === 'A' ? { A: 'on', B: 'off' } : { A: 'off', B: 'on' };
-    }
     if (!ps) return off;
     if (ps.kind === 'chess') {
       if (!view.floor) return off;
@@ -273,7 +284,7 @@ export default function Console(): JSX.Element {
       A: ps.liveSides.includes('A') ? 'half' : 'off',
       B: ps.liveSides.includes('B') ? 'half' : 'off',
     };
-  }, [ps, view.bankDraw, view.floor, view.transport]);
+  }, [ps, view.floor, view.transport]);
 
   const speakingId = view.currentSpeaker?.id ?? null;
   const onDeckId = view.onDeck?.id ?? null;
@@ -326,47 +337,27 @@ export default function Console(): JSX.Element {
   const canStart =
     !isChess || view.floor !== null || firstFloor !== 'operator' || view.phase !== 'in';
 
-  const bankSide = view.bankDraw;
-  const bankPlan = bankSide === null ? null : plan.banks[bankSide];
+  /** Whose clock this is — announced with the time to assistive tech, never printed. */
+  const clockOwner =
+    mode === 'speech'
+      ? (ps?.speaker?.name ?? '')
+      : mode === 'shared' && ps
+        ? ps.participants.map((sp) => sp.name).join(' · ')
+        : '';
 
-  /** Who the centre clock belongs to, named. Never a bare index. */
-  const coreName =
-    mode === 'bank' && bankSide !== null
-      ? sideLabels[bankSide]
-      : mode === 'speech'
-        ? (ps?.speaker?.name ?? '')
-        : mode === 'shared' && ps
-          ? ps.participants.map((sp) => sp.name).join(' · ')
-          : '';
-
+  // The next segment by its own label and length. Who gives it is on the figures already:
+  // their arrow says so.
   const upNext =
     nextPs === null ? null : (
-      <p className="ucore__next" data-urgent={view.onDeckUrgent ? '' : undefined}>
+      <p className="ucore__next" data-urgent={expired ? '' : undefined}>
         <span className="ucore__nextlabel">{t('st.upNext')}</span>
-        <span className="ucore__nextname">{nextPs.speaker?.name ?? l10n(nextPs.label)}</span>
         <span className="ucore__nextrole">{l10n(nextPs.label)}</span>
         <span data-numeric="">{formatTime(nextPs.allottedMs)}</span>
       </p>
     );
 
   let core: JSX.Element;
-  if (mode === 'bank' && bankSide !== null && bankPlan !== null) {
-    core = (
-      <RingCore
-        clockId={bankPlan.id}
-        allottedMs={bankPlan.allottedMs}
-        remainingMs={primary?.remainingMs ?? bankPlan.allottedMs}
-        band={primary?.band ?? 'normal'}
-        fill={primary?.fill ?? 1}
-        transport={primary?.transport ?? 'armed'}
-        label={t('st.prepBank')}
-        status={statusWord}
-        name={coreName}
-        secondsOnly={secondsOnly}
-        armed={armed}
-      />
-    );
-  } else if (mode === 'chess' && ps && chessSides) {
+  if (mode === 'chess' && ps && chessSides) {
     core = (
       <ChessBars
         label={l10n(ps.label)}
@@ -378,6 +369,8 @@ export default function Console(): JSX.Element {
         firstFloorLabel={firstFloor === 'operator' ? '' : sideLabels[firstFloor]}
         swap={swapAllowed}
         onSwap={() => dispatch({ t: 'SWAP' })}
+        canGiveFloor={can.floor}
+        onGiveFloor={(side) => dispatch({ t: 'GIVE_FLOOR', side })}
         secondsOnly={secondsOnly}
       />
     );
@@ -392,7 +385,7 @@ export default function Console(): JSX.Element {
         transport={primary?.transport ?? 'armed'}
         label={l10n(ps.label)}
         status={statusWord}
-        name={coreName}
+        name={clockOwner}
         secondsOnly={secondsOnly}
         armed={armed}
       >
@@ -471,41 +464,29 @@ export default function Console(): JSX.Element {
           onDeckId={view.onDeck?.side === 'A' ? onDeckId : null}
           spokenIds={spokenIds}
           overlay={overlay}
-          urgent={view.onDeckUrgent}
+          urgent={expired}
           floor={floorLevels.A}
           lit={ps === null ? false : ps.liveSides.includes('A')}
-          hasBank={hasBank.A}
-          bankMs={view.bank.A}
-          drawing={view.bankDraw === 'A'}
-          onDrawBank={() => dispatch({ t: 'BANK_DRAW', side: 'A' })}
         />
 
         <div className="uconsole__centre">
           {core}
 
           <Transport
-        phase={view.phase}
-        transport={view.transport}
-        hold={view.hold}
-        chess={isChess}
-        canStart={canStart}
-        sideLabels={sideLabels}
-        canPrev={state.cursor > 0}
-        canUndo={view.canUndo}
-        canRedo={view.canRedo}
-        resetProgress={resetProgress}
-        on={{
-          toggle: () => dispatch({ t: 'TOGGLE' }),
-          togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
-          advance: () => doAdvance(),
-          prev: () => dispatch({ t: 'PREV' }),
-          reset: () => dispatch({ t: 'RESET_SEGMENT' }),
-          hold: () => dispatch(view.hold ? { t: 'RELEASE' } : { t: 'HOLD' }),
-          adjust,
-          floor: (side) => dispatch({ t: 'GIVE_FLOOR', side }),
-          undo: () => undo(),
-          redo: () => redo(),
-        }}
+            phase={view.phase}
+            transport={view.transport}
+            hold={view.hold}
+            chess={isChess}
+            canStart={canStart}
+            canAdjust={can.adjust}
+            canReset={view.phase === 'in' && !view.hold}
+            on={{
+              toggle: () => dispatch({ t: 'TOGGLE' }),
+              togglePause: () => dispatch({ t: 'TOGGLE', pauseInChess: true }),
+              reset: resetSegment,
+              hold: toggleHold,
+              adjust,
+            }}
           />
         </div>
 
@@ -518,13 +499,9 @@ export default function Console(): JSX.Element {
           onDeckId={view.onDeck?.side === 'B' ? onDeckId : null}
           spokenIds={spokenIds}
           overlay={overlay}
-          urgent={view.onDeckUrgent}
+          urgent={expired}
           floor={floorLevels.B}
           lit={ps === null ? false : ps.liveSides.includes('B')}
-          hasBank={hasBank.B}
-          bankMs={view.bank.B}
-          drawing={view.bankDraw === 'B'}
-          onDrawBank={() => dispatch({ t: 'BANK_DRAW', side: 'B' })}
         />
       </div>
 
@@ -535,19 +512,10 @@ export default function Console(): JSX.Element {
         selected={selected}
         onSelect={setSelected}
         onLoad={loadAt}
-        onNext={() => doAdvance()}
-        nextDisabled={view.phase === 'complete'}
-      />
-
-
-
-      <UndoChip
-        name={advancedTo}
-        onUndo={() => {
-          undo();
-          setAdvancedTo(null);
-        }}
-        onExpire={() => setAdvancedTo(null)}
+        onPrev={() => dispatch({ t: 'PREV' })}
+        prevDisabled={!can.prev}
+        onNext={() => dispatch({ t: 'ADVANCE' })}
+        nextDisabled={!can.advance}
       />
 
       <span className="sr-only" aria-live="polite">

@@ -10,15 +10,15 @@ const cx = (id: string): SharedSegment => ({
   live: ['A', 'B'],
 });
 
-/** 8/3/5 with 8:00 prep banks per side, drawn on demand. */
+/** 8/3/5: constructives, cross-examinations, rebuttals. */
 export const policy: RoundConfig = {
   v: SCHEMA_VERSION,
   id: 'policy',
   presetRef: 'policy',
   title: { en: 'Policy (Cross-Examination)', zh: '政策辩论' },
   sides: [
-    side('A', 'Affirmative', '正方', COLOR_A, 480_000),
-    side('B', 'Negative', '反方', COLOR_B, 480_000),
+    side('A', 'Affirmative', '正方', COLOR_A),
+    side('B', 'Negative', '反方', COLOR_B),
   ],
   speakers: [
     { id: '1ac', side: 'A', name: '1AC', role: { en: 'First Aff Constructive', zh: '正方一辩立论' }, defaultMs: 480_000 },

@@ -6,6 +6,10 @@
  * Button` at the strip's left end. Opposition speeches read as negative numbers, and an arrow
  * runs between consecutive squares so the direction of the round reads at a glance.
  *
+ * Moving between segments lives here, not under the ring: Back sits beside the green ▶▶ and
+ * returns to the previous segment at the time it actually stopped at, which is also how a
+ * mistaken advance is taken back. Both are enabled exactly when the reducer would move.
+ *
  * Everything the console's Ribbon could do, this does: a click SELECTS, a second click (or
  * Enter) LOADS, arrow-key focus walks the strip, and the live square fills to what has
  * ACTUALLY been consumed. A stray click can never restart a leg.
@@ -15,6 +19,7 @@
 
 import type { JSX, KeyboardEvent as ReactKeyboardEvent, Ref } from 'react';
 import { Fragment, useImperativeHandle, useRef } from 'react';
+import { ariaShortcut, shortcutText } from '../app/hotkeys';
 import { useLang } from '../i18n/useLang';
 import { clamp01 } from '../lib/clamp';
 import { formatTime } from '../lib/format';
@@ -36,6 +41,9 @@ export interface TimelineProps {
   selected: number;
   onSelect: (index: number) => void;
   onLoad: (index: number) => void;
+  /** Back one segment, at its remembered time. */
+  onPrev: () => void;
+  prevDisabled: boolean;
   /** The green double-chevron at the strip's left end. */
   onNext: () => void;
   nextDisabled: boolean;
@@ -48,6 +56,8 @@ export function Timeline({
   selected,
   onSelect,
   onLoad,
+  onPrev,
+  prevDisabled,
   onNext,
   nextDisabled,
   ref,
@@ -89,19 +99,34 @@ export function Timeline({
 
   return (
     <div className="tline">
-      <button
-        type="button"
-        className="tline__next"
-        onClick={onNext}
-        disabled={nextDisabled}
-        aria-keyshortcuts="N"
-      >
-        <span className="tline__chev" aria-hidden="true">
-          <Icon name="next" size={16} />
-          <Icon name="next" size={16} />
-        </span>
-        <span className="tline__nextlabel">{t('t.next')}</span>
-      </button>
+      <div className="tline__nav">
+        <button
+          type="button"
+          className="tline__prev"
+          onClick={onPrev}
+          disabled={prevDisabled}
+          aria-keyshortcuts={ariaShortcut('prev')}
+          title={`${t('t.back')} · ${shortcutText('prev')}`}
+        >
+          <Icon name="prev" size={16} />
+          <span className="tline__navlabel">{t('t.back')}</span>
+        </button>
+
+        <button
+          type="button"
+          className="tline__next"
+          onClick={onNext}
+          disabled={nextDisabled}
+          aria-keyshortcuts={ariaShortcut('advance')}
+          title={`${t('t.next')} · ${shortcutText('advance')}`}
+        >
+          <span className="tline__chev" aria-hidden="true">
+            <Icon name="next" size={16} />
+            <Icon name="next" size={16} />
+          </span>
+          <span className="tline__navlabel">{t('t.next')}</span>
+        </button>
+      </div>
 
       <div className="tline__strip">
         <div

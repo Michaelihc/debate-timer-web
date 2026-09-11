@@ -21,8 +21,8 @@ which was built in Unity as a Windows desktop app.
 - **Seven format presets.** Chinese Academic 4v4 (default), British Parliamentary, World Schools,
   Lincoln-Douglas, Policy/CX, Public Forum, and Blank. Every one is a starting point you can edit.
 - **Free-debate chess clock** for 自由辩论, with per-side clocks and a swap control.
-- **A preparation phase**, with every figure holding a clipboard, plus per-side prep banks drawn
-  mid-round with `Q` / `W`.
+- **A preparation phase**, scheduled in the running order, with every figure holding a clipboard
+  while it runs — as the desktop app shows it.
 - **Bilingual.** English and 简体中文 throughout, switchable mid-round with `L`. Nothing is baked in
   at segment-entry time, so the whole round re-labels instantly.
 - **Share a round as a link.** The entire configuration is compressed into the URL.
@@ -53,6 +53,7 @@ rather than sitting there doing nothing.
 ## Keyboard
 
 The whole round can be run without looking at the keyboard. `?` shows this legend in the app.
+On Windows and Linux `⇧` is Shift and `⌥` is Alt; the app prints the names your keyboard uses.
 
 | Key | Action |
 |---|---|
@@ -65,23 +66,22 @@ The whole round can be run without looking at the keyboard. `?` shows this legen
 | `P` / `PgUp` | Previous segment, at its remembered time |
 | `PgDn` | GO — start, then advance (for a presenter clicker) |
 | `↑` `↓` | ±15s on the current clock (`⇧` for 60s, `⌥` for 5s) |
-| `Q` `W` | Draw a prep bank |
 | `B` `.` | Hold / release the whole round |
-| `R` | Hold to reset the segment |
+| `R` | Reset the segment |
 | `⏎` | Load the segment under the cursor |
-| `⌘ Z` / `⌘ ⇧ Z` | Undo · Redo |
 | `E` | Open the editor |
 | `L` | EN ⇄ 中文 |
 | `M` | Mute cues |
 | `F` | Fullscreen |
-| `⌘ S` | Share |
+| `Ctrl S` (`⌘ S` on a Mac) | Share |
 | `?` | This legend |
 
 ## Notable differences from the Unity version
 
 The behavioural rewrites, beyond the new UI:
 
-- **You can go backwards.** `P` returns to the previous segment at the time it actually stopped at.
+- **You can go backwards.** `P` (or Back, beside Next on the timeline) returns to the previous segment
+  at the time it actually stopped at.
   The original only went forward.
 - **A clock at zero keeps counting up** and every control stays live. The original hid start, pause
   *and* resume at zero, leaving Reset as the only way out.
@@ -101,7 +101,7 @@ The behavioural rewrites, beyond the new UI:
 ```bash
 npm install
 npm run dev        # vite dev server
-npm run test       # vitest — 337 tests
+npm run test       # vitest — 344 tests
 npm run typecheck  # tsc -b
 npm run lint       # oxlint
 npm run build      # production build

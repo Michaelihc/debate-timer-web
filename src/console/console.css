@@ -5,8 +5,8 @@
    measurement below is a PROPORTION of that box rather than a pixel from it:
 
      Topic          (0, 193.5)      450 x 50      centred, top
-     Speakers Pro   (-300, 125)                   left row of figures
-     Speakers Con   (+300, 125)                   right row, mirrored
+     Speakers Pro   (-300, 125)                   left column of figures
+     Speakers Con   (+300, 125)                   right column, mirrored
      Count Down     (0, 44)         314.7 x 248.8 the radial ring, centre
      Timeline       (15.7, -194.4)  650 x 60      squares 31.3 x 30.7, gap 2
      Line (rail)    648 x 10 white, y = -16.7 inside Timeline
@@ -25,10 +25,15 @@
   /* The ring is the screen. Everything else is sized off it. */
   --uc-ring: clamp(168px, min(30vw, 34vh), 380px);
   --uc-fig: clamp(52px, 9vh, 104px);
+  /* Speaker.prefab's on-screen box is 0.3815 wide per unit tall (see unity.css). */
+  --uc-fig-w: calc(var(--uc-fig) * 0.3815);
   --uc-pip: 32px;
 
   position: relative;
   display: grid;
+  /* One column, as wide as the console and never wider: an implicit `auto` track
+     would size itself to the widest band's content and push the screen sideways. */
+  grid-template-columns: minmax(0, 1fr);
   /* motion / the facing teams and the ring / the pip strip. Nothing else: the
      original's bottom band is a Next button, the pips and a rail, full stop. */
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -205,8 +210,8 @@
   padding: 0 var(--s-6);
 }
 
-/* The ring and, directly under it, the transport — the original puts Pause and
-   Reset here rather than in a band along the bottom. */
+/* The ring and, directly under it, the timer controls — the original puts Pause
+   and Reset here rather than in a band along the bottom. */
 .uconsole__centre {
   display: flex;
   flex-direction: column;
@@ -264,85 +269,37 @@
   opacity: 0.45;
 }
 
-/* The gap is set off the figure, not off the space scale: the speech bubble and
-   the next arrow are positioned in the sprite's own units and hang outboard of
-   the figure they belong to, so the room between figures has to scale with it. */
-/* `Speakers Pro` carries a VerticalLayoutGroup, and its children land 69.8 apart
-   on a 67.8-tall figure — a column, nearly touching. Rendering the real scene is
-   what settled this; the anchor rect alone did not. The gap here is a little more
-   generous than 2/67.8 so the speech bubble has somewhere to go. */
+/* `Speakers Pro` / `Speakers Con` carry a VerticalLayoutGroup — spacing 2, no child
+   scaling — so each figure is laid out at its unscaled 67.8 height and drawn at 54.24.
+   Measured off the rendered scene: the column pitch is 69.8 / 54.24 = 1.2869 figure
+   heights, a gap of 0.2869.
+
+   The overlays hang off the figure, so the list reserves their room: the speech and
+   group bubbles rise 0.475 of a figure above its top and reach 2.5719 figure widths
+   inboard, and the next arrow starts 1.7031 widths outboard. Nothing is clipped at the
+   screen edge and nothing runs into the team header. */
 .uteam__figs {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: calc(var(--uc-fig) * 0.46);
+  align-items: flex-start;
+  gap: calc(var(--uc-fig) * 0.2869);
   margin: 0;
-  padding: calc(var(--uc-fig) * 0.34) 0 0;
+  padding-block: calc(var(--uc-fig) * 0.475) 0;
+  padding-inline: calc(var(--uc-fig-w) * 1.7031) calc(var(--uc-fig-w) * 2.5719);
   list-style: none;
 }
 
-/* The con side is mirrored, so its first speaker sits at the outer edge too. */
+/* The con side faces inward: its arrow room is on the right, its bubble room on the left. */
 .uteam[data-side='B'] .uteam__figs {
-  align-items: stretch;
+  padding-inline: calc(var(--uc-fig-w) * 2.5719) calc(var(--uc-fig-w) * 1.7031);
 }
 
 .uteam__fig {
   display: flex;
 }
 
-/* A column of [figure][name] rows, name inboard, so the outboard slot stays free
-   for the next arrow and the prep clipboard. */
 .uteam .udeb {
   --fig-h: var(--uc-fig);
-  align-items: center;
-  gap: var(--s-3);
-}
-
-.uteam .udeb__name {
-  max-width: 9ch;
-  font-size: var(--t-meta);
-}
-
-.uteam__bank {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-3);
-  min-height: var(--s-7);
-  padding: 0 var(--s-4);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-0);
-  background: transparent;
-  color: var(--text-mid);
-  font-family: inherit;
-  cursor: pointer;
-  transition:
-    border-color var(--d-fast) var(--ease-out),
-    color var(--d-fast) var(--ease-out);
-}
-
-.uteam__bank:hover {
-  border-color: var(--rule-strong);
-  color: var(--text-hi);
-}
-
-.uteam__bank[data-drawing] {
-  border-color: var(--lime);
-  color: var(--lime);
-}
-
-.uteam__banklabel {
-  font-size: var(--t-cap);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.uteam__banktime {
-  font-size: var(--t-meta);
-  font-variant-numeric: tabular-nums;
-}
-
-.uteam__bank[data-over] .uteam__banktime {
-  color: var(--danger);
 }
 
 /* ==========================================================================
@@ -393,14 +350,6 @@
   text-align: center;
 }
 
-.ucore__name {
-  margin: 0;
-  font-size: var(--t-name);
-  font-weight: 600;
-  color: var(--text-hi);
-  text-wrap: balance;
-}
-
 .ucore__label {
   display: flex;
   flex-wrap: wrap;
@@ -437,6 +386,8 @@
   color: var(--lime);
 }
 
+/* "Up next" names the next segment by its own label and length. Who gives it is on
+   the figures: their arrow says so. */
 .ucore__next {
   display: flex;
   flex-wrap: wrap;
@@ -455,17 +406,16 @@
   color: var(--text-lo);
 }
 
-.ucore__nextname {
+.ucore__nextrole {
   color: var(--text-hi);
 }
 
-.ucore__nextrole,
 .ucore__next [data-numeric] {
   font-size: var(--t-meta);
   color: var(--text-lo);
 }
 
-.ucore__next[data-urgent] .ucore__nextname {
+.ucore__next[data-urgent] .ucore__nextrole {
   color: var(--lime);
 }
 
@@ -550,11 +500,26 @@
   font-size: calc(var(--uc-ring) * 0.14);
 }
 
+/* One slot under each side's own time: who has the floor while that side runs,
+   otherwise the button that gives it the floor. Fixed height, so the bars never jump. */
+.ubar__slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--s-8);
+}
+
 .ubar__word {
   font-size: var(--t-cap);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-lo);
+}
+
+.ubar__give {
+  min-height: var(--s-7);
+  padding: 0 var(--s-4);
+  font-size: var(--t-meta);
 }
 
 .uchess__mid {
@@ -600,7 +565,7 @@
 }
 
 /* ==========================================================================
-   The timeline strip — squares over a white rail, Next at the left end.
+   The timeline strip — squares over a white rail, Back and Next at the left end.
    ========================================================================== */
 
 .tline {
@@ -608,6 +573,47 @@
   align-items: center;
   gap: var(--s-4);
   padding: var(--s-3) var(--s-5) var(--s-4);
+}
+
+/* Segment navigation. Next is the original's green button; Back sits beside it,
+   outlined, so the green stays the one loud thing on the strip. */
+.tline__nav {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-2);
+  flex: none;
+}
+
+.tline__prev {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+  min-height: calc(var(--uc-pip) + var(--s-3));
+  padding: 0 var(--s-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-0);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: inherit;
+  font-size: var(--t-cap);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
+}
+
+.tline__prev:hover:not(:disabled) {
+  border-color: var(--text-mid);
+  color: var(--text-hi);
+}
+
+.tline__prev:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 /* Next Button: 66.9 x 43.3, `--green` fill, a #323232 double chevron. */
@@ -771,16 +777,16 @@
 }
 
 /* ==========================================================================
-   Transport — the original's buttons: light faces, dark labels, square corners.
+   Timer controls — under the ring, and nothing but the timer.
    ========================================================================== */
 
-/* Under the ring, as in the original: a stacked pair of rows rather than a band
-   spanning the window. The primary pair is loud; everything else recedes. */
+/* The loud pair is the original's: a blue Pause and a coral Reset, side by side.
+   Under it the ±15s nudges, then Hold round, quieter still. */
 .transport {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--s-3);
+  gap: var(--s-4);
   padding: 0;
 }
 
@@ -789,21 +795,18 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
-  min-width: 0;
-}
-
-.transport__main,
-.transport__aux {
   justify-content: center;
+  gap: var(--s-3);
+  min-width: 0;
 }
 
 .tbtn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s-2);
   min-height: var(--s-8);
-  padding: 0 var(--s-4);
+  padding: 0 var(--s-5);
   border: 1px solid transparent;
   border-radius: var(--r-0);
   background: var(--pip-idle);
@@ -814,6 +817,8 @@
   cursor: pointer;
   transition:
     background var(--d-fast) var(--ease-out),
+    border-color var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out),
     opacity var(--d-fast) var(--ease-out);
 }
 
@@ -826,109 +831,77 @@
   cursor: default;
 }
 
-.tbtn--primary {
-  background: var(--btn-run);
-  color: var(--text-inv);
-}
-
-.tbtn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--btn-run) 82%, white);
-}
-
-.tbtn--hold {
-  background: var(--btn-reset);
-  color: var(--text-inv);
-}
-
 .tbtn__label {
   white-space: nowrap;
 }
 
-/* Keycaps sit on a light face here, so they invert. */
+/* Keycaps sit on a light or coloured face here, so they invert. */
 .tbtn .keycap {
   border-color: color-mix(in srgb, var(--pip-ink) 30%, transparent);
   background: transparent;
   color: var(--pip-ink);
 }
 
-/* The aux row is the same family, one step quieter and smaller. */
-.transport__aux .tbtn {
-  min-height: var(--s-6);
+/* Pause 120 x 30 at #5E95FF, Reset 120 x 30 at #FF625E: the same size, side by side. */
+.tbtn--primary,
+.tbtn--reset {
+  min-width: calc(var(--uc-ring) * 0.46);
+  color: var(--text-inv);
+}
+
+.tbtn--primary {
+  background: var(--btn-run);
+}
+
+.tbtn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--btn-run) 82%, white);
+}
+
+.tbtn--reset {
+  background: var(--btn-reset);
+}
+
+.tbtn--reset:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--btn-reset) 82%, white);
+}
+
+/* ±15s: outlined, one step down from the pair. */
+.tbtn--step {
+  min-height: var(--s-7);
+  padding: 0 var(--s-4);
+  border-color: var(--rule-strong);
+  background: transparent;
+  color: var(--text-mid);
+  font-size: var(--t-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.tbtn--step:hover:not(:disabled) {
+  background: var(--bg-raised);
+  color: var(--text-hi);
+}
+
+/* Hold round: the quietest thing under the ring. */
+.tbtn--quiet {
+  min-height: var(--s-7);
   padding: 0 var(--s-3);
+  background: transparent;
+  color: var(--text-lo);
   font-size: var(--t-cap);
   font-weight: 500;
+}
+
+.tbtn--quiet:hover:not(:disabled) {
   background: transparent;
   border-color: var(--rule);
-  color: var(--text-lo);
-}
-
-.transport__aux .tbtn:hover:not(:disabled) {
-  background: var(--bg-raised);
-  border-color: var(--rule-strong);
   color: var(--text-hi);
 }
 
-.transport__aux .tbtn--hold {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--btn-reset) 55%, transparent);
-  color: var(--btn-reset);
-}
-
-.transport__aux .tbtn .keycap {
-  border-color: var(--rule-strong);
-  color: var(--text-mid);
-}
-
-.holdbtn.tbtn--hold {
-  min-height: var(--s-7);
-  border-radius: var(--r-0);
-  background: var(--bg-raised);
-  font-size: var(--t-cap);
-}
-
-/* ==========================================================================
-   Undo chip — feedback after an advance, never a confirmation dialog.
-   ========================================================================== */
-
-.undochip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(var(--s-10) + var(--s-6));
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-  padding: var(--s-3) var(--s-5);
-  border: 1px solid var(--lime);
-  border-radius: var(--r-0);
-  background: var(--bg-panel);
-  transform: translateX(-50%);
-}
-
-.undochip__text {
-  font-size: var(--t-meta);
-  color: var(--text-hi);
-}
-
-.undochip__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  min-height: var(--s-6);
-  padding: 0 var(--s-3);
-  border: 0;
-  border-radius: var(--r-0);
-  background: var(--lime);
-  color: var(--text-inv);
-  font-family: inherit;
-  font-size: var(--t-cap);
-  font-weight: 700;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.undochip__btn:hover {
-  background: var(--green);
+.transport__rule {
+  align-self: stretch;
+  width: 1px;
+  margin: var(--s-2) var(--s-2);
+  background: var(--rule);
 }
 
 /* ==========================================================================
@@ -992,11 +965,6 @@
   .uconsole {
     --uc-fig: clamp(48px, 8vh, 76px);
   }
-
-  .uteam .udeb__name {
-    max-width: 8ch;
-    font-size: var(--t-cap);
-  }
 }
 
 @media (max-width: 720px) {
@@ -1015,6 +983,9 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
     gap: var(--s-4) var(--s-3);
+    /* The console scrolls here, so the band keeps its full height instead of being
+       squeezed until the rosters slide under the timeline strip. */
+    min-height: auto;
     padding: 0 var(--s-4);
   }
 
@@ -1036,27 +1007,13 @@
     padding-inline: var(--s-4);
   }
 
-  .transport__aux {
-    margin-inline-start: 0;
-  }
-
-  .tbtn,
-  .transport .holdbtn {
+  .tbtn {
     flex: 1 1 auto;
-    justify-content: center;
     min-height: 56px;
   }
 
   .tbtn .keycaps {
     display: none;
-  }
-
-  .undochip {
-    left: var(--s-4);
-    right: var(--s-4);
-    bottom: var(--s-4);
-    transform: none;
-    justify-content: space-between;
   }
 }
 
@@ -1064,19 +1021,13 @@
   .utop__side--left,
   .utop__sub,
   .utop__round,
-  .tline__nextlabel,
-  .ucore__nextrole {
-    display: none;
-  }
-
-  .uteam .udeb__name {
+  .tline__navlabel {
     display: none;
   }
 }
 
 @media (pointer: coarse) {
-  .tbtn,
-  .transport .holdbtn {
+  .tbtn {
     min-height: 56px;
   }
 }

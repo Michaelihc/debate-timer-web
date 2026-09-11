@@ -8,14 +8,21 @@
  *
  * SWAP acts only when EXACTLY ONE side is running, which is the original's design, so the
  * control is HIDDEN — never a dead button — whenever `canSwap()` is false. Its keybinding
- * goes inert in the same breath. Each side keeps its own start/pause, so the operator opens
- * the segment by giving a side the floor and SWAP appears at that moment.
+ * goes inert in the same breath.
+ *
+ * Handing the floor to a side is done from under THAT side's own time: "Give floor to
+ * Proposition" sits beneath the Proposition bar, "Give floor to Opposition" beneath the
+ * Opposition bar. A side's button is hidden whenever giving it the floor would change
+ * nothing — above all while its own clock is already running — and the slot shows who has
+ * the floor instead.
  *
  * Each side holds its OWN full allotment and keeps counting past zero.
  */
 
 import type { JSX } from 'react';
 import { useEffect, useRef } from 'react';
+import type { HotkeyAction } from '../app/hotkeys';
+import { ariaShortcut, capsOf, shortcutText } from '../app/hotkeys';
 import type { SideId } from '../domain/config';
 import { registerTick } from '../engine/loop';
 import type { ClockView } from '../engine/selectors';
@@ -25,6 +32,7 @@ import { getSession } from '../engine/store';
 import { useLang } from '../i18n/useLang';
 import type { DigitsHandle } from '../ui/Digits';
 import { Digits } from '../ui/Digits';
+import { Keycaps } from '../ui/KeyLegendOverlay';
 
 import { ringState } from './ringState';
 import './console.css';
@@ -51,6 +59,9 @@ export interface ChessBarsProps {
   /** `canSwap()`. False hides the SWAP control outright. */
   swap: boolean;
   onSwap: () => void;
+  /** Per side: would giving it the floor change anything? False hides its button. */
+  canGiveFloor: Record<SideId, boolean>;
+  onGiveFloor: (side: SideId) => void;
   secondsOnly: boolean;
 }
 
@@ -59,11 +70,15 @@ function SideBar({
   live,
   secondsOnly,
   announce,
+  canGive,
+  onGive,
 }: {
   entry: ChessSideView;
   live: boolean;
   secondsOnly: boolean;
   announce: boolean;
+  canGive: boolean;
+  onGive: () => void;
 }): JSX.Element {
   const { t } = useLang();
   const digits = useRef<DigitsHandle>(null);
@@ -73,6 +88,8 @@ function SideBar({
   const band = view?.band ?? 'normal';
   const remaining = view?.remainingMs ?? entry.allottedMs;
   const fill = view?.fill ?? 1;
+  const action: HotkeyAction = entry.side === 'A' ? 'floorA' : 'floorB';
+  const giveLabel = t('c.giveFloor', { side: entry.label });
 
   useEffect(() => {
     const el = box.current;
@@ -121,7 +138,25 @@ function SideBar({
         announce={announce}
         className="ubar__digits"
       />
-      <span className="ubar__word">{live ? t('st.floorA', { side: entry.label }) : t('st.idle')}</span>
+      {/* One slot under the time, so the bars never jump between states. */}
+      <div className="ubar__slot">
+        {live ? (
+          <span className="ubar__word">{t('st.floorA', { side: entry.label })}</span>
+        ) : canGive ? (
+          <button
+            type="button"
+            className="tbtn ubar__give"
+            onClick={onGive}
+            aria-keyshortcuts={ariaShortcut(action)}
+            title={`${giveLabel} · ${shortcutText(action)}`}
+          >
+            <span className="tbtn__label">{giveLabel}</span>
+            <Keycaps caps={capsOf(action)} />
+          </button>
+        ) : (
+          <span className="ubar__word">{t('st.idle')}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -136,6 +171,8 @@ export function ChessBars({
   firstFloorLabel,
   swap,
   onSwap,
+  canGiveFloor,
+  onGiveFloor,
   secondsOnly,
 }: ChessBarsProps): JSX.Element {
   const { t } = useLang();
@@ -149,6 +186,8 @@ export function ChessBars({
           live={a.view?.running === true}
           secondsOnly={secondsOnly}
           announce={floor !== 'B'}
+          canGive={canGiveFloor.A}
+          onGive={() => onGiveFloor('A')}
         />
 
         <div className="uchess__mid">
@@ -166,6 +205,8 @@ export function ChessBars({
           live={b.view?.running === true}
           secondsOnly={secondsOnly}
           announce={floor === 'B'}
+          canGive={canGiveFloor.B}
+          onGive={() => onGiveFloor('B')}
         />
       </div>
 

@@ -2,25 +2,21 @@
  * One team, facing the other across the screen.
  *
  * This is the original's `Speakers Pro` / `Speakers Con` anchor at (-300, 125) / (+300, 125):
- * a row of `Speaker.prefab` figures tinted with the side colour, each carrying its number,
- * the con side mirrored so the two teams look at each other. `<Debater>` is that prefab.
+ * a VerticalLayoutGroup column of `Speaker.prefab` figures tinted with the side colour, each
+ * carrying its number, the con side mirrored so the two teams look at each other.
+ * `<Debater>` is that prefab.
  *
  * The phase overlays are per-PHASE, not per-speaker, exactly as `AnimationController` does
  * it: during prep every figure holds a clipboard, during free debate every figure shows the
  * group icon, and both suppress the speech bubble and the next arrow.
  *
- * The prep bank stays here as a real control — the original had no such thing, and losing
- * it to a repaint would cost the operator a capability.
+ * No names are printed beside the figures — the colour and the number already say who each
+ * one is. The side's own name heads the column.
  */
 
 import type { JSX } from 'react';
-import { useEffect, useRef } from 'react';
 import type { Id, SideId, SpeakerCfg } from '../domain/config';
-import { registerTick } from '../engine/loop';
-import { bankRemaining } from '../engine/selectors';
-import { getSession } from '../engine/store';
 import { useLang } from '../i18n/useLang';
-import { formatTime } from '../lib/format';
 import type { DebaterOverlay, DebaterState } from '../ui/unity/Debater';
 import { Debater } from '../ui/unity/Debater';
 
@@ -44,15 +40,11 @@ export interface TeamColumnProps {
   spokenIds: ReadonlySet<Id>;
   /** Applied to EVERY figure, as the original does. */
   overlay: DebaterOverlay;
-  /** The live clock has expired: the next arrow starts its 1s bob (NextFlash.anim). */
+  /** The live clock has expired: the next figure steps up and its arrow bobs. */
   urgent: boolean;
   floor: FloorLevel;
   /** False while the round is somewhere this side is not on the clock. */
   lit: boolean;
-  hasBank: boolean;
-  bankMs: number;
-  drawing: boolean;
-  onDrawBank: () => void;
 }
 
 export function TeamColumn({
@@ -67,39 +59,14 @@ export function TeamColumn({
   urgent,
   floor,
   lit,
-  hasBank,
-  bankMs,
-  drawing,
-  onDrawBank,
 }: TeamColumnProps): JSX.Element {
   const { t } = useLang();
-  const bankEl = useRef<HTMLSpanElement>(null);
-  const bankBox = useRef<HTMLButtonElement>(null);
-
-  // The bank ticks like any other clock while it is drawn, so the frame loop paints it.
-  useEffect(() => {
-    if (!hasBank) return undefined;
-    let lastText = '';
-    let lastOver = false;
-    return registerTick((n) => {
-      const s = getSession();
-      const ms = bankRemaining(s.state, s.plan, side, n);
-      const text = formatTime(ms);
-      if (text !== lastText) {
-        lastText = text;
-        if (bankEl.current) bankEl.current.textContent = text;
-      }
-      const over = ms < 0;
-      if (over !== lastOver) {
-        lastOver = over;
-        const box = bankBox.current;
-        if (box) {
-          if (over) box.dataset['over'] = '';
-          else delete box.dataset['over'];
-        }
-      }
-    });
-  }, [side, hasBank]);
+  const stateWord: Record<DebaterState, string | null> = {
+    speaking: t('c.speaking'),
+    next: t('st.onDeck'),
+    done: t('c.spoken'),
+    idle: null,
+  };
 
   return (
     <section className="uteam" data-side={side} data-lit={lit ? '' : undefined} aria-label={label}>
@@ -116,12 +83,13 @@ export function TeamColumn({
                 : spokenIds.has(sp.id)
                   ? 'done'
                   : 'idle';
+          const word = stateWord[state];
           return (
             <li key={sp.id} className="uteam__fig">
               <Debater
                 side={side}
                 index={ordinals[sp.id] ?? 0}
-                name={sp.name}
+                srLabel={word === null ? sp.name : `${sp.name}, ${word}`}
                 state={state}
                 overlay={overlay}
                 urgent={urgent && state === 'next'}
@@ -130,24 +98,6 @@ export function TeamColumn({
           );
         })}
       </ul>
-
-      {hasBank ? (
-        <button
-          ref={bankBox}
-          type="button"
-          className="uteam__bank"
-          data-drawing={drawing ? '' : undefined}
-          onClick={onDrawBank}
-          aria-pressed={drawing}
-          aria-label={t('c.drawBank', { side: label })}
-          aria-keyshortcuts={side === 'A' ? 'Q' : 'W'}
-        >
-          <span className="uteam__banklabel">{t('st.prepBank')}</span>
-          <span ref={bankEl} className="uteam__banktime" data-numeric="">
-            {formatTime(bankMs)}
-          </span>
-        </button>
-      ) : null}
     </section>
   );
 }

@@ -9,7 +9,7 @@
 
 import type { JSX } from 'react';
 import type { HotkeyContext, KeyBinding } from '../app/hotkeys';
-import { bindingsForGroup, capsOf } from '../app/hotkeys';
+import { bindingsForGroup, capsOf, displayCaps } from '../app/hotkeys';
 import { translate, useLang } from '../i18n/useLang';
 import { Overlay } from './Overlay';
 
@@ -45,7 +45,8 @@ function Row({ binding, chess }: { binding: KeyBinding; chess: boolean }): JSX.E
   const inert = binding.chessOnly === true && !chess;
   return (
     <li className="legend__row" data-inert={inert ? '' : undefined}>
-      <Keycaps caps={binding.caps} />
+      {/* ⌘ ⇧ ⌥ on a Mac, Ctrl Shift Alt everywhere else. */}
+      <Keycaps caps={displayCaps(binding.caps)} />
       <span className="legend__text">
         <span className="t-ctl" lang="en">
           {translate('en', binding.label)}
