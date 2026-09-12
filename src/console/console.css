@@ -723,11 +723,12 @@
   outline-offset: var(--focus-offset);
 }
 
-/* Consumption, painted by the frame loop — the live square fills from the bottom. */
+/* Consumption, painted by the frame loop. It drains from the top down, the way a level
+   falls: what is left of the square's bright face is what is left of the segment. */
 .tline__fill {
   position: absolute;
   left: 0;
-  bottom: 0;
+  top: 0;
   width: 100%;
   height: 0;
   background: var(--pip-ink);

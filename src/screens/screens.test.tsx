@@ -41,7 +41,7 @@ describe('Launch', () => {
 
   it('states the shape of a format before it is chosen', () => {
     render(<Launch />);
-    // 4v4 · 10 segments · 34:00 — speaker count, structure and length, on the card.
+    // 4v4 · 10 segments · 35:00 — speaker count, structure and length, on the card.
     expect(screen.getByText(/4v4 · 10 segments · /)).toBeTruthy();
     expect(document.querySelectorAll('.lc__card .ribbon--thumb').length).toBeGreaterThan(0);
   });

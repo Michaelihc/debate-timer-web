@@ -115,13 +115,13 @@ test('nothing is printed beside the figures, and no speaker name under the ring'
 
 test('before the round the ring holds the first segment’s time, and Start arms it there', () => {
   const { segments, totalMs } = getSession().plan;
-  // The preset opens on its 5:00 prep phase, in a 34:00 round.
+  // The preset opens on its 5:00 prep phase, in a 35:00 round.
   expect(segments[0]?.allottedMs).toBe(300_000);
-  expect(totalMs).toBe(2_040_000);
+  expect(totalMs).toBe(2_100_000);
   render(<Console />);
 
   expect(el('.ucore__ring').textContent).toContain('5:00');
-  expect(el('.ucore__ring').textContent).not.toContain('34:00');
+  expect(el('.ucore__ring').textContent).not.toContain('35:00');
   const caption = el('.ucore__caption').textContent ?? '';
   expect(caption).toContain('Begins shortly');
   // "Up next" names the segment; its length is already the big number in the ring.

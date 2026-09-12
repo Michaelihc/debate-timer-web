@@ -176,8 +176,8 @@ describe('Editor', () => {
     expect(within(rows()[10] as HTMLElement).getByLabelText("Segment 11 · 正一's time")).toHaveValue('3:30');
     // No speech has a time of its own, so nothing is marked.
     expect(opening.querySelector('.step__note')).toBeNull();
-    // 14:30 before; +0:30 on the opening, +3:30 for the repeat.
-    expect(screen.getByText('Floor time with free debate: Proposition 18:30 · Opposition 14:30')).toBeInTheDocument();
+    // 15:00 before; +0:30 on the opening, +3:30 for the repeat.
+    expect(screen.getByText('Floor time with free debate: Proposition 19:00 · Opposition 15:00')).toBeInTheDocument();
   });
 
   it('a time for one speech lives in its details, and is marked only while it differs', () => {
@@ -221,7 +221,7 @@ describe('Editor', () => {
     expect(row.querySelector('.step__note')).toBeNull();
     typeTime(within(row).getByLabelText("Segment 2 · 正一's time"), '3:30', 'enter');
     expect(row.querySelector('.step__note')).toBeNull();
-    expect(screen.getByText('Floor time with free debate: Proposition 15:00 · Opposition 14:30')).toBeInTheDocument();
+    expect(screen.getByText('Floor time with free debate: Proposition 15:30 · Opposition 15:00')).toBeInTheDocument();
   });
 
   it('the roster heads count speakers only; the strip has the one set of side totals, and says what it counts', () => {
@@ -230,7 +230,7 @@ describe('Editor', () => {
     for (const head of within(roster).getAllByRole('heading', { level: 3 })) {
       expect(head.textContent).not.toMatch(/\d:\d\d/);
     }
-    expect(screen.getByText('Floor time with free debate: Proposition 14:30 · Opposition 14:30')).toHaveAttribute(
+    expect(screen.getByText('Floor time with free debate: Proposition 15:00 · Opposition 15:00')).toHaveAttribute(
       'title',
       "Each side's speeches plus its free-debate clock. Prep, shared clocks and breaks are not counted.",
     );
@@ -432,7 +432,7 @@ describe('leaving the editor', () => {
 describe('time boxes', () => {
   it('an unreadable time says so, marks the box invalid, and puts the old value back', () => {
     render(<Editor />);
-    const box = within(rows()[5] as HTMLElement).getByLabelText("Segment 6 · 正三's time");
+    const box = within(rows()[4] as HTMLElement).getByLabelText("Segment 5 · 正三's time");
     typeTime(box, 'abc', 'enter');
 
     expect(box).toHaveValue('2:00');
@@ -449,7 +449,7 @@ describe('time boxes', () => {
 
   it('says how a bare number will be read before it is committed', () => {
     render(<Editor />);
-    const box = within(rows()[5] as HTMLElement).getByLabelText("Segment 6 · 正三's time");
+    const box = within(rows()[4] as HTMLElement).getByLabelText("Segment 5 · 正三's time");
     fireEvent.focus(box);
     fireEvent.change(box, { target: { value: '150' } });
     expect(screen.getByText('150 sec → 2:30')).toBeInTheDocument();
