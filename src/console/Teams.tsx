@@ -42,6 +42,11 @@ export interface TeamColumnProps {
   overlay: DebaterOverlay;
   /** The live clock has expired: the next figure steps up and its arrow bobs. */
   urgent: boolean;
+  /**
+   * A clock is running right now. The speaking figure carries its microphone only then —
+   * the original plays Speak.anim with the clock, not with the turn.
+   */
+  running: boolean;
   floor: FloorLevel;
   /** False while the round is somewhere this side is not on the clock. */
   lit: boolean;
@@ -57,6 +62,7 @@ export function TeamColumn({
   spokenIds,
   overlay,
   urgent,
+  running,
   floor,
   lit,
 }: TeamColumnProps): JSX.Element {
@@ -91,6 +97,7 @@ export function TeamColumn({
                 index={ordinals[sp.id] ?? 0}
                 srLabel={word === null ? sp.name : `${sp.name}, ${word}`}
                 state={state}
+                live={state === 'speaking' && running}
                 overlay={overlay}
                 urgent={urgent && state === 'next'}
               />

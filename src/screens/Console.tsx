@@ -90,6 +90,9 @@ function useExpired(): boolean {
   return expired;
 }
 
+/** Worst first wins: the screen answers to the most urgent clock that is running. */
+const BANDS: readonly string[] = ['normal', 'warning', 'final10', 'over'];
+
 export default function Console(): JSX.Element {
   const { t, l10n, lang, toggleLang } = useLang();
   const session = useRound();
@@ -99,6 +102,7 @@ export default function Console(): JSX.Element {
 
   const timelineRef = useRef<TimelineHandle>(null);
   const flashRef = useRef<HTMLSpanElement>(null);
+  const vignetteRef = useRef<HTMLSpanElement>(null);
   const [selected, setSelected] = useState(0);
   const expired = useExpired();
 
@@ -212,15 +216,39 @@ export default function Console(): JSX.Element {
   }, [state.cursor, plan.segments.length]);
 
   // The current square fills to ACTUAL consumption, sixty times a second, without a render.
+  // The same frame decides how red the screen is: the wash follows whichever clock is
+  // running, so it comes up the instant a speech passes zero and stays up for as long as the
+  // operator lets the speaker finish.
   useEffect(() => {
+    let lastBand = '';
     return registerTick((n) => {
       const s = getSession();
       const i = s.state.cursor;
       const current = i >= 0 ? s.plan.segments[i] : undefined;
-      if (!current) return;
-      let used = 0;
-      for (const id of current.clockIds) used += elapsedMs(s.state, id, n);
-      timelineRef.current?.write(i, used);
+      let band = 'normal';
+      if (current) {
+        let used = 0;
+        for (const id of current.clockIds) used += elapsedMs(s.state, id, n);
+        timelineRef.current?.write(i, used);
+
+        let anyRunning = false;
+        for (const id of current.clockIds) {
+          const v = clockView(s.state, s.plan, id, n);
+          if (!v?.running) continue;
+          anyRunning = true;
+          if (BANDS.indexOf(v.band) > BANDS.indexOf(band)) band = v.band;
+        }
+        // Nothing is running: the segment's own clock still says whether it is past its
+        // time, so pausing in overtime does not wash the red off the screen.
+        if (!anyRunning) {
+          band = clockView(s.state, s.plan, current.primaryClockId, n)?.band ?? 'normal';
+        }
+      }
+      const el = vignetteRef.current;
+      if (el && band !== lastBand) {
+        lastBand = band;
+        el.dataset['band'] = band;
+      }
     });
   }, []);
 
@@ -459,6 +487,9 @@ export default function Console(): JSX.Element {
         }}
       />
 
+      {/* Held for as long as the clock is past its time; the frame loop above sets the band. */}
+      <span ref={vignetteRef} className="u-vignette" data-band="normal" aria-hidden="true" />
+
       <TopBar
         title={l10n(config.title)}
         segmentIndex={Math.min(Math.max(state.cursor + 1, 0), plan.segments.length)}
@@ -488,6 +519,7 @@ export default function Console(): JSX.Element {
           spokenIds={spokenIds}
           overlay={overlay}
           urgent={expired}
+          running={view.transport === 'running'}
           floor={floorLevels.A}
           lit={ps === null ? false : ps.liveSides.includes('A')}
         />
@@ -521,6 +553,7 @@ export default function Console(): JSX.Element {
           spokenIds={spokenIds}
           overlay={overlay}
           urgent={expired}
+          running={view.transport === 'running'}
           floor={floorLevels.B}
           lit={ps === null ? false : ps.liveSides.includes('B')}
         />

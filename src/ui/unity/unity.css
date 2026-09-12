@@ -9,7 +9,8 @@
    Motion is the original's, to the keyframe:
      --d-fade  0.167s   Speak.anim / NextAppear.anim alpha ramps
      --d-bob   1s       NextFlash.anim, looping
-     --d-flash 1s       flash.anim, one shot, peaking at alpha 0.3843 at 0.5s
+     --d-flash 1s       flash.anim, one shot (Unity peaks at alpha 0.3843; this port
+                        peaks higher and washes the edges, see the flash section)
    ========================================================================== */
 
 .u-sr {
@@ -242,10 +243,16 @@
   filter: invert(1);
 }
 
-.udeb[data-state='speaking'] .udeb__badge--speech,
 .udeb[data-state='next'] .udeb__badge--next,
 .udeb[data-overlay='prep'] .udeb__badge--clipboard,
 .udeb[data-overlay='free'] .udeb__badge--group {
+  opacity: 1;
+}
+
+/* Speak.anim runs with the clock, not with the turn: the microphone fades in when the
+   speech starts and fades out the moment it is paused or stopped, so the room can tell a
+   running speech from a stopped one without reading the digits. */
+.udeb[data-state='speaking'][data-live] .udeb__badge--speech {
   opacity: 1;
 }
 
@@ -304,18 +311,29 @@
 
 /* --- flash.anim: the warning pulse across the whole surface -------------- */
 
+/* One wash, two uses: the one-shot cue flash and the held overtime vignette. Clear in the
+   middle where the ring and the digits are, deepening to the state colour at the edges, so
+   it never sits between the operator and the number they are reading. Built out of the
+   state token, so it carries no colour of its own. */
+:root {
+  --u-wash: radial-gradient(ellipse 82% 72% at 50% 50%, transparent 38%, var(--state-over) 100%);
+}
+
 @keyframes u-flash {
   0% {
     opacity: 0;
   }
   50% {
-    opacity: 0.3843;
+    opacity: 0.78;
   }
   100% {
     opacity: 0;
   }
 }
 
+/* Unity peaks this at alpha 0.3843, which a projector's gamma and a lit room between them
+   turn into almost nothing. It peaks higher here, and the border is backed by a wash that
+   darkens the edges toward the middle, so the cue carries to the back of the room. */
 .u-flash {
   position: absolute;
   inset: 0;
@@ -326,7 +344,30 @@
      same red reads identically and costs no bytes. A border, not a box-shadow —
      the app has none anywhere. */
   box-sizing: border-box;
-  border: 12px solid var(--state-over);
+  border: 14px solid var(--state-over);
+  background: var(--u-wash);
+}
+
+/* --- past zero: the wash that stays ---------------------------------------
+
+   The flash above is one second long; a speech can run over by minutes. While the clock
+   that is running is past its time the edges of the screen stay washed in the same red,
+   held rather than pulsing — a loop this size would be unwatchable for that long, and the
+   room needs to see that a speech is over without reading the digits from the back.
+
+   It is the running clock that decides, so it lifts the moment the operator moves on. */
+.u-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--u-wash);
+  transition: opacity var(--d-base) var(--ease-out);
+}
+
+.u-vignette[data-band='over'] {
+  opacity: 0.55;
 }
 
 .u-flash[data-fire] {

@@ -64,7 +64,8 @@ function Key({
   disabled = false,
 }: {
   onClick: () => void;
-  icon: IconName;
+  /** Left off where the label already draws the glyph: −15s carries its own sign. */
+  icon?: IconName;
   label: string;
   action: HotkeyAction;
   tone: Tone;
@@ -82,7 +83,7 @@ function Key({
       aria-keyshortcuts={ariaShortcut(action)}
       title={`${label} · ${shortcutText(action)}`}
     >
-      <Icon name={icon} size={small ? 14 : 18} />
+      {icon === undefined ? null : <Icon name={icon} size={small ? 14 : 18} />}
       <span className="tbtn__label">{label}</span>
       {caps ? <Keycaps caps={capsOf(action)} /> : null}
     </button>
@@ -143,9 +144,10 @@ export function Transport({
       </div>
 
       <div className="transport__aux">
+        {/* No icon: the label is "−15s", so a minus glyph beside it would be the same
+            sign twice. */}
         <Key
           onClick={() => on.adjust(-STEP_MS)}
-          icon="minus"
           label={t('t.minus15')}
           action="minus15"
           tone="step"
@@ -153,7 +155,6 @@ export function Transport({
         />
         <Key
           onClick={() => on.adjust(STEP_MS)}
-          icon="plus"
           label={t('t.plus15')}
           action="plus15"
           tone="step"

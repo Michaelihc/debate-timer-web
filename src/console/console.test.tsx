@@ -316,6 +316,55 @@ test('the on-deck figure waits half-lit, then steps up once the live clock runs 
   expect(onDeck().hasAttribute('data-urgent')).toBe(false);
 });
 
+test('the microphone runs with the clock, and past zero the screen stays washed', async () => {
+  const i = firstSpeechIndex();
+  act(() => {
+    dispatch({ t: 'LOAD', cursor: i });
+  });
+  render(<Console />);
+  await frames();
+
+  const speaker = (): HTMLElement => el('.uteam .udeb[data-state="speaking"]');
+  const wash = (): string => el('.u-vignette').dataset['band'] ?? '';
+
+  // Loaded but not started: it is their turn, and nothing is being said yet.
+  expect(speaker().hasAttribute('data-live')).toBe(false);
+
+  act(() => {
+    dispatch({ t: 'START' });
+  });
+  await frames();
+  expect(speaker().hasAttribute('data-live')).toBe(true);
+  expect(wash()).toBe('normal');
+
+  act(() => {
+    dispatch({ t: 'PAUSE' });
+  });
+  await frames();
+  expect(speaker().hasAttribute('data-live')).toBe(false);
+
+  // Past zero the wash comes up, and it stays up while the speaker is allowed to finish.
+  act(() => {
+    dispatch({ t: 'START' });
+    dispatch({ t: 'ADJUST', deltaMs: -(remainingOf(i) + 1_000) });
+  });
+  await frames();
+  expect(wash()).toBe('over');
+
+  act(() => {
+    dispatch({ t: 'PAUSE' });
+  });
+  await frames();
+  expect(wash()).toBe('over');
+
+  // Moving on clears it: the next segment has its full time.
+  act(() => {
+    dispatch({ t: 'ADVANCE' });
+  });
+  await frames();
+  expect(wash()).toBe('normal');
+});
+
 test('there is no prep bank on the console: no chip under a roster, and Q and W do nothing', () => {
   for (const presetKey of PRESET_KEYS) {
     for (const side of instantiatePreset(presetKey).sides) expect(side.prepBankMs).toBe(0);

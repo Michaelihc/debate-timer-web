@@ -32,6 +32,12 @@ export interface DebaterProps {
   /** Read to assistive tech only — never drawn. */
   srLabel?: string;
   state: DebaterState;
+  /**
+   * Their clock is actually running. The microphone is Speak.anim, and the original plays
+   * it with the clock: it appears when the speech starts and fades out again the moment the
+   * operator pauses or stops it.
+   */
+  live?: boolean;
   /** Phase overlays the original shows on every figure at once. */
   overlay?: DebaterOverlay;
   /** True once the live clock has run out: the arrow bobs and the figure steps up to full. */
@@ -44,6 +50,7 @@ export function Debater({
   index,
   srLabel,
   state,
+  live = false,
   overlay = 'none',
   urgent = false,
   onSelect,
@@ -53,6 +60,7 @@ export function Debater({
     <Tag
       className={`udeb udeb--${side === 'A' ? 'a' : 'b'}`}
       data-state={state}
+      data-live={live ? '' : undefined}
       data-overlay={overlay}
       data-urgent={urgent ? '' : undefined}
       {...(onSelect ? { type: 'button' as const, onClick: onSelect } : {})}
