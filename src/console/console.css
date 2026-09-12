@@ -23,7 +23,7 @@
 
 .uconsole {
   /* The ring is the screen. Everything else is sized off it. */
-  --uc-ring: clamp(168px, min(30vw, 34vh), 380px);
+  --uc-ring: clamp(168px, min(30vw, 36vh), 420px);
   --uc-fig: clamp(52px, 9vh, 104px);
   /* Speaker.prefab's on-screen box is 0.3815 wide per unit tall (see unity.css). */
   --uc-fig-w: calc(var(--uc-fig) * 0.3815);
@@ -423,10 +423,11 @@
   gap: var(--s-3);
 }
 
+/* The same word appears on the column head at the screen edge; one treatment for both. */
 .ubar__name {
   font-size: var(--t-cap);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-lo);
 }
@@ -702,6 +703,7 @@
   overflow: hidden;
   transition:
     background var(--d-fast) var(--ease-out),
+    transform var(--d-base) var(--ease-out),
     opacity var(--d-fast) var(--ease-out);
 }
 
@@ -709,8 +711,11 @@
   opacity: 0.4;
 }
 
+/* The square the round is on stands slightly proud of the rest of the strip, so the eye
+   finds it without hunting for the green. */
 .tline__pip[data-state='current'] {
   background: var(--pip-current);
+  transform: scale(1.1);
 }
 
 /* The keyboard's pick. Focusing a square picks it, so while the keyboard is on the strip
@@ -862,6 +867,23 @@
   white-space: nowrap;
 }
 
+/* One cell holding the primary button and a hidden copy of it carrying the longest label
+   the round can put there. The button stretches to that cell, so neither it nor Reset
+   moves as the label changes. */
+.transport__slot {
+  display: grid;
+  place-items: stretch;
+}
+
+.transport__slot > * {
+  grid-area: 1 / 1;
+}
+
+.transport__sizer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Keycaps sit on a light or coloured face here, so they invert. */
 .tbtn .keycap {
   border-color: color-mix(in srgb, var(--pip-ink) 30%, transparent);
@@ -988,6 +1010,14 @@
    is no horizontal scroll at any width — only the pip strip scrolls, alone.
    ========================================================================== */
 
+/* Free debate is a taller core than a speech — a name, a bar, its time and the floor slot
+   against a ring and its caption — so the controls under it sit lower there. Reserving the
+   taller shape everywhere was tried and taken out again: the extra chrome is a fixed height
+   rather than a share of the ring, so no single reserve fits every screen, and the one that
+   covered free debate pushed Start and Reset back under the timeline strip on a short
+   screen. The speech states already agree with each other, which is where a round spends
+   its time; the move happens only when the whole centre changes from a ring to two bars. */
+
 @media (max-width: 1080px) {
   .uconsole {
     --uc-fig: clamp(48px, 8vh, 76px);
@@ -1045,6 +1075,35 @@
   .uconsole__centre {
     grid-column: 1 / -1;
     grid-row: 1;
+  }
+
+  /* The hidden copies that keep the free-debate bars from shifting are cut to the longest
+     give-floor label, which is wider than a phone's half-screen: they would push the bars
+     off both edges, and the console clips rather than scrolls sideways. A phone gets the
+     honest version instead — the label may wrap and the slot may resize, but every word of
+     it is on the screen. */
+  .ubar__sizer,
+  .uchess__sizer {
+    display: none;
+  }
+
+  .uchess {
+    max-width: 100%;
+  }
+
+  .ubar,
+  .ubar__slot {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ubar__give {
+    max-width: 100%;
+    padding: 0 var(--s-3);
+  }
+
+  .ubar__give .tbtn__label {
+    white-space: normal;
   }
 
   .utop {

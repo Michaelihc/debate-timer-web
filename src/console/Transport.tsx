@@ -113,6 +113,15 @@ export function Transport({
           ? t('t.resume')
           : t('t.start');
 
+  // One font, so the most characters is the widest face.
+  const widestMain = [
+    t('t.startRound'),
+    t('t.release'),
+    t('t.start'),
+    t('t.pause'),
+    t('t.resume'),
+  ].reduce((a, b) => (b.length > a.length ? b : a));
+
   const mainIcon: IconName = hold ? 'hold' : running ? 'pause' : 'play';
   // While held the one thing the round accepts is its release, so that is what the
   // primary button does, in free debate too.
@@ -123,15 +132,27 @@ export function Transport({
   return (
     <div className="transport" role="group" aria-label={t('nav.console')}>
       <div className="transport__main">
-        <Key
-          onClick={onMain}
-          icon={mainIcon}
-          label={mainLabel}
-          action={mainKeys}
-          tone="primary"
-          caps
-          disabled={!hold && (complete || !canStart)}
-        />
+        {/* Start / Pause / Resume / Resume round are four different widths. The slot is cut
+            to the longest of them and never resizes, so the button under the operator's
+            hand — and the Reset beside it — hold still while the round changes state. */}
+        <div className="transport__slot">
+          <Key
+            onClick={onMain}
+            icon={mainIcon}
+            label={mainLabel}
+            action={mainKeys}
+            tone="primary"
+            caps
+            disabled={!hold && (complete || !canStart)}
+          />
+          {/* After the button it sizes, never before: the real control stays the first
+              `.tbtn--primary` in the document for anything that goes looking for it. */}
+          <span className="tbtn tbtn--primary transport__sizer" aria-hidden="true">
+            <Icon name="play" size={18} />
+            <span className="tbtn__label">{widestMain}</span>
+            <Keycaps caps={capsOf('toggle')} />
+          </span>
+        </div>
         <Key
           onClick={on.reset}
           icon="reset"

@@ -314,9 +314,18 @@ export default function Summary(): JSX.Element {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((row) => (
+                      {rows.map((row, i) => (
                         <tr key={row.key}>
-                          <td className="sum__order">{row.order === null ? '—' : row.order}</td>
+                          {/* Free debate is one slot in the run order holding two clocks, so
+                              the number is printed once and the second row reads as its
+                              continuation rather than as a repeated position. */}
+                          <td className="sum__order">
+                            {row.order === null
+                              ? '—'
+                              : rows[i - 1]?.order === row.order
+                                ? ''
+                                : row.order}
+                          </td>
                           <td className="sum__label">
                             <span
                               className="sum__tick"

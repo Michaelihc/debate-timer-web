@@ -51,7 +51,11 @@
   --pj-over: #FF3A35;
   --pj-live: #00FF10;
   --pj-track: rgba(255, 255, 255, 0.2627);
-  --pj-track-over: rgba(149, 19, 19, 0.3137);
+  /* Unity's timeoutBGColor is rgba(149, 19, 19, 0.3137). Over this ground that blends to
+     about 1.15:1, so through a projector in a lit room the ring all but disappears at the
+     one moment it matters most — and early in overtime the arc is still a sliver, so the
+     track IS the ring. Brightened to sit at the same presence as the normal track. */
+  --pj-track-over: rgba(255, 58, 53, 0.55);
   --pj-pip-idle: #FFFFFF;
   --pj-pip-ink: #323232;
   /* A projector renders the console's ground as black, so side colours are judged
@@ -173,7 +177,7 @@
   --state-over: #9B2C1B;
   --state-live: #1B6E3D;
   --ring-track: rgba(23, 23, 26, 0.22);
-  --ring-track-over: rgba(155, 44, 27, 0.25);
+  --ring-track-over: rgba(155, 44, 27, 0.45);
 
   --pip-idle: #FFFFFF;
   --pip-current: #2C8F4E;

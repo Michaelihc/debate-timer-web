@@ -235,11 +235,16 @@ export function ChessBars({
           <span>{label}</span>
           <span className="ucore__status">{status}</span>
         </p>
-        {awaitingFloor ? (
-          <p className="ucore__prompt">
-            {operatorChooses ? t('st.chooseSide') : t('st.takesFloor', { side: firstFloorLabel })}
-          </p>
-        ) : null}
+        {/* Always drawn, empty or not. Giving the floor for the first time used to take this
+            line away and pull the timer controls up by 12px, mid-handover, under the hand
+            that was reaching for them. */}
+        <p className="ucore__prompt" aria-hidden={awaitingFloor ? undefined : true}>
+          {awaitingFloor
+            ? operatorChooses
+              ? t('st.chooseSide')
+              : t('st.takesFloor', { side: firstFloorLabel })
+            : ' '}
+        </p>
       </div>
     </div>
   );
