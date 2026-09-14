@@ -2,7 +2,7 @@
 
 A browser port of [Michaelihc/debate-timer](https://github.com/Michaelihc/debate-timer), the Unity debate timer with current/next speaker indicators, a double timer for free debate, and a clickable timeline.
 
-Live: https://michaelihc.github.io/debate-timer-html/
+Live: https://michaelihc.github.io/debate-timer-web/#/console
 
 No build step and no dependencies. Plain HTML, CSS, and JavaScript.
 
