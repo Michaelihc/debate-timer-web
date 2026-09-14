@@ -28,16 +28,16 @@
     },
     title: "在公共空间中，权利行使应不应受“公序良俗”的限制",
     pro_side: [
-      { name: "Team 1 A", time: 180 },
-      { name: "Team 1 B", time: 120 },
-      { name: "Team 1 C", time: 120 },
-      { name: "Team 1 D", time: 180 },
+      { name: "正一", time: 180 },
+      { name: "正二", time: 120 },
+      { name: "正三", time: 120 },
+      { name: "正四", time: 180 },
     ],
     con_side: [
-      { name: "Team 2 A", time: 180 },
-      { name: "Team 2 B", time: 120 },
-      { name: "Team 2 C", time: 120 },
-      { name: "Team 2 D", time: 180 },
+      { name: "反一", time: 180 },
+      { name: "反二", time: 120 },
+      { name: "反三", time: 120 },
+      { name: "反四", time: 180 },
     ],
     event_order: [1, -1, -2, 3, 2, -3, "free", 4, -4],
   };
@@ -1184,7 +1184,7 @@
     return id > 0 ? s.pro_label || t("proDefault") : s.con_label || t("conDefault");
   }
 
-  // Long description for the detailed view, e.g. "Pro 1 · Team 1 A" and "4:00".
+  // Long description for the detailed view, e.g. "Pro 1 · 正一" and "3:00".
   function eventDetail(ev) {
     const s = draft.settings;
     if (ev === "prep") return { text: t("prep"), time: formatTime(s.time_prep, true) };
@@ -1396,6 +1396,27 @@
     o[parts[parts.length - 1]] = value;
   }
 
+  let removalPending = false;
+  function slideRemove(el, onDone) {
+    if (!el || removalPending || el.classList.contains("removing")) return;
+    removalPending = true;
+    els.form.classList.add("removal-active");
+    els.form.setAttribute("aria-busy", "true");
+    el.style.setProperty("--remove-height", `${el.getBoundingClientRect().height}px`);
+    el.classList.add("removing");
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      removalPending = false;
+      els.form.classList.remove("removal-active");
+      els.form.removeAttribute("aria-busy");
+      onDone();
+    };
+    el.addEventListener("animationend", finish, { once: true });
+    setTimeout(finish, 350);
+  }
+
   // Delegated form events
   els.form.addEventListener("input", (e) => {
     const el = e.target;
@@ -1430,14 +1451,16 @@
     if (d.addSpeaker) {
       const side = d.addSpeaker;
       const list = draft[side + "_side"];
-      list.push({ name: `${side === "pro" ? "Team 1" : "Team 2"} ${String.fromCharCode(65 + (list.length % 26))}`, time: 180 });
+      list.push({ name: `${side === "pro" ? "正" : "反"}${list.length + 1}`, time: 180 });
       renderSpeakerList(side);
       renderEventChips();
     } else if (d.delSpeaker) {
       const [side, idx] = d.delSpeaker.split(":");
-      draft[side + "_side"].splice(Number(idx), 1);
-      renderSpeakerList(side);
-      renderEventChips();
+      slideRemove(b.closest(".srow"), () => {
+        draft[side + "_side"].splice(Number(idx), 1);
+        renderSpeakerList(side);
+        renderEventChips();
+      });
     } else if (d.view) {
       orderView = d.view === "detailed" ? "detailed" : "simple";
       localStorage.setItem(ORDER_VIEW_KEY, orderView);
@@ -1447,8 +1470,10 @@
       draft.event_order.push(chipValue(b));
       renderEventChips();
     } else if (d.delEvent !== undefined) {
-      draft.event_order.splice(Number(d.delEvent), 1);
-      renderEventChips();
+      slideRemove(b.closest(".chip"), () => {
+        draft.event_order.splice(Number(d.delEvent), 1);
+        renderEventChips();
+      });
     } else if (d.audioFile) {
       const key = d.audioFile;
       els.audioFileInput.onchange = () => {

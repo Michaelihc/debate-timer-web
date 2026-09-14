@@ -23,7 +23,7 @@ python -m http.server 8000
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
 - Clickable timeline to jump to any event
-- Settings menu with a form editor and a raw JSON editor; event order defaults to a detailed vertical list, with an optional compact view, categorized add controls, and robust drag-and-drop reordering in both
+- Settings menu with a form editor and a raw JSON editor; event order defaults to a detailed vertical list, with an optional compact view, categorized add controls, robust drag-and-drop reordering, and animated removal
 - Custom background color (text and ring colors adapt to light backgrounds)
 - Custom warning and end sounds, from a URL or an uploaded file
 - English and Simplified Chinese UI
@@ -66,16 +66,16 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
   },
   "title": "在公共空间中，权利行使应不应受“公序良俗”的限制",
   "pro_side": [
-    { "name": "Team 1 A", "time": 180 },
-    { "name": "Team 1 B", "time": 120 },
-    { "name": "Team 1 C", "time": 120 },
-    { "name": "Team 1 D", "time": 180 }
+    { "name": "正一", "time": 180 },
+    { "name": "正二", "time": 120 },
+    { "name": "正三", "time": 120 },
+    { "name": "正四", "time": 180 }
   ],
   "con_side": [
-    { "name": "Team 2 A", "time": 180 },
-    { "name": "Team 2 B", "time": 120 },
-    { "name": "Team 2 C", "time": 120 },
-    { "name": "Team 2 D", "time": 180 }
+    { "name": "反一", "time": 180 },
+    { "name": "反二", "time": 120 },
+    { "name": "反三", "time": 120 },
+    { "name": "反四", "time": 180 }
   ],
   "event_order": [1, -1, -2, 3, 2, -3, "free", 4, -4]
 }
