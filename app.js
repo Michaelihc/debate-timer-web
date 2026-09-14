@@ -1398,23 +1398,75 @@
 
   let removalPending = false;
   function slideRemove(el, onDone) {
-    if (!el || removalPending || el.classList.contains("removing")) return;
+    if (!el || removalPending) return;
     removalPending = true;
     els.form.classList.add("removal-active");
     els.form.setAttribute("aria-busy", "true");
-    el.style.setProperty("--remove-height", `${el.getBoundingClientRect().height}px`);
-    el.classList.add("removing");
+
+    const container = el.parentElement;
+    const isChip = el.classList.contains("chip");
+    const peers = () =>
+      Array.from(container.children).filter((child) =>
+        isChip ? child.classList.contains("chip") : child.classList.contains("srow") && !child.classList.contains("head")
+      );
+    const oldRects = peers()
+      .filter((child) => child !== el)
+      .map((child) => child.getBoundingClientRect());
+    const rect = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true);
+    ghost.classList.add("removal-ghost");
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.inert = true;
+    if (isChip) {
+      ghost.classList.add("ghost");
+      if (container.classList.contains("vertical")) {
+        ghost.classList.add("vertical-ghost");
+        ghost.dataset.step = String(peers().indexOf(el) + 1);
+      }
+    }
+    Object.assign(ghost.style, {
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    });
+    document.body.appendChild(ghost);
+
+    // Update the data and layout once, then animate only compositor-friendly
+    // transforms. This avoids a full settings-panel reflow on every frame.
+    onDone();
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 220;
+    const animations = peers().map((child, i) => {
+      const before = oldRects[i];
+      const after = child.getBoundingClientRect();
+      const dx = before ? before.left - after.left : 0;
+      const dy = before ? before.top - after.top : 0;
+      return child.animate(
+        [{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: "translate3d(0, 0, 0)" }],
+        { duration, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+    });
+    animations.push(
+      ghost.animate(
+        [
+          { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+          { opacity: 0, transform: "translate3d(-72px, 0, 0) scale(0.98)" },
+        ],
+        { duration, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" }
+      )
+    );
+
     let finished = false;
     const finish = () => {
       if (finished) return;
       finished = true;
+      ghost.remove();
       removalPending = false;
       els.form.classList.remove("removal-active");
       els.form.removeAttribute("aria-busy");
-      onDone();
     };
-    el.addEventListener("animationend", finish, { once: true });
-    setTimeout(finish, 350);
+    Promise.allSettled(animations.map((animation) => animation.finished)).then(finish);
+    setTimeout(finish, duration + 100);
   }
 
   // Delegated form events
