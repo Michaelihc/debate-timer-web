@@ -962,6 +962,45 @@ body {
   transform: none;
 }
 
+/* The drag preview lives under <body>, so it cannot inherit .chips.vertical rules. */
+.chip.ghost.vertical-ghost {
+  justify-content: flex-start;
+  gap: 1vw;
+  height: auto;
+  padding: 0.7vh 1vw 0.7vh 0.6vw;
+}
+.chip.ghost.vertical-ghost::before {
+  content: attr(data-step);
+  width: 2em;
+  flex: none;
+  text-align: right;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+.chip.ghost.vertical-ghost .lbl {
+  min-width: 2.2em;
+  text-align: center;
+  padding: 0.1em 0.4em;
+  border-radius: 0.35em;
+  background: rgba(0, 0, 0, 0.12);
+}
+.chip.ghost.vertical-ghost .txt {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip.ghost.vertical-ghost .dur {
+  flex: none;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.55);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Palette in detailed mode: outlined chips with text */
 .chips.palette.detailed .chip {
   gap: 0.6vw;
@@ -999,6 +1038,26 @@ body {
 }
 .palette-row .chips {
   min-height: 0;
+}
+.chips.palette {
+  flex: 1;
+  flex-flow: column nowrap;
+  gap: 0.7vh;
+  min-width: 0;
+}
+.palette-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6vh 0.6vw;
+  min-width: 0;
+}
+.palette-group-label {
+  width: 4.5em;
+  flex: none;
+  text-align: right;
+  color: #aaa;
+  font-size: 1.7vmin;
 }
 
 .overlay.confirm {

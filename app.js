@@ -106,6 +106,7 @@
       viewDetailed: "Detailed",
       perSide: "per side",
       fAddLabel: "Add",
+      fPhases: "Phases",
       fEmptyOrder: "No events yet. Click an item below to add it.",
       fFileTooBig: "Audio file is too large (max 2 MB). Use a URL instead.",
       fNoSpeaker: "Speaker does not exist",
@@ -183,6 +184,7 @@
       viewDetailed: "详细",
       perSide: "每方",
       fAddLabel: "添加",
+      fPhases: "环节",
       fEmptyOrder: "暂无流程，点击下方项目添加。",
       fFileTooBig: "音频文件过大（最大 2 MB），请改用 URL。",
       fNoSpeaker: "辩手不存在",
@@ -1101,8 +1103,8 @@
         <div class="sgroup-head">
           <h3>${esc(t("fEvents"))}</h3>
           <div class="seg" role="group">
-            <button type="button" class="seg-btn ${orderView === "simple" ? "active" : ""}" data-view="simple">${esc(t("viewSimple"))}</button>
             <button type="button" class="seg-btn ${orderView === "detailed" ? "active" : ""}" data-view="detailed">${esc(t("viewDetailed"))}</button>
+            <button type="button" class="seg-btn ${orderView === "simple" ? "active" : ""}" data-view="simple">${esc(t("viewSimple"))}</button>
           </div>
         </div>
         <p class="hint">${esc(t("fEventsHint"))}</p>
@@ -1175,7 +1177,7 @@
 
   // "simple": compact chips in a row; "detailed": vertical list with side, name and duration.
   const ORDER_VIEW_KEY = "debate-timer-order-view";
-  let orderView = localStorage.getItem(ORDER_VIEW_KEY) === "detailed" ? "detailed" : "simple";
+  let orderView = localStorage.getItem(ORDER_VIEW_KEY) === "simple" ? "simple" : "detailed";
 
   function sideName(id) {
     const s = draft.settings;
@@ -1236,14 +1238,22 @@
   function renderPalette() {
     const root = $("event-palette");
     root.innerHTML = "";
-    const items = ["prep", "free"]
-      .concat(draft.pro_side.map((_, i) => i + 1))
-      .concat(draft.con_side.map((_, i) => -(i + 1)));
-    items.forEach((ev) => {
-      const chip = makeChip(ev, "add");
-      chip.dataset.addEv = String(ev);
-      chip.setAttribute("role", "button");
-      root.appendChild(chip);
+    const groups = [
+      { label: t("fPhases"), items: ["prep", "free"] },
+      { label: sideName(1), items: draft.pro_side.map((_, i) => i + 1) },
+      { label: sideName(-1), items: draft.con_side.map((_, i) => -(i + 1)) },
+    ];
+    groups.forEach(({ label, items }) => {
+      const group = document.createElement("div");
+      group.className = "palette-group";
+      group.innerHTML = `<span class="palette-group-label">${esc(label)}</span>`;
+      items.forEach((ev) => {
+        const chip = makeChip(ev, "add");
+        chip.dataset.addEv = String(ev);
+        chip.setAttribute("role", "button");
+        group.appendChild(chip);
+      });
+      root.appendChild(group);
     });
   }
 
@@ -1261,6 +1271,7 @@
     let dragging = false;
     let sx = 0;
     let sy = 0;
+    let pointerId = null;
 
     function moveGhost(e) {
       ghost.style.transform = `translate(${e.clientX - sx}px, ${e.clientY - sy}px)`;
@@ -1287,9 +1298,13 @@
         : e.clientX < r.left + r.width / 2;
       if (before) root.insertBefore(dragEl, best);
       else root.insertBefore(dragEl, best.nextSibling);
+      if (ghost && root.classList.contains("vertical")) {
+        ghost.dataset.step = String(Array.from(root.querySelectorAll(".chip")).indexOf(dragEl) + 1);
+      }
     }
 
     document.addEventListener("pointerdown", (e) => {
+      if (dragEl) endDrag();
       root = rootEl();
       if (!root || !root.contains(e.target)) return;
       const chip = e.target.closest(".chip");
@@ -1298,17 +1313,28 @@
       dragging = false;
       sx = e.clientX;
       sy = e.clientY;
-      chip.setPointerCapture(e.pointerId);
+      pointerId = e.pointerId;
+      // Capture on the stable list: moving the chip itself can otherwise drop
+      // pointer capture and leave the drag preview stranded on screen.
+      try {
+        root.setPointerCapture(pointerId);
+      } catch (_) {
+        /* document listeners remain as a fallback */
+      }
     });
 
     document.addEventListener("pointermove", (e) => {
-      if (!dragEl) return;
+      if (!dragEl || e.pointerId !== pointerId) return;
       if (!dragging) {
         if (Math.hypot(e.clientX - sx, e.clientY - sy) < 5) return;
         dragging = true;
         const r = dragEl.getBoundingClientRect();
         ghost = dragEl.cloneNode(true);
         ghost.classList.add("ghost");
+        if (root.classList.contains("vertical")) {
+          ghost.classList.add("vertical-ghost");
+          ghost.dataset.step = String(Array.from(root.querySelectorAll(".chip")).indexOf(dragEl) + 1);
+        }
         ghost.style.left = `${r.left}px`;
         ghost.style.top = `${r.top}px`;
         ghost.style.width = `${r.width}px`;
@@ -1320,20 +1346,41 @@
       placeAt(e);
     });
 
-    function endDrag() {
+    function endDrag(e) {
       if (!dragEl) return;
-      if (dragging) {
-        dragEl.classList.remove("dragging");
-        if (ghost) ghost.remove();
-        ghost = null;
-        draft.event_order = Array.from(root.querySelectorAll(".chip")).map(chipValue);
+      if (e && e.pointerId != null && e.pointerId !== pointerId) return;
+      const finishedRoot = root;
+      const finishedChip = dragEl;
+      const finishedGhost = ghost;
+      const finishedPointer = pointerId;
+      const didDrag = dragging;
+      root = null;
+      dragEl = null;
+      ghost = null;
+      pointerId = null;
+      dragging = false;
+
+      finishedChip.classList.remove("dragging");
+      if (finishedGhost) finishedGhost.remove();
+      try {
+        if (finishedRoot && finishedPointer != null && finishedRoot.hasPointerCapture(finishedPointer)) {
+          finishedRoot.releasePointerCapture(finishedPointer);
+        }
+      } catch (_) {
+        /* capture may already have been released by the browser */
+      }
+      if (didDrag && finishedRoot && finishedRoot.isConnected) {
+        draft.event_order = Array.from(finishedRoot.querySelectorAll(".chip")).map(chipValue);
         renderEventChips();
       }
-      dragEl = null;
-      dragging = false;
     }
     document.addEventListener("pointerup", endDrag);
     document.addEventListener("pointercancel", endDrag);
+    document.addEventListener("lostpointercapture", endDrag);
+    window.addEventListener("blur", () => endDrag());
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) endDrag();
+    });
   })();
 
   function participant2(id) {

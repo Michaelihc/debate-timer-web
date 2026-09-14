@@ -23,7 +23,7 @@ python -m http.server 8000
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
 - Clickable timeline to jump to any event
-- Settings menu with a form editor and a raw JSON editor; the event order can be edited as compact chips or as a detailed vertical list, with drag-and-drop reordering in both
+- Settings menu with a form editor and a raw JSON editor; event order defaults to a detailed vertical list, with an optional compact view, categorized add controls, and robust drag-and-drop reordering in both
 - Custom background color (text and ring colors adapt to light backgrounds)
 - Custom warning and end sounds, from a URL or an uploaded file
 - English and Simplified Chinese UI
