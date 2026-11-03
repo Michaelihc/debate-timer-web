@@ -22,11 +22,18 @@
   --gutter-y: clamp(10px, 2.2vh, 28px);
   --gutter-x: clamp(12px, 1.8vw, 36px);
   --ring: min(50vh, 36vw);
+  /* Soft surfaces for main-screen buttons, tinted from the foreground. */
+  --surface: rgba(255, 255, 255, 0.08);
+  --surface-hover: rgba(255, 255, 255, 0.14);
+  --surface-line: rgba(255, 255, 255, 0.16);
   --font: "Liberation Sans", Arial, "Helvetica Neue", "Noto Sans SC", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 }
 :root.light-bg {
   --fg: #111;
+  --surface: rgba(0, 0, 0, 0.05);
+  --surface-hover: rgba(0, 0, 0, 0.09);
+  --surface-line: rgba(0, 0, 0, 0.16);
   --muted: rgba(0, 0, 0, 0.55);
   --ring-bg: rgba(0, 0, 0, 0.18);
   --ring-fg: #222;
@@ -62,7 +69,7 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding: var(--gutter-y) var(--gutter-x);
-  gap: clamp(6px, 1.4vh, 18px);
+  gap: clamp(10px, 2.6vh, 34px);
 }
 
 /* ---------- Buttons ---------- */
@@ -139,18 +146,71 @@ body {
   gap: calc(var(--ctl) * 0.45);
   align-items: center;
 }
-.btn-gear {
+/* ---------- Main-screen buttons ----------
+   Secondary actions are soft translucent "tonal" buttons with an icon; the
+   one thing to press next is the solid green primary. */
+.btn-tonal,
+.btn-primary,
+.btn-alert {
   display: inline-flex;
   align-items: center;
-  gap: 0.45em;
+  justify-content: center;
+  gap: 0.5em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.55em 1.15em;
+  border-radius: 0.75em;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.08s, color 0.15s;
 }
-.btn-gear svg {
+.btn-tonal svg,
+.btn-primary svg,
+.btn-alert svg {
   width: 1.05em;
   height: 1.05em;
+  flex: none;
+}
+.btn-tonal .ic,
+.btn-primary .ic,
+.btn-alert .ic {
+  display: inline-flex;
+}
+.btn-tonal {
+  background: var(--surface);
+  border-color: var(--surface-line);
+  color: var(--fg);
+}
+.btn-tonal:hover {
+  background: var(--surface-hover);
+  filter: none;
+}
+.btn-primary {
+  background: linear-gradient(180deg, #8ef2bc, #58d892);
+  color: #08281a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 0.35em 1.2em rgba(88, 216, 146, 0.28);
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 0.45em 1.5em rgba(88, 216, 146, 0.4);
+}
+.btn-reset:hover {
+  color: var(--red);
+  border-color: rgba(242, 107, 107, 0.45);
+  background: rgba(242, 107, 107, 0.12);
+}
+/* "Time ran out" is a status, not something to press. */
+.btn-alert,
+.btn-alert:disabled {
+  background: rgba(242, 107, 107, 0.16);
+  border-color: rgba(242, 107, 107, 0.5);
+  color: #ffb0b0;
+  cursor: default;
+}
+:root.light-bg .btn-alert {
+  color: #b42323;
 }
 .btn-icon {
-  padding: 0.4em 0.55em;
-  line-height: 1.2;
+  padding: 0.55em 0.62em;
 }
 .title {
   margin: 0;
@@ -169,14 +229,19 @@ body {
 /* ---------- Stage ---------- */
 .stage {
   display: grid;
-  grid-template-columns: minmax(150px, 17vw) 1fr minmax(150px, 17vw);
+  /* The centre is about as wide as the timer needs, so the speaker columns
+     sit evenly between the screen edge and the timer. */
+  grid-template-columns: minmax(0, 1fr) minmax(min-content, min(56vw, 92vh)) minmax(0, 1fr);
   align-items: stretch;
   min-height: 0;
 }
 
+/* Each side is its label plus its speakers, kept together and centred
+   on the same line as the timer. */
 .side {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-height: 0;
 }
 .side-label {
@@ -185,7 +250,8 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  padding-bottom: 0.4em;
+  /* room for the speech bubble that rises above the first speaker's head */
+  padding-bottom: calc(var(--fig-h) * 0.2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,11 +261,12 @@ body {
 }
 
 .speakers {
-  flex: 1;
+  flex: none;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
+  justify-content: center;
   align-items: center;
+  gap: var(--fig-gap, 3vh);
   min-height: 0;
 }
 
@@ -310,22 +377,114 @@ body {
   min-width: 0;
 }
 
-.idle-hint {
-  max-width: 80%;
+/* Before the round: who is first, their time on a full ring in their team
+   colour, and the whole round as a bar. */
+.idle {
+  --first: var(--fg);
+  --idle-ring: calc(var(--ring) * 0.78);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 2.4vh, 28px);
+  width: 100%;
+  max-width: calc(var(--ring) * 1.35);
   text-align: center;
+}
+.idle-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15em;
+}
+.idle-eyebrow {
+  font-size: clamp(11px, 1.9vmin, 22px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
 }
-.idle-hint p {
-  margin: 0;
-}
-.idle-first {
-  margin-bottom: 0.6em !important;
+.idle-name {
+  font-size: clamp(20px, 5vmin, 64px);
+  font-weight: 600;
+  line-height: 1.1;
   color: var(--fg);
-  font-size: clamp(18px, 4.2vmin, 54px);
-  text-wrap: balance;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.idle-name::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: var(--first);
+}
+.idle-ring {
+  position: relative;
+  width: var(--idle-ring);
+  height: var(--idle-ring);
+}
+.idle-ring-bg {
+  fill: none;
+  stroke: var(--ring-bg);
+  stroke-width: 10;
+}
+.idle-ring-fg {
+  fill: none;
+  stroke: var(--first);
+  stroke-width: 10;
+  animation: idle-breathe 3.2s ease-in-out infinite;
+}
+@keyframes idle-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle-ring-fg {
+    animation: none;
+  }
+}
+.idle-time {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--idle-ring) * 0.26);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.idle-round {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+}
+.idle-bar {
+  display: flex;
+  gap: 3px;
+  height: clamp(6px, 1.1vh, 12px);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.idle-bar i {
+  display: block;
+  min-width: 4px;
+}
+.idle-total {
+  font-size: clamp(13px, 2.5vmin, 30px);
+  color: var(--fg);
+  opacity: 0.8;
 }
 .idle-text {
-  font-size: clamp(13px, 2.4vmin, 28px);
+  margin: 0;
+  font-size: clamp(13px, 2.3vmin, 28px);
+  color: var(--muted);
 }
 
 .ring-timer {
@@ -388,6 +547,8 @@ body {
   justify-content: center;
   gap: clamp(20px, 6vw, 120px);
   width: 100%;
+  /* keep the timer/arrow icons beside the Pro bar inside the centre column */
+  padding-inline: calc(6vh + 2vw);
 }
 .bar-timer {
   display: flex;
@@ -465,26 +626,31 @@ body {
 .invert-btn {
   width: clamp(64px, 14vh, 150px);
   height: clamp(64px, 14vh, 150px);
-  background: var(--tile);
-  border: none;
-  border-radius: clamp(8px, 1.4vh, 16px);
+  background: var(--surface);
+  border: 1px solid var(--surface-line);
+  border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5vh;
+  gap: 0.3em;
   cursor: pointer;
   font-family: inherit;
-  font-weight: 700;
-  font-size: var(--ctl);
-  color: #111;
+  font-weight: 600;
+  font-size: calc(var(--ctl) * 0.85);
+  color: var(--fg);
+  transition: background 0.15s;
 }
-.invert-btn img {
-  width: 55%;
-  filter: brightness(0);
+.invert-btn svg {
+  width: 40%;
+  height: auto;
+  transition: transform 0.3s;
 }
 .invert-btn:hover {
-  filter: brightness(1.05);
+  background: var(--surface-hover);
+}
+.invert-btn:active svg {
+  transform: rotate(180deg);
 }
 
 /* ---------- Bottom / timeline ---------- */
@@ -499,8 +665,17 @@ body {
   min-width: 5em;
   padding: 0.35em 1em;
 }
+/* The buttons and the line share one track, so a long order on a narrow
+   screen scrolls sideways instead of being cut off. */
 .timeline {
   position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(100%, max-content);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding-top: 4px;
   padding-bottom: calc(var(--ctl) * 0.55);
 }
 .timeline-buttons {
@@ -521,13 +696,16 @@ body {
   font-size: var(--ctl);
   min-width: 2.4em;
   padding: 0.3em 0.5em;
-  border: none;
-  border-radius: 0.35em;
-  background: var(--tile);
-  color: #333;
+  border: 1px solid var(--surface-line);
+  border-radius: 0.5em;
+  /* opaque, so the stem behind it doesn't show through */
+  background: var(--bg) linear-gradient(var(--surface-hover), var(--surface-hover));
+  color: var(--fg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
   z-index: 1;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .tl-btn::after {
   content: "";
@@ -541,11 +719,59 @@ body {
   z-index: -1;
 }
 .tl-btn:hover {
-  filter: brightness(1.05);
+  background: var(--bg) linear-gradient(var(--surface-line), var(--surface-line));
 }
 .tl-btn.active {
-  background: var(--active);
-  color: #fff;
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #111;
+  box-shadow: 0 0 0 4px rgba(195, 242, 106, 0.22), 0 0.3em 1em rgba(195, 242, 106, 0.3);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  /* icon-only top bar buttons, so the title has room */
+  .top .btn > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .top .btn {
+    padding: 0.55em 0.62em;
+  }
+  .double-timer {
+    gap: 8px;
+    padding-inline: 0;
+  }
+  .bar-label {
+    display: none !important;
+  }
+  .bar-controls .btn {
+    min-width: 0;
+    padding-inline: 0.7em;
+  }
+  .bar-text {
+    font-size: clamp(22px, 8vw, 40px);
+  }
+  .invert-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 12px;
+  }
+  .timeline-buttons {
+    gap: 2px;
+    padding: 0 2px;
+  }
+  .tl-btn {
+    min-width: 1.9em;
+    padding: 0.25em 0.3em;
+  }
+  .btn-next {
+    min-width: 0;
+    padding: 0.35em 0.7em;
+  }
 }
 
 /* ---------- Overlays ---------- */

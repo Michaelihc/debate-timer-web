@@ -23,7 +23,7 @@ python -m http.server 8000
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
 - Clickable timeline to jump to any event
-- Before the round, the centre shows what comes first and its length
+- Before the round, the centre previews what comes first on a full ring in its team colour, with the whole round as a coloured bar and its total length
 - Main-screen controls, timers, and the timeline scale with the screen within sensible limits, from phone landscape to a 1080p projector
 - Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
 - Presets: built-in **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating, no free debate, warning at 15 s), plus your own presets with a name and icon. Presets can be downloaded and opened as `.json` files to share between computers

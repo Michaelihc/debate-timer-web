@@ -145,7 +145,9 @@
       conDefault: "Con",
       speakerTurn: (name) => `${name}’s Turn`,
       idleHint: "Press Begin when the first speaker is ready.",
-      firstUp: (what, time) => `First up: ${what}${time ? " · " + time : ""}`,
+      firstUp: "First up",
+      roundTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min in all`,
+      invertTitle: "Invert (I)",
       minutes: "Minutes",
       seconds: "Seconds",
       minShort: "min",
@@ -314,7 +316,9 @@
       conDefault: "反方",
       speakerTurn: (name) => `辩手 ${name} 发言`,
       idleHint: "第一位辩手准备好后，按“开始”。",
-      firstUp: (what, time) => `首先：${what}${time ? " · " + time : ""}`,
+      firstUp: "第一项",
+      roundTotal: (n, min) => `共 ${n} 项 · 全程约 ${min} 分钟`,
+      invertTitle: "翻转 (I)",
       minutes: "分钟",
       seconds: "秒",
       minShort: "分",
@@ -580,7 +584,11 @@
     form: $("settings-form"),
     nav: $("settings-nav"),
     idleHint: $("idle-hint"),
-    idleFirst: $("idle-first"),
+    idleName: $("idle-name"),
+    idleTime: $("idle-time"),
+    idleBar: $("idle-bar"),
+    idleTotal: $("idle-total"),
+    btnNextLabel: $("btn-next-label"),
     btnSave: $("btn-save"),
     btnDiscard: $("btn-discard"),
     panelFoot: $("panel-foot"),
@@ -793,7 +801,7 @@
       }
     });
     els.btnLang.textContent = t("langBtn");
-    els.btnNext.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     if (state.data) {
       els.proLabel.textContent = state.data.settings.pro_label || t("proDefault");
       els.conLabel.textContent = state.data.settings.con_label || t("conDefault");
@@ -826,22 +834,32 @@
     const idle = Boolean(d) && state.eventIndex < 0 && d.event_order.length > 0;
     show(els.idleHint, idle);
     if (!idle) return;
+    const s = d.settings;
     const ev = d.event_order[0];
-    const dm = d.settings.display_minutes;
+    const colorOf = (e) =>
+      e === "prep" ? "var(--lime)" : e === "free" ? "var(--yellow)" : Number(e) > 0 ? s.pro_colors : s.con_colors;
     let what;
-    let time = "";
+    let sec = 0;
     if (ev === "prep") {
       what = t("prep");
-      time = formatTime(d.settings.time_prep, dm);
+      sec = s.time_prep;
     } else if (ev === "free") {
       what = t("free");
-      time = formatTime(d.settings.time_free, dm);
+      sec = s.time_free;
     } else {
       const p = participant(Number(ev));
       what = p ? nameOf(Number(ev), p) : String(ev);
-      time = p ? formatTime(p.time, dm) : "";
+      sec = p ? p.time : 0;
     }
-    els.idleFirst.textContent = t("firstUp")(what, time);
+    els.idleHint.style.setProperty("--first", colorOf(ev));
+    els.idleName.textContent = what;
+    els.idleTime.textContent = formatTime(sec, s.display_minutes);
+    // The whole round as one bar, each part as long as it lasts.
+    const stats = roundStats(d);
+    els.idleBar.innerHTML = stats.segs
+      .map((g, i) => `<i style="flex-grow:${g.sec || 1};background:${colorOf(d.event_order[i])}"></i>`)
+      .join("");
+    els.idleTotal.textContent = t("roundTotal")(d.event_order.length, Math.round(stats.total / 60));
   }
 
   function updateTitle() {
@@ -931,7 +949,7 @@
     show(els.ringTimer, Boolean(p.ringVisible));
     show(els.doubleTimer, Boolean(p.doubleVisible));
     updateTitle();
-    els.btnNext.textContent = t("next");
+    els.btnNextLabel.textContent = t("next");
     updateTimelineActive();
     updateSpeakerIndicators();
     return true;
@@ -1038,12 +1056,22 @@
     fitSpeakerSize();
   }
 
+  // Size the speaker figures to fill the side columns, leaving a little air
+  // above and below, with gaps in proportion to the figures.
   function fitSpeakerSize() {
     const n = Math.max(state.speakers.pro.length, state.speakers.con.length, 1);
-    const avail = els.proCol.clientHeight || window.innerHeight * 0.65;
-    const gap = avail * 0.06;
-    const h = Math.min(avail * 0.24, (avail - (n - 1) * gap) / n);
-    document.documentElement.style.setProperty("--fig-h", `${Math.max(30, h)}px`);
+    const side = els.proCol.parentElement;
+    const full = side.clientHeight || window.innerHeight * 0.7;
+    const gapRatio = 0.3;
+    // The label's padding is 0.2 × the figure height, so it is solved for here too.
+    const label = parseFloat(getComputedStyle(els.proLabel).fontSize) * 1.2 || 0;
+    const avail = full * 0.94 - label;
+    // A speaker row is about 1.6 figure-heights wide (figure plus its icons).
+    const widthCap = (side.clientWidth || Infinity) / 1.6;
+    const h = Math.min(full * 0.22, widthCap, avail / (n + gapRatio * (n - 1) + 0.2));
+    const fig = Math.max(24, h);
+    document.documentElement.style.setProperty("--fig-h", `${fig}px`);
+    document.documentElement.style.setProperty("--fig-gap", `${fig * gapRatio}px`);
   }
 
   function eventLabel(ev) {
@@ -1135,7 +1163,7 @@
     }
 
     updateTitle();
-    els.btnNext.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     updateTimelineActive();
     updateSpeakerIndicators();
     persistProgress();
@@ -2600,6 +2628,8 @@
   });
 
   window.addEventListener("resize", fitSpeakerSize);
+  // The stage also changes height when the title wraps onto a second line.
+  if ("ResizeObserver" in window) new ResizeObserver(() => fitSpeakerSize()).observe(els.proCol.parentElement);
 
   // ---------------------------------------------------------------------------
   // Main loop (Update)
