@@ -11,6 +11,54 @@
     end: "assets/audio/bell.ogg",
   };
 
+  // Round presets. A preset sets the debate format (title, speakers, event
+  // order, warning/prep/free times); colors, labels, sounds and language are kept.
+  const sideOf = (prefix, times) => times.map((time, i) => ({ name: prefix + "一二三四五六七八九十"[i], time }));
+  const PRESETS = {
+    default: {
+      title: "",
+      time_warning: 30,
+      time_prep: 300,
+      time_free: 300,
+      pro_side: sideOf("正", [180, 120, 120, 180]),
+      con_side: sideOf("反", [180, 120, 120, 180]),
+      event_order: [1, -1, -2, 3, 2, -3, "free", 4, -4],
+    },
+    round_robin: {
+      title: "",
+      time_warning: 15,
+      time_prep: 300,
+      time_free: 300,
+      pro_side: sideOf("正", [120, 60, 60, 120]),
+      con_side: sideOf("反", [120, 60, 60, 120]),
+      event_order: [1, -1, 2, -2, 3, -3, 4, -4],
+    },
+  };
+  const PRESET_KEYS = Object.keys(PRESETS);
+
+  // Deep copy of a preset's format fields, shaped like a save file's top level.
+  function presetFormat(key) {
+    const p = JSON.parse(JSON.stringify(PRESETS[key]));
+    return { title: p.title, pro_side: p.pro_side, con_side: p.con_side, event_order: p.event_order };
+  }
+  const PRESET_LABELS = { default: "presetDefault", round_robin: "presetRoundRobin" };
+
+  // Loads a preset's format into a save, keeping its other settings.
+  function applyPreset(save, key) {
+    Object.assign(save, presetFormat(key));
+    save.settings.time_warning = PRESETS[key].time_warning;
+    save.settings.time_prep = PRESETS[key].time_prep;
+    save.settings.time_free = PRESETS[key].time_free;
+  }
+
+  // The preset whose format a save matches exactly (ignoring the title), or "".
+  function matchPreset(save) {
+    const fmt = (o) =>
+      JSON.stringify([o.pro_side, o.con_side, o.event_order, o.time_warning, o.time_prep, o.time_free]);
+    const mine = fmt({ ...save, ...save.settings });
+    return PRESET_KEYS.find((k) => fmt(PRESETS[k]) === mine) || "";
+  }
+
   const DEFAULT_SAVE = {
     settings: {
       pro_colors: "#0000FF",
@@ -18,28 +66,15 @@
       pro_label: "",
       con_label: "",
       background_color: "#000000",
-      time_warning: 30,
-      time_prep: 300,
-      time_free: 300,
+      time_warning: PRESETS.default.time_warning,
+      time_prep: PRESETS.default.time_prep,
+      time_free: PRESETS.default.time_free,
       display_minutes: true,
       language: "en",
       audio_warning: "",
       audio_end: "",
     },
-    title: "在公共空间中，权利行使应不应受“公序良俗”的限制",
-    pro_side: [
-      { name: "正一", time: 180 },
-      { name: "正二", time: 120 },
-      { name: "正三", time: 120 },
-      { name: "正四", time: 180 },
-    ],
-    con_side: [
-      { name: "反一", time: 180 },
-      { name: "反二", time: 120 },
-      { name: "反三", time: 120 },
-      { name: "反四", time: 180 },
-    ],
-    event_order: [1, -1, -2, 3, 2, -3, "free", 4, -4],
+    ...presetFormat("default"),
   };
   const DEFAULT_TEXT = JSON.stringify(DEFAULT_SAVE, null, 2);
 
@@ -76,6 +111,10 @@
       // settings form
       fGeneral: "General",
       fTitle: "Debate title",
+      fPreset: "Preset",
+      presetDefault: "Default",
+      presetRoundRobin: "Round robin (quick)",
+      presetCustom: "Custom",
       fLanguage: "Language",
       fDisplayMinutes: "Show minutes (m:ss)",
       fBackground: "Background color",
@@ -154,6 +193,10 @@
       speakerTurn: (name) => `辩手 ${name} 发言`,
       fGeneral: "常规",
       fTitle: "辩题",
+      fPreset: "预设",
+      presetDefault: "默认",
+      presetRoundRobin: "循环赛（快速）",
+      presetCustom: "自定义",
       fLanguage: "语言",
       fDisplayMinutes: "显示分钟 (m:ss)",
       fBackground: "背景颜色",
@@ -1068,6 +1111,7 @@
       <section class="sgroup">
         <h3>${esc(t("fGeneral"))}</h3>
         <div class="frow">
+          ${field("fPreset", presetSelect())}
           ${field("fTitle", `<input type="text" data-path="title" value="${esc(draft.title)}" />`, "grow")}
           ${field(
             "fLanguage",
@@ -1118,6 +1162,16 @@
     renderSpeakerList("pro");
     renderSpeakerList("con");
     renderEventChips();
+  }
+
+  function presetSelect() {
+    const current = matchPreset(draft);
+    const opt = (value, labelKey) =>
+      `<option value="${value}" ${current === value ? "selected" : ""}>${esc(t(labelKey))}</option>`;
+    return `<select data-preset>
+      ${current ? "" : opt("", "presetCustom")}
+      ${PRESET_KEYS.map((k) => opt(k, PRESET_LABELS[k])).join("")}
+    </select>`;
   }
 
   function audioRow(labelKey, key, defaultSrc) {
@@ -1216,7 +1270,15 @@
     return chip;
   }
 
+  // Re-pick the preset dropdown after an edit, so it shows "Custom" once the
+  // format no longer matches a preset.
+  function refreshPresetSelect() {
+    const sel = els.form.querySelector("select[data-preset]");
+    if (sel) sel.outerHTML = presetSelect();
+  }
+
   function renderEventChips() {
+    refreshPresetSelect();
     const root = $("event-chips");
     root.innerHTML = "";
     root.classList.toggle("vertical", orderView === "detailed");
@@ -1493,7 +1555,12 @@
       if (key === "name") renderEventChips();
     } else if (el.dataset.audioUrl) {
       draft.settings[el.dataset.audioUrl] = el.value.trim();
+    } else if ("preset" in el.dataset) {
+      if (el.value) applyPreset(draft, el.value);
+      renderForm();
+      return;
     }
+    refreshPresetSelect();
   });
 
   els.form.addEventListener("click", (e) => {
