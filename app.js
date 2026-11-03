@@ -21,8 +21,15 @@
   const ROUND_SETTINGS = ["pro_label", "con_label", "pro_colors", "con_colors", "time_warning", "time_prep", "time_free"];
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const CN_NUM = "一二三四五六七八九十";
-  const speakerName = (side, i) => (side === "pro" ? "正" : "反") + (i < CN_NUM.length ? CN_NUM[i] : String(i + 1));
-  const team = (side, times) => times.map((time, i) => ({ name: speakerName(side, i), time }));
+  // Default speaker names follow the screen language: 正一 / 反一 in Chinese,
+  // Pro 1 / Con 1 in English. A speaker saved with an empty name uses them.
+  function defaultSpeakerName(side, i, lang) {
+    if (lang === "zh") return (side === "pro" ? "正" : "反") + (i < CN_NUM.length ? CN_NUM[i] : String(i + 1));
+    return (side === "pro" ? "Pro " : "Con ") + (i + 1);
+  }
+  const isDefaultName = (side, i, name) =>
+    name === defaultSpeakerName(side, i, "zh") || name === defaultSpeakerName(side, i, "en");
+  const team = (side, times) => times.map((time) => ({ name: "", time }));
 
   function makeRound(o) {
     return {
@@ -84,12 +91,22 @@
     return key(preset.round, withTitle) === key(save, withTitle);
   }
 
+  // Chinese if the browser's preferred language is Chinese, otherwise English.
+  function browserLang() {
+    try {
+      const l = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+      return /^zh\b/i.test(l) ? "zh" : "en";
+    } catch (_) {
+      return "en";
+    }
+  }
+
   const DEFAULT_SAVE = {
     title: "",
     settings: {
       background_color: "#000000",
       display_minutes: true,
-      language: "en",
+      language: browserLang(),
       audio_warning: "",
       audio_end: "",
     },
@@ -126,7 +143,11 @@
       invalidJson: "The settings file has a mistake: ",
       proDefault: "Pro",
       conDefault: "Con",
-      speakerTurn: (name) => `Speaker ${name}'s Turn`,
+      speakerTurn: (name) => `${name}’s Turn`,
+      idleHint: "Press Begin when the first speaker is ready.",
+      firstUp: "First up",
+      roundTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min in all`,
+      invertTitle: "Invert (I)",
       minutes: "Minutes",
       seconds: "Seconds",
       minShort: "min",
@@ -294,6 +315,10 @@
       proDefault: "正方",
       conDefault: "反方",
       speakerTurn: (name) => `辩手 ${name} 发言`,
+      idleHint: "第一位辩手准备好后，按“开始”。",
+      firstUp: "第一项",
+      roundTotal: (n, min) => `共 ${n} 项 · 全程约 ${min} 分钟`,
+      invertTitle: "翻转 (I)",
       minutes: "分钟",
       seconds: "秒",
       minShort: "分",
@@ -488,12 +513,12 @@
     const raw = typeof text === "string" ? JSON.parse(text) : text;
     if (!raw || typeof raw !== "object") throw new Error("root must be an object");
     const s = Object.assign({}, DEFAULT_SAVE.settings, raw.settings || {});
-    const list = (arr) =>
+    const list = (arr, side) =>
       Array.isArray(arr)
-        ? arr.map((p, i) => ({
-            name: p && p.name != null ? String(p.name) : String(i + 1),
-            time: Math.max(0, Number(p && p.time) || 0),
-          }))
+        ? arr.map((p, i) => {
+            const name = p && p.name != null ? String(p.name) : "";
+            return { name: isDefaultName(side, i, name) ? "" : name, time: Math.max(0, Number(p && p.time) || 0) };
+          })
         : [];
     const events = Array.isArray(raw.event_order)
       ? raw.event_order
@@ -520,8 +545,8 @@
         audio_end: String(s.audio_end || ""),
       },
       title: raw.title != null ? String(raw.title) : "",
-      pro_side: list(raw.pro_side),
-      con_side: list(raw.con_side),
+      pro_side: list(raw.pro_side, "pro"),
+      con_side: list(raw.con_side, "con"),
       event_order: events,
     };
   }
@@ -558,6 +583,12 @@
     audioEnd: $("audio-end"),
     form: $("settings-form"),
     nav: $("settings-nav"),
+    idleHint: $("idle-hint"),
+    idleName: $("idle-name"),
+    idleTime: $("idle-time"),
+    idleBar: $("idle-bar"),
+    idleTotal: $("idle-total"),
+    btnNextLabel: $("btn-next-label"),
     btnSave: $("btn-save"),
     btnDiscard: $("btn-discard"),
     panelFoot: $("panel-foot"),
@@ -770,7 +801,7 @@
       }
     });
     els.btnLang.textContent = t("langBtn");
-    els.btnNext.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     if (state.data) {
       els.proLabel.textContent = state.data.settings.pro_label || t("proDefault");
       els.conLabel.textContent = state.data.settings.con_label || t("conDefault");
@@ -792,9 +823,49 @@
     return null;
   }
 
+  // A speaker's name as shown, falling back to the default for the language.
+  function nameOf(id, p) {
+    return (p && p.name) || defaultSpeakerName(id > 0 ? "pro" : "con", Math.abs(id) - 1, state.lang);
+  }
+
+  // Before the round, the empty centre says what comes first and what to press.
+  function updateIdleHint() {
+    const d = state.data;
+    const idle = Boolean(d) && state.eventIndex < 0 && d.event_order.length > 0;
+    show(els.idleHint, idle);
+    if (!idle) return;
+    const s = d.settings;
+    const ev = d.event_order[0];
+    const colorOf = (e) =>
+      e === "prep" ? "var(--lime)" : e === "free" ? "var(--yellow)" : Number(e) > 0 ? s.pro_colors : s.con_colors;
+    let what;
+    let sec = 0;
+    if (ev === "prep") {
+      what = t("prep");
+      sec = s.time_prep;
+    } else if (ev === "free") {
+      what = t("free");
+      sec = s.time_free;
+    } else {
+      const p = participant(Number(ev));
+      what = p ? nameOf(Number(ev), p) : String(ev);
+      sec = p ? p.time : 0;
+    }
+    els.idleHint.style.setProperty("--first", colorOf(ev));
+    els.idleName.textContent = what;
+    els.idleTime.textContent = formatTime(sec, s.display_minutes);
+    // The whole round as one bar, each part as long as it lasts.
+    const stats = roundStats(d);
+    els.idleBar.innerHTML = stats.segs
+      .map((g, i) => `<i style="flex-grow:${g.sec || 1};background:${colorOf(d.event_order[i])}"></i>`)
+      .join("");
+    els.idleTotal.textContent = t("roundTotal")(d.event_order.length, Math.round(stats.total / 60));
+  }
+
   function updateTitle() {
     const d = state.data;
     if (!d) return;
+    updateIdleHint();
     const order = d.event_order;
     const i = state.eventIndex;
     if (i < 0 || i >= order.length) {
@@ -806,7 +877,7 @@
     else if (ev === "free") els.title.textContent = t("free");
     else {
       const p = participant(speakerIdAt(i));
-      els.title.textContent = p ? t("speakerTurn")(p.name) : `${t("fNoSpeaker")} (${ev})`;
+      els.title.textContent = p ? t("speakerTurn")(nameOf(speakerIdAt(i), p)) : `${t("fNoSpeaker")} (${ev})`;
     }
   }
 
@@ -878,7 +949,7 @@
     show(els.ringTimer, Boolean(p.ringVisible));
     show(els.doubleTimer, Boolean(p.doubleVisible));
     updateTitle();
-    els.btnNext.textContent = t("next");
+    els.btnNextLabel.textContent = t("next");
     updateTimelineActive();
     updateSpeakerIndicators();
     return true;
@@ -985,12 +1056,22 @@
     fitSpeakerSize();
   }
 
+  // Size the speaker figures to fill the side columns, leaving a little air
+  // above and below, with gaps in proportion to the figures.
   function fitSpeakerSize() {
     const n = Math.max(state.speakers.pro.length, state.speakers.con.length, 1);
-    const avail = els.proCol.clientHeight || window.innerHeight * 0.65;
-    const gap = avail * 0.06;
-    const h = Math.min(avail * 0.24, (avail - (n - 1) * gap) / n);
-    document.documentElement.style.setProperty("--fig-h", `${Math.max(30, h)}px`);
+    const side = els.proCol.parentElement;
+    const full = side.clientHeight || window.innerHeight * 0.7;
+    const gapRatio = 0.3;
+    // The label's padding is 0.2 × the figure height, so it is solved for here too.
+    const label = parseFloat(getComputedStyle(els.proLabel).fontSize) * 1.2 || 0;
+    const avail = full * 0.94 - label;
+    // A speaker row is about 1.6 figure-heights wide (figure plus its icons).
+    const widthCap = (side.clientWidth || Infinity) / 1.6;
+    const h = Math.min(full * 0.22, widthCap, avail / (n + gapRatio * (n - 1) + 0.2));
+    const fig = Math.max(24, h);
+    document.documentElement.style.setProperty("--fig-h", `${fig}px`);
+    document.documentElement.style.setProperty("--fig-gap", `${fig * gapRatio}px`);
   }
 
   function eventLabel(ev) {
@@ -1004,7 +1085,7 @@
       b.className = "tl-btn";
       b.textContent = eventLabel(ev);
       const p = participant(Number(ev));
-      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? p.name : String(ev);
+      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? nameOf(Number(ev), p) : String(ev);
       b.addEventListener("click", () => {
         state.eventIndex = i - 1; // TimelineButtonControl.OnButtonPress
         next();
@@ -1082,7 +1163,7 @@
     }
 
     updateTitle();
-    els.btnNext.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     updateTimelineActive();
     updateSpeakerIndicators();
     persistProgress();
@@ -1584,12 +1665,14 @@
       row.className = "srow";
       row.innerHTML = `<span class="num">${i + 1}</span>
         <span class="name-cell">
-          <input type="text" data-sp="${side}:${i}:name" value="${esc(p.name)}" aria-label="${esc(t("fName") + " " + (i + 1))}" />
+          <input type="text" data-sp="${side}:${i}:name" value="${esc(p.name)}" placeholder="${esc(
+            defaultSpeakerName(side, i, state.lang)
+          )}" aria-label="${esc(t("fName") + " " + (i + 1))}" />
           ${scheduled ? "" : `<span class="tag-warn" title="${esc(t("notInOrderHint"))}">${esc(t("notInOrder"))}</span>`}
         </span>
         ${durInput(`sp:${side}:${i}`, p.time, t("fSpeakingTime"))}
         <button type="button" class="icon-btn danger" data-del-speaker="${side}:${i}" title="${esc(t("fRemove"))}" aria-label="${esc(
-        t("fRemove") + " " + p.name
+        t("fRemove") + " " + nameOf(sign * (i + 1), p)
       )}">${ICONS.trash}</button>`;
       root.appendChild(row);
     });
@@ -1752,7 +1835,7 @@
     if (ev === "prep") return t("prep");
     if (ev === "free") return t("free");
     const p = participant2(Number(ev));
-    return p ? p.name : t("fNoSpeaker");
+    return p ? nameOf(Number(ev), p) : t("fNoSpeaker");
   }
 
   function sideName(id) {
@@ -1769,7 +1852,7 @@
     const p = participant2(id);
     const who = `${sideName(id)} ${Math.abs(id)}`;
     if (!p) return { text: `${who} · ${t("fNoSpeaker")}`, time: "" };
-    return { text: `${who} · ${p.name}`, time: formatTime(p.time, true) };
+    return { text: p.name ? `${who} · ${p.name}` : who, time: formatTime(p.time, true) };
   }
 
   function makeChip(ev, extra) {
@@ -2079,7 +2162,7 @@
   function addSpeaker(side) {
     const list = draft[side + "_side"];
     const last = list[list.length - 1];
-    list.push({ name: speakerName(side, list.length), time: last ? last.time : 120 });
+    list.push({ name: "", time: last ? last.time : 120 });
     renderSpeakerList(side);
     const inputs = $("list-" + side).querySelectorAll("input[data-sp$=':name']");
     if (inputs.length) inputs[inputs.length - 1].focus();
@@ -2417,7 +2500,10 @@
           cls: "btn-red",
           action: () => {
             draft = parseSave(DEFAULT_TEXT);
-            draft.settings.language = state.lang;
+            if (state.lang !== draft.settings.language) {
+              state.lang = draft.settings.language;
+              applyI18n();
+            }
             notice = "";
             setError("");
             renderForm();
@@ -2542,6 +2628,8 @@
   });
 
   window.addEventListener("resize", fitSpeakerSize);
+  // The stage also changes height when the title wraps onto a second line.
+  if ("ResizeObserver" in window) new ResizeObserver(() => fitSpeakerSize()).observe(els.proCol.parentElement);
 
   // ---------------------------------------------------------------------------
   // Main loop (Update)

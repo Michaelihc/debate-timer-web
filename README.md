@@ -23,6 +23,8 @@ python -m http.server 8000
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
 - Clickable timeline to jump to any event
+- Before the round, the centre previews what comes first on a full ring in its team colour, with the whole round as a coloured bar and its total length
+- Main-screen controls, timers, and the timeline scale with the screen within sensible limits, from phone landscape to a 1080p projector
 - Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
 - Presets: built-in **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating, no free debate, warning at 15 s), plus your own presets with a name and icon. Presets can be downloaded and opened as `.json` files to share between computers
 - Event order as a detailed vertical list or compact chips, with drag-and-drop reordering, an "Alternate Pro and Con" shortcut, and a running total. Removing a speaker also removes and renumbers their turns
@@ -69,16 +71,16 @@ A preset file is a save file holding just those fields, plus a `name` and an `ic
     "time_free": 300
   },
   "pro_side": [
-    { "name": "正一", "time": 120 },
-    { "name": "正二", "time": 60 },
-    { "name": "正三", "time": 60 },
-    { "name": "正四", "time": 120 }
+    { "name": "", "time": 120 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 120 }
   ],
   "con_side": [
-    { "name": "反一", "time": 120 },
-    { "name": "反二", "time": 60 },
-    { "name": "反三", "time": 60 },
-    { "name": "反四", "time": 120 }
+    { "name": "", "time": 120 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 120 }
   ],
   "event_order": [1, -1, 2, -2, 3, -3, 4, -4]
 }
@@ -88,7 +90,7 @@ A preset file is a save file holding just those fields, plus a `name` and an `ic
 
 ## Save file format
 
-Compatible with the original. New optional fields are `pro_label`, `con_label`, `background_color`, `audio_warning`, and `audio_end`. `language` accepts `"en"`, `"zh"`, or the original numeric values (`0` = Chinese, `1` = English).
+Compatible with the original. New optional fields are `pro_label`, `con_label`, `background_color`, `audio_warning`, and `audio_end`. `language` accepts `"en"`, `"zh"`, or the original numeric values (`0` = Chinese, `1` = English). The default language follows the browser: Chinese if its preferred language is Chinese, otherwise English.
 
 ```json
 {
@@ -108,21 +110,22 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
   },
   "title": "",
   "pro_side": [
-    { "name": "正一", "time": 180 },
-    { "name": "正二", "time": 120 },
-    { "name": "正三", "time": 120 },
-    { "name": "正四", "time": 180 }
+    { "name": "", "time": 180 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 180 }
   ],
   "con_side": [
-    { "name": "反一", "time": 180 },
-    { "name": "反二", "time": 120 },
-    { "name": "反三", "time": 120 },
-    { "name": "反四", "time": 180 }
+    { "name": "", "time": 180 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 180 }
   ],
   "event_order": [1, -1, -2, 3, 2, -3, "free", 4, -4]
 }
 ```
 
+- Speaker `name`: leave it empty to use the default name in the screen language (Pro 1, Con 1… in English; 正一, 反一… in Chinese).
 - `event_order` entries: `"prep"` for preparation time, `"free"` for free debate, a positive number for a pro speaker, a negative number for a con speaker.
 - Empty labels fall back to "Pro" / "Con" (or 正方 / 反方 in Chinese).
 - Empty audio fields use the bundled sounds. Uploaded files are stored inline as data URLs (2 MB limit); larger sounds should be referenced by URL.

@@ -13,11 +13,11 @@
     <div id="flash" class="flash" aria-hidden="true"></div>
 
     <header class="top">
-      <button id="btn-menu" class="btn btn-lime btn-gear" data-i18n-title="menuTitle" title="Settings (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span data-i18n="menu">Settings</span></button>
+      <button id="btn-menu" class="btn btn-tonal btn-gear" data-i18n-title="menuTitle" title="Settings (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span data-i18n="menu">Settings</span></button>
       <h1 id="title" class="title">Debate Timer</h1>
       <div class="top-right">
-        <button id="btn-reload" class="btn btn-lime" data-i18n="reload">Reload Scene</button>
-        <button id="btn-fullscreen" class="btn btn-lime btn-icon" data-i18n-title="fullscreen" title="Fullscreen (F)" aria-label="Fullscreen">⛶</button>
+        <button id="btn-reload" class="btn btn-tonal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg><span data-i18n="reload">Reload Scene</span></button>
+        <button id="btn-fullscreen" class="btn btn-tonal btn-icon" data-i18n-title="fullscreen" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
       </div>
     </header>
 
@@ -28,6 +28,26 @@
       </div>
 
       <section class="center">
+        <!-- Before the round -->
+        <div id="idle-hint" class="idle hidden" aria-live="polite">
+          <div class="idle-who">
+            <span class="idle-eyebrow" data-i18n="firstUp">First up</span>
+            <span id="idle-name" class="idle-name"></span>
+          </div>
+          <div class="idle-ring">
+            <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="idle-ring-bg" cx="50" cy="50" r="44" />
+              <circle class="idle-ring-fg" cx="50" cy="50" r="44" />
+            </svg>
+            <div id="idle-time" class="idle-time">0:00</div>
+          </div>
+          <div class="idle-round">
+            <div id="idle-bar" class="idle-bar" aria-hidden="true"></div>
+            <div id="idle-total" class="idle-total"></div>
+          </div>
+          <p class="idle-text" data-i18n="idleHint">Press Begin when the first speaker is ready.</p>
+        </div>
+
         <!-- Single ring timer (prep + speakers) -->
         <div id="ring-timer" class="ring-timer hidden">
           <div class="ring-wrap">
@@ -38,11 +58,11 @@
             <div id="ring-text" class="ring-text">0:00</div>
           </div>
           <div class="controls">
-            <button id="ring-start" class="btn btn-mint" data-i18n="start">Start</button>
-            <button id="ring-pause" class="btn btn-blue" data-i18n="pause">Pause</button>
-            <button id="ring-resume" class="btn btn-mint" data-i18n="resume">Resume</button>
-            <button id="ring-out" class="btn btn-grey" disabled data-i18n="timeout">Time ran out</button>
-            <button id="ring-reset" class="btn btn-red" data-i18n="reset">Reset</button>
+            <button id="ring-start" class="btn btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="start">Start</span></button>
+            <button id="ring-pause" class="btn btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></span><span data-i18n="pause">Pause</span></button>
+            <button id="ring-resume" class="btn btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="resume">Resume</span></button>
+            <button id="ring-out" class="btn btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
+            <button id="ring-reset" class="btn btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
           </div>
         </div>
 
@@ -59,16 +79,16 @@
             </div>
             <div class="bar-text">0:00</div>
             <div class="bar-controls">
-              <button class="btn btn-mint bar-start" data-i18n="start">Start</button>
-              <button class="btn btn-blue bar-pause" data-i18n="pause">Pause</button>
-              <button class="btn btn-mint bar-resume" data-i18n="resume">Resume</button>
-              <button class="btn btn-grey bar-out" disabled data-i18n="timeout">Time ran out</button>
-              <button class="btn btn-red bar-reset" data-i18n="reset">Reset</button>
+              <button class="btn bar-start btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="start">Start</span></button>
+              <button class="btn bar-pause btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></span><span data-i18n="pause">Pause</span></button>
+              <button class="btn bar-resume btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="resume">Resume</span></button>
+              <button class="btn bar-out btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
+              <button class="btn bar-reset btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
             </div>
           </div>
 
-          <button id="btn-invert" class="invert-btn">
-            <img src="assets/icons/swap-icon.png" alt="" />
+          <button id="btn-invert" class="invert-btn" data-i18n-title="invertTitle" title="Invert (I)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
             <span data-i18n="invert">Invert</span>
           </button>
 
@@ -83,11 +103,11 @@
             </div>
             <div class="bar-text">0:00</div>
             <div class="bar-controls">
-              <button class="btn btn-mint bar-start" data-i18n="start">Start</button>
-              <button class="btn btn-blue bar-pause" data-i18n="pause">Pause</button>
-              <button class="btn btn-mint bar-resume" data-i18n="resume">Resume</button>
-              <button class="btn btn-grey bar-out" disabled data-i18n="timeout">Time ran out</button>
-              <button class="btn btn-red bar-reset" data-i18n="reset">Reset</button>
+              <button class="btn bar-start btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="start">Start</span></button>
+              <button class="btn bar-pause btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></span><span data-i18n="pause">Pause</span></button>
+              <button class="btn bar-resume btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="resume">Resume</span></button>
+              <button class="btn bar-out btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
+              <button class="btn bar-reset btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
             </div>
           </div>
         </div>
@@ -100,7 +120,7 @@
     </main>
 
     <footer class="bottom">
-      <button id="btn-next" class="btn btn-mint btn-next" data-i18n="begin">Begin</button>
+      <button id="btn-next" class="btn btn-primary btn-next"><span id="btn-next-label">Begin</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       <div class="timeline">
         <div id="timeline-buttons" class="timeline-buttons"></div>
         <div class="timeline-line"></div>
@@ -169,8 +189,8 @@
       <div class="end-card">
         <h2 data-i18n="ended">Debate Ended</h2>
         <div class="panel-actions">
-          <button id="btn-end-close" class="btn btn-mint" data-i18n="close">Close</button>
-          <button id="btn-end-reload" class="btn btn-lime" data-i18n="reload">Reload Scene</button>
+          <button id="btn-end-close" class="btn btn-tonal" data-i18n="close">Close</button>
+          <button id="btn-end-reload" class="btn btn-primary" data-i18n="reload">Reload Scene</button>
         </div>
       </div>
     </div>
