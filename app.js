@@ -21,8 +21,15 @@
   const ROUND_SETTINGS = ["pro_label", "con_label", "pro_colors", "con_colors", "time_warning", "time_prep", "time_free"];
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const CN_NUM = "一二三四五六七八九十";
-  const speakerName = (side, i) => (side === "pro" ? "正" : "反") + (i < CN_NUM.length ? CN_NUM[i] : String(i + 1));
-  const team = (side, times) => times.map((time, i) => ({ name: speakerName(side, i), time }));
+  // Default speaker names follow the screen language: 正一 / 反一 in Chinese,
+  // Pro 1 / Con 1 in English. A speaker saved with an empty name uses them.
+  function defaultSpeakerName(side, i, lang) {
+    if (lang === "zh") return (side === "pro" ? "正" : "反") + (i < CN_NUM.length ? CN_NUM[i] : String(i + 1));
+    return (side === "pro" ? "Pro " : "Con ") + (i + 1);
+  }
+  const isDefaultName = (side, i, name) =>
+    name === defaultSpeakerName(side, i, "zh") || name === defaultSpeakerName(side, i, "en");
+  const team = (side, times) => times.map((time) => ({ name: "", time }));
 
   function makeRound(o) {
     return {
@@ -84,12 +91,22 @@
     return key(preset.round, withTitle) === key(save, withTitle);
   }
 
+  // Chinese if the browser's preferred language is Chinese, otherwise English.
+  function browserLang() {
+    try {
+      const l = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+      return /^zh\b/i.test(l) ? "zh" : "en";
+    } catch (_) {
+      return "en";
+    }
+  }
+
   const DEFAULT_SAVE = {
     title: "",
     settings: {
       background_color: "#000000",
       display_minutes: true,
-      language: "en",
+      language: browserLang(),
       audio_warning: "",
       audio_end: "",
     },
@@ -488,12 +505,12 @@
     const raw = typeof text === "string" ? JSON.parse(text) : text;
     if (!raw || typeof raw !== "object") throw new Error("root must be an object");
     const s = Object.assign({}, DEFAULT_SAVE.settings, raw.settings || {});
-    const list = (arr) =>
+    const list = (arr, side) =>
       Array.isArray(arr)
-        ? arr.map((p, i) => ({
-            name: p && p.name != null ? String(p.name) : String(i + 1),
-            time: Math.max(0, Number(p && p.time) || 0),
-          }))
+        ? arr.map((p, i) => {
+            const name = p && p.name != null ? String(p.name) : "";
+            return { name: isDefaultName(side, i, name) ? "" : name, time: Math.max(0, Number(p && p.time) || 0) };
+          })
         : [];
     const events = Array.isArray(raw.event_order)
       ? raw.event_order
@@ -520,8 +537,8 @@
         audio_end: String(s.audio_end || ""),
       },
       title: raw.title != null ? String(raw.title) : "",
-      pro_side: list(raw.pro_side),
-      con_side: list(raw.con_side),
+      pro_side: list(raw.pro_side, "pro"),
+      con_side: list(raw.con_side, "con"),
       event_order: events,
     };
   }
@@ -792,6 +809,11 @@
     return null;
   }
 
+  // A speaker's name as shown, falling back to the default for the language.
+  function nameOf(id, p) {
+    return (p && p.name) || defaultSpeakerName(id > 0 ? "pro" : "con", Math.abs(id) - 1, state.lang);
+  }
+
   function updateTitle() {
     const d = state.data;
     if (!d) return;
@@ -806,7 +828,7 @@
     else if (ev === "free") els.title.textContent = t("free");
     else {
       const p = participant(speakerIdAt(i));
-      els.title.textContent = p ? t("speakerTurn")(p.name) : `${t("fNoSpeaker")} (${ev})`;
+      els.title.textContent = p ? t("speakerTurn")(nameOf(speakerIdAt(i), p)) : `${t("fNoSpeaker")} (${ev})`;
     }
   }
 
@@ -1004,7 +1026,7 @@
       b.className = "tl-btn";
       b.textContent = eventLabel(ev);
       const p = participant(Number(ev));
-      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? p.name : String(ev);
+      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? nameOf(Number(ev), p) : String(ev);
       b.addEventListener("click", () => {
         state.eventIndex = i - 1; // TimelineButtonControl.OnButtonPress
         next();
@@ -1584,12 +1606,14 @@
       row.className = "srow";
       row.innerHTML = `<span class="num">${i + 1}</span>
         <span class="name-cell">
-          <input type="text" data-sp="${side}:${i}:name" value="${esc(p.name)}" aria-label="${esc(t("fName") + " " + (i + 1))}" />
+          <input type="text" data-sp="${side}:${i}:name" value="${esc(p.name)}" placeholder="${esc(
+            defaultSpeakerName(side, i, state.lang)
+          )}" aria-label="${esc(t("fName") + " " + (i + 1))}" />
           ${scheduled ? "" : `<span class="tag-warn" title="${esc(t("notInOrderHint"))}">${esc(t("notInOrder"))}</span>`}
         </span>
         ${durInput(`sp:${side}:${i}`, p.time, t("fSpeakingTime"))}
         <button type="button" class="icon-btn danger" data-del-speaker="${side}:${i}" title="${esc(t("fRemove"))}" aria-label="${esc(
-        t("fRemove") + " " + p.name
+        t("fRemove") + " " + nameOf(sign * (i + 1), p)
       )}">${ICONS.trash}</button>`;
       root.appendChild(row);
     });
@@ -1752,7 +1776,7 @@
     if (ev === "prep") return t("prep");
     if (ev === "free") return t("free");
     const p = participant2(Number(ev));
-    return p ? p.name : t("fNoSpeaker");
+    return p ? nameOf(Number(ev), p) : t("fNoSpeaker");
   }
 
   function sideName(id) {
@@ -1769,7 +1793,7 @@
     const p = participant2(id);
     const who = `${sideName(id)} ${Math.abs(id)}`;
     if (!p) return { text: `${who} · ${t("fNoSpeaker")}`, time: "" };
-    return { text: `${who} · ${p.name}`, time: formatTime(p.time, true) };
+    return { text: p.name ? `${who} · ${p.name}` : who, time: formatTime(p.time, true) };
   }
 
   function makeChip(ev, extra) {
@@ -2079,7 +2103,7 @@
   function addSpeaker(side) {
     const list = draft[side + "_side"];
     const last = list[list.length - 1];
-    list.push({ name: speakerName(side, list.length), time: last ? last.time : 120 });
+    list.push({ name: "", time: last ? last.time : 120 });
     renderSpeakerList(side);
     const inputs = $("list-" + side).querySelectorAll("input[data-sp$=':name']");
     if (inputs.length) inputs[inputs.length - 1].focus();
@@ -2417,7 +2441,10 @@
           cls: "btn-red",
           action: () => {
             draft = parseSave(DEFAULT_TEXT);
-            draft.settings.language = state.lang;
+            if (state.lang !== draft.settings.language) {
+              state.lang = draft.settings.language;
+              applyI18n();
+            }
             notice = "";
             setError("");
             renderForm();

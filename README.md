@@ -69,16 +69,16 @@ A preset file is a save file holding just those fields, plus a `name` and an `ic
     "time_free": 300
   },
   "pro_side": [
-    { "name": "正一", "time": 120 },
-    { "name": "正二", "time": 60 },
-    { "name": "正三", "time": 60 },
-    { "name": "正四", "time": 120 }
+    { "name": "", "time": 120 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 120 }
   ],
   "con_side": [
-    { "name": "反一", "time": 120 },
-    { "name": "反二", "time": 60 },
-    { "name": "反三", "time": 60 },
-    { "name": "反四", "time": 120 }
+    { "name": "", "time": 120 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 60 },
+    { "name": "", "time": 120 }
   ],
   "event_order": [1, -1, 2, -2, 3, -3, 4, -4]
 }
@@ -88,7 +88,7 @@ A preset file is a save file holding just those fields, plus a `name` and an `ic
 
 ## Save file format
 
-Compatible with the original. New optional fields are `pro_label`, `con_label`, `background_color`, `audio_warning`, and `audio_end`. `language` accepts `"en"`, `"zh"`, or the original numeric values (`0` = Chinese, `1` = English).
+Compatible with the original. New optional fields are `pro_label`, `con_label`, `background_color`, `audio_warning`, and `audio_end`. `language` accepts `"en"`, `"zh"`, or the original numeric values (`0` = Chinese, `1` = English). The default language follows the browser: Chinese if its preferred language is Chinese, otherwise English.
 
 ```json
 {
@@ -108,21 +108,22 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
   },
   "title": "",
   "pro_side": [
-    { "name": "正一", "time": 180 },
-    { "name": "正二", "time": 120 },
-    { "name": "正三", "time": 120 },
-    { "name": "正四", "time": 180 }
+    { "name": "", "time": 180 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 180 }
   ],
   "con_side": [
-    { "name": "反一", "time": 180 },
-    { "name": "反二", "time": 120 },
-    { "name": "反三", "time": 120 },
-    { "name": "反四", "time": 180 }
+    { "name": "", "time": 180 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 120 },
+    { "name": "", "time": 180 }
   ],
   "event_order": [1, -1, -2, 3, 2, -3, "free", 4, -4]
 }
 ```
 
+- Speaker `name`: leave it empty to use the default name in the screen language (Pro 1, Con 1… in English; 正一, 反一… in Chinese).
 - `event_order` entries: `"prep"` for preparation time, `"free"` for free debate, a positive number for a pro speaker, a negative number for a con speaker.
 - Empty labels fall back to "Pro" / "Con" (or 正方 / 反方 in Chinese).
 - Empty audio fields use the bundled sounds. Uploaded files are stored inline as data URLs (2 MB limit); larger sounds should be referenced by URL.
