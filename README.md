@@ -23,6 +23,7 @@ python -m http.server 8000
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
 - Clickable timeline to jump to any event
+- Round presets in the settings menu: **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating `1, -1, 2, -2, 3, -3, 4, -4`, no free debate). Picking a preset replaces the title, speakers, event order, and prep/free times, and keeps colors, labels, sounds, and language; editing the format afterwards shows the preset as "Custom"
 - Settings menu with a form editor and a raw JSON editor; event order defaults to a detailed vertical list, with an optional compact view, categorized add controls, robust drag-and-drop reordering, and animated removal
 - Custom background color (text and ring colors adapt to light backgrounds)
 - Custom warning and end sounds, from a URL or an uploaded file
@@ -64,7 +65,7 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
     "audio_warning": "",
     "audio_end": ""
   },
-  "title": "在公共空间中，权利行使应不应受“公序良俗”的限制",
+  "title": "",
   "pro_side": [
     { "name": "正一", "time": 180 },
     { "name": "正二", "time": 120 },
