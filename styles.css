@@ -16,6 +16,12 @@
   --ring-fg-warning: #fdff00;
   --line: #fff;
   --fig-h: 14vh;
+  /* Main screen scale: one control size, a title size and an edge gutter,
+     clamped so phones stay usable and projectors don't balloon. */
+  --ctl: clamp(13px, 2.8vmin, 32px);
+  --gutter-y: clamp(10px, 2.2vh, 28px);
+  --gutter-x: clamp(12px, 1.8vw, 36px);
+  --ring: min(50vh, 36vw);
   --font: "Liberation Sans", Arial, "Helvetica Neue", "Noto Sans SC", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 }
@@ -52,20 +58,21 @@ body {
 #app {
   position: relative;
   height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  padding: 2vh 1.5vw;
-  gap: 1vh;
+  padding: var(--gutter-y) var(--gutter-x);
+  gap: clamp(6px, 1.4vh, 18px);
 }
 
 /* ---------- Buttons ---------- */
 .btn {
   font-family: inherit;
-  font-size: 2.6vmin;
+  font-size: var(--ctl);
   line-height: 1.2;
-  padding: 0.35em 1.1em;
+  padding: 0.4em 1.1em;
   border: none;
-  border-radius: 0.35em;
+  border-radius: 0.4em;
   color: #222;
   cursor: pointer;
   white-space: nowrap;
@@ -83,8 +90,14 @@ body {
   transform: none;
 }
 .btn.sm {
-  font-size: 1.9vmin;
+  font-size: calc(var(--ctl) * 0.8);
   padding: 0.35em 0.9em;
+}
+.btn:focus-visible,
+.tl-btn:focus-visible,
+.invert-btn:focus-visible {
+  outline: 3px solid var(--lime);
+  outline-offset: 3px;
 }
 .btn-lime {
   background: var(--lime);
@@ -113,7 +126,7 @@ body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 1vw;
+  gap: var(--gutter-x);
 }
 .top > :last-child {
   justify-self: end;
@@ -123,7 +136,7 @@ body {
 }
 .top-right {
   display: flex;
-  gap: 0.6vw;
+  gap: calc(var(--ctl) * 0.45);
   align-items: center;
 }
 .btn-gear {
@@ -136,16 +149,16 @@ body {
   height: 1.05em;
 }
 .btn-icon {
-  padding: 0.35em 0.6em;
-  font-size: 2.8vmin;
-  line-height: 1;
+  padding: 0.4em 0.55em;
+  line-height: 1.2;
 }
 .title {
   margin: 0;
   font-weight: 400;
-  font-size: 6vmin;
-  line-height: 1.1;
+  font-size: clamp(22px, 5.6vmin, 76px);
+  line-height: 1.12;
   text-align: center;
+  text-wrap: balance;
   max-width: 62vw;
   overflow: hidden;
   display: -webkit-box;
@@ -168,11 +181,11 @@ body {
 }
 .side-label {
   text-align: center;
-  font-size: 2.8vmin;
-  letter-spacing: 0.06em;
+  font-size: clamp(13px, 2.6vmin, 32px);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  padding-bottom: 0.5vh;
+  padding-bottom: 0.4em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -297,16 +310,34 @@ body {
   min-width: 0;
 }
 
+.idle-hint {
+  max-width: 80%;
+  text-align: center;
+  color: var(--muted);
+}
+.idle-hint p {
+  margin: 0;
+}
+.idle-first {
+  margin-bottom: 0.6em !important;
+  color: var(--fg);
+  font-size: clamp(18px, 4.2vmin, 54px);
+  text-wrap: balance;
+}
+.idle-text {
+  font-size: clamp(13px, 2.4vmin, 28px);
+}
+
 .ring-timer {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4vh;
+  gap: clamp(14px, 4vh, 44px);
 }
 .ring-wrap {
   position: relative;
-  width: min(48vh, 34vw);
-  height: min(48vh, 34vw);
+  width: var(--ring);
+  height: var(--ring);
 }
 .ring {
   width: 100%;
@@ -337,16 +368,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: min(9vh, 7vw);
+  font-size: calc(var(--ring) * 0.24);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 .controls {
   display: flex;
-  gap: 2.5vw;
+  gap: calc(var(--ctl) * 1.2);
 }
 .controls .btn {
-  min-width: 14vw;
-  font-size: 3.2vmin;
+  min-width: calc(var(--ctl) * 7);
+  font-size: calc(var(--ctl) * 1.2);
 }
 
 /* Double timer */
@@ -354,22 +386,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5vw;
+  gap: clamp(20px, 6vw, 120px);
   width: 100%;
 }
 .bar-timer {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5vh;
+  gap: clamp(8px, 1.6vh, 18px);
   position: relative;
 }
 .bar-wrap {
   position: relative;
-  width: 4vh;
-  height: 38vh;
+  width: clamp(28px, 6vh, 72px);
+  height: 36vh;
   overflow: hidden;
-  border-radius: 0.5vh;
+  border-radius: clamp(6px, 1vh, 12px);
 }
 .bar-bg {
   position: absolute;
@@ -391,18 +423,18 @@ body {
   background: var(--ring-fg-warning);
 }
 .bar-text {
-  font-size: 6vmin;
+  font-size: clamp(28px, 9vmin, 120px);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .bar-controls {
   display: flex;
   flex-direction: column;
-  gap: 1vh;
+  gap: calc(var(--ctl) * 0.45);
 }
 .bar-controls .btn {
-  min-width: 14vw;
-  font-size: 3vmin;
+  min-width: calc(var(--ctl) * 7);
+  font-size: calc(var(--ctl) * 1.1);
 }
 .bar-label {
   position: absolute;
@@ -431,11 +463,11 @@ body {
 }
 
 .invert-btn {
-  width: 13vh;
-  height: 13vh;
+  width: clamp(64px, 14vh, 150px);
+  height: clamp(64px, 14vh, 150px);
   background: var(--tile);
   border: none;
-  border-radius: 0.6vh;
+  border-radius: clamp(8px, 1.4vh, 16px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -444,7 +476,7 @@ body {
   cursor: pointer;
   font-family: inherit;
   font-weight: 700;
-  font-size: 2.6vmin;
+  font-size: var(--ctl);
   color: #111;
 }
 .invert-btn img {
@@ -460,37 +492,37 @@ body {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: end;
-  gap: 1.5vw;
-  padding: 0 1vw;
+  gap: var(--gutter-x);
 }
 .btn-next {
-  font-size: 4vmin;
-  min-width: 9vw;
-  margin-bottom: 0.4vh;
+  font-size: calc(var(--ctl) * 1.6);
+  min-width: 5em;
+  padding: 0.35em 1em;
 }
 .timeline {
   position: relative;
-  padding-bottom: 1.2vh;
+  padding-bottom: calc(var(--ctl) * 0.55);
 }
 .timeline-buttons {
   display: flex;
   justify-content: space-between;
-  padding: 0 1vw;
+  gap: 4px;
+  padding: 0 calc(var(--ctl) * 0.5);
 }
 .timeline-line {
-  height: 1.2vh;
+  height: clamp(5px, 0.9vh, 10px);
   background: var(--line);
-  border-radius: 1vh;
-  margin-top: 2.6vh;
+  border-radius: 99px;
+  margin-top: calc(var(--ctl) * 0.9);
 }
 .tl-btn {
   position: relative;
   font-family: inherit;
-  font-size: 2.6vmin;
-  min-width: 3.6vw;
-  padding: 0.35em 0.6em;
+  font-size: var(--ctl);
+  min-width: 2.4em;
+  padding: 0.3em 0.5em;
   border: none;
-  border-radius: 0.3em;
+  border-radius: 0.35em;
   background: var(--tile);
   color: #333;
   cursor: pointer;
@@ -502,9 +534,9 @@ body {
   position: absolute;
   left: 50%;
   top: 100%;
-  width: 0.4vh;
-  height: 2.8vh;
-  margin-left: -0.2vh;
+  width: 3px;
+  height: calc(var(--ctl) * 1);
+  margin-left: -1.5px;
   background: var(--line);
   z-index: -1;
 }
@@ -1678,9 +1710,9 @@ kbd {
 }
 
 .end-card {
-  background: #3e3e3e;
-  border-radius: 1vh;
-  padding: 4vh 4vw;
+  background: #26262b;
+  border-radius: 16px;
+  padding: clamp(20px, 5vh, 56px) clamp(24px, 5vw, 80px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1690,11 +1722,11 @@ kbd {
 .end-card .panel-actions {
   display: flex;
   justify-content: center;
-  gap: 3vw;
+  gap: calc(var(--ctl) * 0.8);
 }
 .end-card .btn {
-  min-width: 14vw;
-  font-size: 2.8vmin;
+  min-width: calc(var(--ctl) * 7);
+  font-size: calc(var(--ctl) * 1.1);
 }
 .end-card h2 {
   margin: 0;

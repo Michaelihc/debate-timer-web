@@ -144,6 +144,8 @@
       proDefault: "Pro",
       conDefault: "Con",
       speakerTurn: (name) => `${name}’s Turn`,
+      idleHint: "Press Begin when the first speaker is ready.",
+      firstUp: (what, time) => `First up: ${what}${time ? " · " + time : ""}`,
       minutes: "Minutes",
       seconds: "Seconds",
       minShort: "min",
@@ -311,6 +313,8 @@
       proDefault: "正方",
       conDefault: "反方",
       speakerTurn: (name) => `辩手 ${name} 发言`,
+      idleHint: "第一位辩手准备好后，按“开始”。",
+      firstUp: (what, time) => `首先：${what}${time ? " · " + time : ""}`,
       minutes: "分钟",
       seconds: "秒",
       minShort: "分",
@@ -575,6 +579,8 @@
     audioEnd: $("audio-end"),
     form: $("settings-form"),
     nav: $("settings-nav"),
+    idleHint: $("idle-hint"),
+    idleFirst: $("idle-first"),
     btnSave: $("btn-save"),
     btnDiscard: $("btn-discard"),
     panelFoot: $("panel-foot"),
@@ -814,9 +820,34 @@
     return (p && p.name) || defaultSpeakerName(id > 0 ? "pro" : "con", Math.abs(id) - 1, state.lang);
   }
 
+  // Before the round, the empty centre says what comes first and what to press.
+  function updateIdleHint() {
+    const d = state.data;
+    const idle = Boolean(d) && state.eventIndex < 0 && d.event_order.length > 0;
+    show(els.idleHint, idle);
+    if (!idle) return;
+    const ev = d.event_order[0];
+    const dm = d.settings.display_minutes;
+    let what;
+    let time = "";
+    if (ev === "prep") {
+      what = t("prep");
+      time = formatTime(d.settings.time_prep, dm);
+    } else if (ev === "free") {
+      what = t("free");
+      time = formatTime(d.settings.time_free, dm);
+    } else {
+      const p = participant(Number(ev));
+      what = p ? nameOf(Number(ev), p) : String(ev);
+      time = p ? formatTime(p.time, dm) : "";
+    }
+    els.idleFirst.textContent = t("firstUp")(what, time);
+  }
+
   function updateTitle() {
     const d = state.data;
     if (!d) return;
+    updateIdleHint();
     const order = d.event_order;
     const i = state.eventIndex;
     if (i < 0 || i >= order.length) {
