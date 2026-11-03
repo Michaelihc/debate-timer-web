@@ -217,14 +217,55 @@ body {
   width: 2.5em;
   padding: 0;
 }
+/* Title: a small context line over the main line, which has a dot in
+   the colour of whoever has the floor. */
 .title {
   margin: 0;
-  font-weight: 400;
-  font-size: clamp(22px, 5.6vmin, 76px);
-  line-height: 1.12;
-  text-align: center;
-  text-wrap: balance;
   max-width: 62vw;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25em;
+  text-align: center;
+  font-size: clamp(22px, 5.2vmin, 70px);
+}
+.title-eyebrow {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: max(12px, 0.38em);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.title-eyebrow:empty {
+  display: none;
+}
+.title-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  max-width: 100%;
+}
+.title-dot {
+  display: none;
+  flex: none;
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.1em color-mix(in srgb, currentColor 12%, transparent);
+}
+.title.has-dot .title-dot {
+  display: block;
+}
+.title-text {
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -293,18 +334,26 @@ body {
   align-items: center;
   flex: none;
 }
-.slot img {
+.slot > * {
   display: none;
 }
-.slot img.show {
+.slot > .show {
   display: block;
 }
 .slot.outer {
   justify-content: flex-end;
 }
-.slot.outer img {
-  max-width: 100%;
-  max-height: 50%;
+/* Up next: chevrons pointing at the speaker */
+.slot .icon-next {
+  width: 78%;
+  aspect-ratio: 1;
+  color: #d6d6d6;
+}
+.slot .icon-next svg,
+.slot .icon-group svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .slot.inner {
   justify-content: flex-start;
@@ -324,14 +373,14 @@ body {
   max-width: none;
   filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.35));
 }
-/* Thought bubble: dots lead down to the head. */
+/* Thought cloud: its trail leads down to the head. */
 .slot .icon-group {
   position: absolute;
-  left: 0;
-  bottom: 74%;
-  height: 44%;
-  width: auto;
-  max-width: none;
+  left: -2%;
+  bottom: 66%;
+  height: 40%;
+  aspect-ratio: 64 / 46;
+  color: #d6d6d6;
 }
 
 .figure {
@@ -368,7 +417,7 @@ body {
     opacity: 0;
   }
 }
-.slot img.flashing {
+.slot .flashing {
   animation: blink 0.5s steps(1) infinite;
 }
 
@@ -620,12 +669,18 @@ body {
 .bar-label.show {
   display: flex;
 }
-.bar-label img {
+.bar-label .icon-timer {
   width: 100%;
+  color: #d6d6d6;
 }
 .bar-label .icon-arrow {
-  width: 80%;
-  filter: sepia(1) saturate(3) hue-rotate(90deg);
+  width: 78%;
+  color: var(--lime);
+}
+.bar-label svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .invert-btn {
@@ -667,10 +722,11 @@ body {
   align-items: center;
   gap: var(--gutter-x);
 }
+/* Back and Next: same width (set by syncStepWidths), sized to content */
 .btn-step {
-  font-size: calc(var(--ctl) * 1.45);
-  width: 6.2em;
-  padding: 0 0.85em;
+  font-size: calc(var(--ctl) * 1.3);
+  padding: 0 0.8em;
+  gap: 0.55em;
   justify-content: space-between;
 }
 .btn-prev .next-text {
@@ -829,7 +885,7 @@ body {
   line-height: 1;
 }
 .next-text small {
-  max-width: 7.5em;
+  max-width: 6em;
   margin-top: 0.12em;
   overflow: hidden;
   font-size: 0.42em;
@@ -844,7 +900,6 @@ body {
 
 @media (max-width: 600px) {
   .btn-step {
-    width: 4.6em;
     font-size: calc(var(--ctl) * 1.2);
     padding: 0 0.6em;
   }
