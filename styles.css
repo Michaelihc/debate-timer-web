@@ -140,6 +140,7 @@ body {
 .top > :first-child {
   justify-self: start;
 }
+.top-left,
 .top-right {
   display: flex;
   gap: calc(var(--ctl) * 0.45);
@@ -658,16 +659,29 @@ body {
 }
 
 /* ---------- Bottom / timeline ---------- */
+/* Back | timeline | Next: the two buttons are the same width, so the
+   timeline sits centred under the timer. */
 .bottom {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--gutter-x);
 }
-.btn-next {
-  font-size: calc(var(--ctl) * 1.6);
-  min-width: 5em;
-  padding: 0 1em;
+.btn-step {
+  font-size: calc(var(--ctl) * 1.45);
+  width: 6.2em;
+  padding: 0 0.85em;
+  justify-content: space-between;
+}
+.btn-prev .next-text {
+  align-items: flex-end;
+}
+.btn-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.btn-step:disabled:hover {
+  background: var(--surface);
 }
 /* ---------- Timeline: a stepper ----------
    One dot per part, all the same width, joined by a line from the first dot's
@@ -815,7 +829,7 @@ body {
   line-height: 1;
 }
 .next-text small {
-  max-width: 9em;
+  max-width: 7.5em;
   margin-top: 0.12em;
   overflow: hidden;
   font-size: 0.42em;
@@ -829,6 +843,18 @@ body {
 }
 
 @media (max-width: 600px) {
+  .btn-step {
+    width: 4.6em;
+    font-size: calc(var(--ctl) * 1.2);
+    padding: 0 0.6em;
+  }
+  .btn-prev {
+    justify-content: center;
+  }
+  .btn-prev .next-text,
+  .btn-next .next-text small {
+    display: none;
+  }
   /* icon-only top bar buttons, so the title has room */
   .top .btn > span {
     position: absolute;
@@ -866,10 +892,6 @@ body {
   }
   .tl-steps {
     min-width: calc(var(--n, 9) * var(--dot) * 1.25);
-  }
-  .btn-next {
-    min-width: 0;
-    padding: 0.35em 0.7em;
   }
 }
 

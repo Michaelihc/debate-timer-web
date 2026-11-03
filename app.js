@@ -149,6 +149,8 @@
       roundTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min in all`,
       invertTitle: "Invert (I)",
       timelineTitle: "Order of speeches",
+      back: "Back",
+      backTitle: "Back (P)",
       prepShort: "Prep",
       freeShort: "Free debate",
       eachSide: (time) => `${time} each`,
@@ -324,6 +326,8 @@
       roundTotal: (n, min) => `共 ${n} 项 · 全程约 ${min} 分钟`,
       invertTitle: "翻转 (I)",
       timelineTitle: "发言顺序",
+      back: "上一项",
+      backTitle: "上一项 (P)",
       prepShort: "准备",
       freeShort: "自由辩论",
       eachSide: (time) => `每方 ${time}`,
@@ -598,6 +602,8 @@
     idleTotal: $("idle-total"),
     btnNextLabel: $("btn-next-label"),
     btnNextSub: $("btn-next-sub"),
+    btnPrev: $("btn-prev"),
+    btnPrevSub: $("btn-prev-sub"),
     btnSave: $("btn-save"),
     btnDiscard: $("btn-discard"),
     panelFoot: $("panel-foot"),
@@ -1180,7 +1186,7 @@
     updateNextButton();
   }
 
-  // "Begin" / "Next", with what comes next underneath.
+  // "Begin" / "Next" and "Back", each with the part they lead to underneath.
   function updateNextButton() {
     const d = state.data;
     if (!d) return;
@@ -1188,6 +1194,9 @@
     els.btnNextLabel.textContent = i < 0 ? t("begin") : t("next");
     const upcoming = d.event_order[i + 1];
     els.btnNextSub.textContent = upcoming === undefined ? "" : partName(upcoming);
+    const canGoBack = i > 0;
+    els.btnPrev.disabled = !canGoBack;
+    els.btnPrevSub.textContent = canGoBack ? partName(d.event_order[i - 1]) : "";
   }
 
   // AnimationController.Update, evaluated every frame
@@ -2642,6 +2651,7 @@
   $("btn-end-reload").addEventListener("click", loadScene);
   $("btn-end-close").addEventListener("click", () => show(els.endOverlay, false));
   els.btnNext.addEventListener("click", next);
+  els.btnPrev.addEventListener("click", previous);
 
   // Fullscreen
   function toggleFullscreen() {
