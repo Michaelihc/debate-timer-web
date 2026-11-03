@@ -281,6 +281,30 @@
       saveFailed: "Could not save (storage full?): ",
       invalidEvents: "The order of speeches includes speakers who don't exist: ",
       fullscreen: "Fullscreen (F)",
+      // debate screen
+      reloadTitleBtn: "Restart the debate from the beginning",
+      timerLabel: "Timer",
+      startTitle: "Start (Space)",
+      pauseTitle: "Pause (Space)",
+      resumeTitle: "Resume (Space)",
+      resetTitle: "Reset this timer",
+      invertTitle: "Hand the clock to the other side (I)",
+      prevTitle: "Previous (←)",
+      nextTitle: (what) => (what ? `${what} (→)` : "(→)"),
+      finish: "Finish",
+      upFirst: "Up first",
+      stepOf: (i, n) => `Part ${i} of ${n}`,
+      stReady: "Ready",
+      stPaused: "Paused",
+      ofTotal: (s) => `of ${s}`,
+      stSpeaking: "Speaking",
+      stNext: "Next",
+      stPreparing: "Preparing",
+      idleHint: "Press Begin to start the round.",
+      roundMinutes: (m) => `${m} min`,
+      roundParts: (n) => `${n} ${n === 1 ? "part" : "parts"}`,
+      tlPrep: "Prep",
+      tlFree: "Free",
     },
     zh: {
       menu: "设置",
@@ -441,6 +465,29 @@
       saveFailed: "保存失败（存储空间不足？）：",
       invalidEvents: "发言顺序中包含不存在的辩手：",
       fullscreen: "全屏 (F)",
+      reloadTitleBtn: "从头开始本场辩论",
+      timerLabel: "计时器",
+      startTitle: "开始 (空格)",
+      pauseTitle: "暂停 (空格)",
+      resumeTitle: "继续 (空格)",
+      resetTitle: "重置此计时器",
+      invertTitle: "把计时交给另一方 (I)",
+      prevTitle: "上一项 (←)",
+      nextTitle: (what) => (what ? `${what} (→)` : "(→)"),
+      finish: "结束",
+      upFirst: "第一项",
+      stepOf: (i, n) => `第 ${i} 项 / 共 ${n} 项`,
+      stReady: "未开始",
+      stPaused: "已暂停",
+      ofTotal: (s) => `共 ${s}`,
+      stSpeaking: "发言中",
+      stNext: "下一位",
+      stPreparing: "准备中",
+      idleHint: "按“开始”进入第一项。",
+      roundMinutes: (m) => `${m} 分钟`,
+      roundParts: (n) => `共 ${n} 项`,
+      tlPrep: "准备",
+      tlFree: "自由",
     },
   };
 
@@ -552,7 +599,20 @@
     String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
   const els = {
+    app: $("app"),
     title: $("title"),
+    nowStep: $("now-step"),
+    nowName: $("now-name"),
+    idleSummary: $("idle-summary"),
+    idleTotal: $("idle-total"),
+    idleRing: $("idle-ring"),
+    ringSub: $("ring-sub"),
+    teamPro: document.querySelector(".team.pro"),
+    teamCon: document.querySelector(".team.con"),
+    btnPrev: $("btn-prev"),
+    nextLabel: $("next-label"),
+    nextHint: $("next-hint"),
+    endText: $("end-text"),
     flash: $("flash"),
     proCol: $("pro-column"),
     conCol: $("con-column"),
@@ -686,17 +746,39 @@
       if (u.onRunningChange) u.onRunningChange(this.running);
     }
 
+    // ready (not started) / running / paused / timeout
+    get status() {
+      if (this.timedOut) return "timeout";
+      if (this.running) return "running";
+      return this.fresh ? "ready" : "paused";
+    }
+
     render() {
       const u = this.ui;
-      u.text.textContent = formatTime(this.remaining, this.displayMinutes);
+      const text = formatTime(this.remaining, this.displayMinutes);
+      if (u.text.textContent !== text) {
+        u.text.textContent = text;
+        u.text.classList.toggle("long", text.length > 5);
+      }
       u.fg.classList.toggle("warning", this.warned);
       u.bg.classList.toggle("timeout", this.timedOut);
       const frac = this.total > 0 ? Math.min(1, Math.max(0, this.remaining / this.total)) : 0;
       u.paint(frac);
+      // State for the stylesheet, and a short status line for people.
+      const st = this.status;
+      const warn = this.warned && !this.timedOut ? "1" : "0";
+      if (u.root.dataset.state !== st) u.root.dataset.state = st;
+      if (u.root.dataset.warn !== warn) u.root.dataset.warn = warn;
+      const sub = u.statusText(st, this);
+      if (u.sub.textContent !== sub) u.sub.textContent = sub;
     }
   }
 
   const ringTimer = new Timer({
+    root: els.ringTimer,
+    sub: els.ringSub,
+    statusText: (st, tm) =>
+      st === "running" ? t("ofTotal")(formatTime(tm.total, tm.displayMinutes)) : st === "paused" ? t("stPaused") : st === "timeout" ? t("timeout") : t("stReady"),
     fg: els.ringFg,
     bg: els.ringBg,
     text: els.ringText,
@@ -711,9 +793,11 @@
   });
 
   function makeBarTimer(root) {
-    const label = root.querySelector(".bar-label");
     const fg = root.querySelector(".bar-fg");
     return new Timer({
+      root,
+      sub: root.querySelector(".duel-status"),
+      statusText: (st) => (st === "running" ? t("stSpeaking") : st === "paused" ? t("stPaused") : st === "ready" ? t("stReady") : ""),
       fg,
       bg: root.querySelector(".bar-bg"),
       text: root.querySelector(".bar-text"),
@@ -723,9 +807,9 @@
       out: root.querySelector(".bar-out"),
       reset: root.querySelector(".bar-reset"),
       paint: (frac) => {
-        fg.style.height = `${frac * 100}%`;
+        fg.style.width = `${frac * 100}%`;
       },
-      onRunningChange: (running) => label.classList.toggle("show", running),
+      onRunningChange: (running) => root.classList.toggle("is-live", running),
     });
   }
   const barTimers = Array.from(els.doubleTimer.querySelectorAll(".bar-timer")).map(makeBarTimer);
@@ -786,13 +870,28 @@
         el.setAttribute("aria-label", v);
       }
     });
+    document.querySelectorAll("[data-i18n-label]").forEach((el) => {
+      const v = I18N[state.lang][el.dataset.i18nLabel];
+      if (typeof v === "string") el.setAttribute("aria-label", v);
+    });
     els.btnLang.textContent = t("langBtn");
-    els.btnNext.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     if (state.data) {
-      els.proLabel.textContent = state.data.settings.pro_label || t("proDefault");
-      els.conLabel.textContent = state.data.settings.con_label || t("conDefault");
+      const labels = { pro: teamLabel("pro"), con: teamLabel("con") };
+      els.proLabel.textContent = labels.pro;
+      els.conLabel.textContent = labels.con;
+      els.doubleTimer.querySelectorAll(".duel-side").forEach((el) => {
+        el.querySelector(".duel-name").textContent = labels[el.dataset.side];
+      });
+      renderSpeakerText();
+      renderTimelineText();
     }
     updateTitle();
+    updateNextButton();
+  }
+
+  function teamLabel(side) {
+    const s = state.data.settings;
+    return (side === "pro" ? s.pro_label : s.con_label) || t(side === "pro" ? "proDefault" : "conDefault");
   }
 
   function speakerIdAt(index) {
@@ -814,22 +913,78 @@
     return (p && p.name) || defaultSpeakerName(id > 0 ? "pro" : "con", Math.abs(id) - 1, state.lang);
   }
 
+  // What an event is, in words: kind, side, a heading ("Pro 1’s Turn") and a name ("Pro 1").
+  function describeEvent(ev) {
+    if (ev === "prep") return { kind: "prep", heading: t("prep"), name: t("prep"), short: t("tlPrep") };
+    if (ev === "free") return { kind: "free", heading: t("free"), name: t("free"), short: t("tlFree") };
+    const id = Number(ev);
+    const side = id > 0 ? "pro" : "con";
+    const p = participant(id);
+    if (!p) {
+      const missing = `${t("fNoSpeaker")} (${ev})`;
+      return { kind: "missing", side, id, heading: missing, name: missing, short: missing };
+    }
+    const name = nameOf(id, p);
+    return { kind: "speech", side, id, time: p.time, heading: t("speakerTurn")(name), name, short: name };
+  }
+
+  const setText = (el, text) => {
+    if (el.textContent !== text) el.textContent = text;
+  };
+
+  // The topic sits in the top bar; the centre says what is happening now.
   function updateTitle() {
     const d = state.data;
     if (!d) return;
+    setText(els.title, d.title);
     const order = d.event_order;
     const i = state.eventIndex;
+    let phase = "idle";
+    let side = "";
     if (i < 0 || i >= order.length) {
-      els.title.textContent = d.title;
-      return;
+      const first = order.length ? describeEvent(order[0]) : null;
+      setText(els.nowStep, first ? t("upFirst") : "");
+      setText(els.nowName, first ? first.name : "");
+      side = first && first.side ? first.side : "";
+      const stats = roundStats(d);
+      setText(els.idleTotal, order.length ? t("roundMinutes")(Math.round(stats.total / 60)) : "");
+      setText(els.idleSummary, order.length ? t("roundParts")(order.length) : "");
+      els.idleRing.style.setProperty("--donut", donutGradient(d));
+    } else {
+      const e = describeEvent(order[i]);
+      phase = e.kind === "prep" ? "prep" : e.kind === "free" ? "free" : "speech";
+      side = e.side || "";
+      setText(els.nowStep, t("stepOf")(i + 1, order.length));
+      setText(els.nowName, e.heading);
     }
-    const ev = order[i];
-    if (ev === "prep") els.title.textContent = t("prep");
-    else if (ev === "free") els.title.textContent = t("free");
-    else {
-      const p = participant(speakerIdAt(i));
-      els.title.textContent = p ? t("speakerTurn")(nameOf(speakerIdAt(i), p)) : `${t("fNoSpeaker")} (${ev})`;
+    els.nowName.classList.toggle("long", els.nowName.textContent.length > 22);
+    if (els.app.dataset.phase !== phase) els.app.dataset.phase = phase;
+    if (side) els.app.dataset.side = side;
+    else delete els.app.dataset.side;
+  }
+
+  // The big button says what it will do: Begin / Next, and who comes up.
+  function updateNextButton() {
+    if (!state.data) return;
+    const order = state.data.event_order;
+    const i = state.eventIndex;
+    let label;
+    let hint = "";
+    if (i < 0) {
+      label = t("begin");
+      if (order.length) hint = describeEvent(order[0]).name;
+    } else if (i + 1 < order.length) {
+      label = t("next");
+      hint = describeEvent(order[i + 1]).name;
+    } else {
+      label = t("finish");
     }
+    setText(els.nextLabel, label);
+    setText(els.nextHint, hint);
+    const title = `${label}${hint ? ": " + hint : ""} (→)`;
+    els.btnNext.title = title;
+    els.btnNext.setAttribute("aria-label", title);
+    els.btnPrev.disabled = i <= 0;
   }
 
   function configHash() {
@@ -900,7 +1055,7 @@
     show(els.ringTimer, Boolean(p.ringVisible));
     show(els.doubleTimer, Boolean(p.doubleVisible));
     updateTitle();
-    els.btnNext.textContent = t("next");
+    updateNextButton();
     updateTimelineActive();
     updateSpeakerIndicators();
     return true;
@@ -915,6 +1070,12 @@
     const b = parseInt(bg.slice(5, 7), 16);
     const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     document.documentElement.classList.toggle("light-bg", lum > 0.6);
+    // Team colours, and the text colour that reads on each.
+    const root = document.documentElement.style;
+    root.setProperty("--pro", settings.pro_colors);
+    root.setProperty("--con", settings.con_colors);
+    root.setProperty("--pro-ink", inkFor(settings.pro_colors));
+    root.setProperty("--con-ink", inkFor(settings.con_colors));
   }
 
   function applyAudio(settings) {
@@ -944,8 +1105,8 @@
 
     applyTheme(data.settings);
     applyAudio(data.settings);
-    buildSpeakers("pro", data.pro_side.length, data.settings.pro_colors);
-    buildSpeakers("con", data.con_side.length, data.settings.con_colors);
+    buildSpeakers("pro", data.pro_side.length);
+    buildSpeakers("con", data.con_side.length);
     buildTimeline(data.event_order);
 
     state.eventIndex = -1;
@@ -979,80 +1140,197 @@
     });
   }
 
-  function buildSpeakers(side, count, color) {
+  const icon = (body) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const SCREEN_ICONS = {
+    mic: icon('<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/>'),
+    next: icon('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+    prep: icon('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>'),
+    free: icon('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'),
+  };
+
+  // Speaker cards: the figure from the original app, a name, and the speaking time.
+  function buildSpeakers(side, count) {
     const col = side === "pro" ? els.proCol : els.conCol;
     col.innerHTML = "";
     const list = [];
     for (let i = 1; i <= count; i++) {
-      const row = document.createElement("div");
-      row.className = "speaker";
+      const row = document.createElement("li");
+      row.className = "spk";
       row.innerHTML = `
-        <div class="slot outer"><img class="icon-next" src="assets/icons/next-icon.png" alt="" /></div>
-        <div class="figure" style="background-color:${color}"><div class="figure-num">${i}</div></div>
-        <div class="slot inner">
-          <img class="icon-clipboard" src="assets/icons/clipboard.png" alt="" />
-          <img class="icon-group" src="assets/icons/group-icon.png" alt="" />
-          <img class="icon-speech" src="assets/icons/speech-icon.png" alt="" />
-        </div>`;
+        <span class="spk-fig" aria-hidden="true"><span class="spk-num">${i}</span></span>
+        <span class="spk-text">
+          <span class="spk-name"></span>
+          <span class="spk-meta">
+            <span class="spk-time"></span>
+            <span class="spk-tag tag-now">${SCREEN_ICONS.mic}<span></span></span>
+            <span class="spk-tag tag-next">${SCREEN_ICONS.next}<span></span></span>
+          </span>
+        </span>`;
       col.appendChild(row);
       list.push({
         id: side === "pro" ? i : -i,
-        next: row.querySelector(".icon-next"),
-        clipboard: row.querySelector(".icon-clipboard"),
-        group: row.querySelector(".icon-group"),
-        speech: row.querySelector(".icon-speech"),
+        el: row,
+        name: row.querySelector(".spk-name"),
+        time: row.querySelector(".spk-time"),
+        nowTag: row.querySelector(".spk-tag.tag-now span"),
+        nextTag: row.querySelector(".spk-tag.tag-next span"),
       });
     }
     state.speakers[side] = list;
     fitSpeakerSize();
   }
 
-  function fitSpeakerSize() {
-    const n = Math.max(state.speakers.pro.length, state.speakers.con.length, 1);
-    const avail = els.proCol.clientHeight || window.innerHeight * 0.65;
-    const gap = avail * 0.06;
-    const h = Math.min(avail * 0.24, (avail - (n - 1) * gap) / n);
-    document.documentElement.style.setProperty("--fig-h", `${Math.max(30, h)}px`);
+  function renderSpeakerText() {
+    const minutes = state.data.settings.display_minutes;
+    for (const sp of state.speakers.pro.concat(state.speakers.con)) {
+      const p = participant(sp.id);
+      setText(sp.name, nameOf(sp.id, p));
+      setText(sp.time, p ? formatTime(p.time, minutes) : "");
+      setText(sp.nowTag, t("stSpeaking"));
+      setText(sp.nextTag, t("stNext"));
+      sp.el.title = nameOf(sp.id, p);
+    }
   }
 
+  // Rows share the column height, up to a comfortable maximum.
+  function fitSpeakerSize() {
+    const n = Math.max(state.speakers.pro.length, state.speakers.con.length, 1);
+    const avail = els.proCol.clientHeight || window.innerHeight * 0.6;
+    const gap = Math.max(4, Math.min(14, avail * 0.02));
+    const max = Math.max(48, Math.min(160, window.innerHeight * 0.145));
+    const h = Math.max(26, Math.min(max, (avail - (n - 1) * gap) / n));
+    const root = document.documentElement.style;
+    root.setProperty("--row-h", `${Math.floor(h)}px`);
+    root.setProperty("--row-gap", `${Math.floor(gap)}px`);
+    const compact = h < 50;
+    els.proCol.classList.toggle("compact", compact);
+    els.conCol.classList.toggle("compact", compact);
+  }
+
+  // Short code for an event, as the settings' order chips show it.
   function eventLabel(ev) {
     return ev === "prep" ? "P" : ev === "free" ? "F" : String(ev);
   }
 
+  // Timeline: one dot per event in the side's colour (lime for preparation,
+  // yellow for free debate, as in the settings), with a caption when there is room.
   function buildTimeline(order) {
     els.timeline.innerHTML = "";
+    els.timeline.style.setProperty("--n", Math.max(1, order.length));
     state.timelineButtons = order.map((ev, i) => {
+      const li = document.createElement("li");
+      li.className = "tl-item";
       const b = document.createElement("button");
+      b.type = "button";
       b.className = "tl-btn";
-      b.textContent = eventLabel(ev);
-      const p = participant(Number(ev));
-      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? nameOf(Number(ev), p) : String(ev);
+      const e = describeEvent(ev);
+      let dot;
+      if (e.kind === "prep") {
+        li.style.cssText = "--c: var(--lime); --ink: #1c2a05";
+        dot = SCREEN_ICONS.prep;
+      } else if (e.kind === "free") {
+        li.style.cssText = "--c: var(--yellow); --ink: #2a1f00";
+        dot = SCREEN_ICONS.free;
+      } else {
+        if (e.kind === "speech") li.style.cssText = `--c: var(--${e.side}); --ink: var(--${e.side}-ink)`;
+        dot = esc(String(Math.abs(e.id)));
+      }
+      b.innerHTML = `<span class="tl-dot" aria-hidden="true">${dot}</span><span class="tl-name"></span>`;
       b.addEventListener("click", () => {
         state.eventIndex = i - 1; // TimelineButtonControl.OnButtonPress
         next();
       });
-      els.timeline.appendChild(b);
+      li.appendChild(b);
+      els.timeline.appendChild(li);
       return b;
     });
   }
 
-  function updateTimelineActive() {
-    state.timelineButtons.forEach((b, i) => b.classList.toggle("active", i === state.eventIndex));
+  function renderTimelineText() {
+    const d = state.data;
+    state.timelineButtons.forEach((b, i) => {
+      const e = describeEvent(d.event_order[i]);
+      const len = e.kind === "prep" ? d.settings.time_prep : e.kind === "free" ? d.settings.time_free : e.time;
+      setText(b.querySelector(".tl-name"), e.short);
+      const side = e.kind === "speech" ? teamLabel(e.side) + " · " : "";
+      const label = `${i + 1}. ${side}${e.name}${len != null ? " · " + formatTime(len, true) : ""}`;
+      b.title = label;
+      b.setAttribute("aria-label", label);
+    });
   }
 
-  // AnimationController.Update, evaluated every frame
-  function updateSpeakerIndicators() {
-    const all = state.speakers.pro.concat(state.speakers.con);
-    const currentTimerDone = ringTimer.remaining < 0.1;
-    for (const sp of all) {
-      sp.clipboard.classList.toggle("show", state.prepPhase);
-      sp.group.classList.toggle("show", state.freePhase);
-      const isCurrent = sp.id === state.currentSpeaker;
-      const isNext = sp.id === state.nextSpeaker;
-      sp.speech.classList.toggle("show", isCurrent && ringTimer.running);
-      sp.next.classList.toggle("show", isNext);
-      sp.next.classList.toggle("flashing", isNext && currentTimerDone);
+  function updateTimelineActive() {
+    const i = state.eventIndex;
+    state.timelineButtons.forEach((b, k) => {
+      b.parentElement.classList.toggle("is-active", k === i);
+      b.parentElement.classList.toggle("done", i >= 0 && k < i);
+      if (k === i) b.setAttribute("aria-current", "step");
+      else b.removeAttribute("aria-current");
+    });
+    els.timeline.style.setProperty("--i", Math.max(0, i));
+    // Keep the current event in view when the timeline scrolls (phones, long rounds).
+    const tl = els.timeline.parentElement;
+    const item = state.timelineButtons[Math.max(0, i)];
+    if (item && tl.scrollWidth > tl.clientWidth) {
+      const li = item.parentElement;
+      tl.scrollLeft = li.offsetLeft - (tl.clientWidth - li.offsetWidth) / 2;
     }
+  }
+
+  function setStatus(el, text) {
+    const s = el.querySelector(".team-status");
+    if (s.textContent !== text) s.textContent = text;
+  }
+
+  // AnimationController.Update, evaluated every frame: the speech bubble
+  // (current speaker), the arrow (next speaker, flashing once time runs out),
+  // the clipboard (preparation) and the thought bubble (free debate).
+  function updateSpeakerIndicators() {
+    const idx = state.eventIndex;
+    const all = state.speakers.pro.concat(state.speakers.con);
+    const currentTimerDone = state.freePhase ? barPro.timedOut && barCon.timedOut : ringTimer.remaining < 0.1;
+    // Before the round, the first speaker is the one to get ready.
+    const nextId = idx < 0 ? speakerIdAt(0) : state.nextSpeaker;
+    for (const sp of all) {
+      const isCurrent = sp.id === state.currentSpeaker;
+      const isNext = sp.id === nextId;
+      const c = sp.el.classList;
+      c.toggle("is-current", isCurrent);
+      c.toggle("is-speaking", isCurrent && ringTimer.running);
+      c.toggle("is-next", isNext);
+      c.toggle("alert", isNext && idx >= 0 && currentTimerDone);
+      if (isCurrent !== sp.el.hasAttribute("aria-current")) sp.el.toggleAttribute("aria-current", isCurrent);
+    }
+    const live = state.freePhase ? (barPro.running ? "pro" : barCon.running ? "con" : null) : null;
+    const preparing = idx >= 0 && state.prepPhase;
+    [
+      ["pro", els.teamPro],
+      ["con", els.teamCon],
+    ].forEach(([side, el]) => {
+      el.classList.toggle("is-live", live === side);
+      el.classList.toggle("is-waiting", Boolean(live) && live !== side);
+      setStatus(el, preparing ? t("stPreparing") : live === side ? t("stSpeaking") : "");
+    });
+  }
+
+  // The round at a glance: a ring split into its parts, in proportion and in
+  // the same colours as the settings' preset bars.
+  function donutGradient(r) {
+    const { segs, total } = roundStats(r);
+    if (!total) return "none";
+    const color = (k) => (k === "pro" ? "var(--pro)" : k === "con" ? "var(--con)" : k === "free" ? "var(--yellow)" : "var(--lime)");
+    const weights = segs.map((g) => g.sec || total * 0.01);
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const gap = segs.length > 1 ? 0.7 : 0;
+    let at = 0;
+    const stops = segs.map((g, i) => {
+      const end = at + (weights[i] / sum) * 100;
+      const stop = `${color(g.kind)} ${at.toFixed(2)}% ${(end - gap).toFixed(2)}%, transparent ${(end - gap).toFixed(2)}% ${end.toFixed(2)}%`;
+      at = end;
+      return stop;
+    });
+    return `conic-gradient(${stops.join(", ")})`;
   }
 
   // MenuController.Next()
@@ -1074,7 +1352,7 @@
       state.prepPhase = true;
       ringTimer.reset();
       show(els.ringTimer, false);
-      show(els.endOverlay, true);
+      showEndScreen();
     } else {
       const ev = order[state.eventIndex];
       if (ev === "prep") {
@@ -1104,10 +1382,23 @@
     }
 
     updateTitle();
-    els.btnNext.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    updateNextButton();
     updateTimelineActive();
     updateSpeakerIndicators();
     persistProgress();
+  }
+
+  function showEndScreen() {
+    const d = state.data;
+    const stats = roundStats(d);
+    const summary = esc(t("orderTotal")(d.event_order.length, Math.round(stats.total / 60)));
+    els.endText.innerHTML = (d.title ? `<strong>${esc(d.title)}</strong>` : "") + summary;
+    show(els.endOverlay, true);
+    $("btn-end-reload").focus();
+  }
+  function closeEndScreen() {
+    show(els.endOverlay, false);
+    els.btnNext.focus();
   }
 
   function previous() {
@@ -2491,8 +2782,9 @@
   // ---------------------------------------------------------------------------
   $("btn-reload").addEventListener("click", requestReload);
   $("btn-end-reload").addEventListener("click", loadScene);
-  $("btn-end-close").addEventListener("click", () => show(els.endOverlay, false));
+  $("btn-end-close").addEventListener("click", closeEndScreen);
   els.btnNext.addEventListener("click", next);
+  els.btnPrev.addEventListener("click", previous);
 
   // Fullscreen
   function toggleFullscreen() {
@@ -2533,7 +2825,7 @@
       if (confirmOpen) show(confirmOverlay, false);
       else if (presetOpen) closePresetDialog();
       else if (menuOpen) requestClose();
-      else if (!els.endOverlay.classList.contains("hidden")) show(els.endOverlay, false);
+      else if (!els.endOverlay.classList.contains("hidden")) closeEndScreen();
       return;
     }
     if (menuOpen && !confirmOpen && !presetOpen && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {

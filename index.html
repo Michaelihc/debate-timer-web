@@ -2,108 +2,153 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
   <title>Debate Timer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='none' stroke='%23fff' stroke-width='14'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="app">
+  <div id="app" data-phase="idle">
     <!-- Warning flash vignette -->
     <div id="flash" class="flash" aria-hidden="true"></div>
 
     <header class="top">
-      <button id="btn-menu" class="btn btn-lime btn-gear" data-i18n-title="menuTitle" title="Settings (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span data-i18n="menu">Settings</span></button>
-      <h1 id="title" class="title">Debate Timer</h1>
-      <div class="top-right">
-        <button id="btn-reload" class="btn btn-lime" data-i18n="reload">Reload Scene</button>
-        <button id="btn-fullscreen" class="btn btn-lime btn-icon" data-i18n-title="fullscreen" title="Fullscreen (F)" aria-label="Fullscreen">⛶</button>
+      <div class="top-side">
+        <button id="btn-menu" class="tbtn" data-i18n-title="menuTitle" title="Settings (S)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+          <span class="tbtn-label" data-i18n="menu">Settings</span>
+        </button>
+      </div>
+      <h1 id="title" class="title"></h1>
+      <div class="top-side end">
+        <button id="btn-reload" class="tbtn" data-i18n-title="reloadTitleBtn" title="Restart the debate from the beginning">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          <span class="tbtn-label" data-i18n="reload">Reload Scene</span>
+        </button>
+        <button id="btn-fullscreen" class="tbtn icon-only" data-i18n-title="fullscreen" title="Fullscreen (F)" aria-label="Fullscreen">
+          <svg class="fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <svg class="fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        </button>
       </div>
     </header>
 
     <main class="stage">
-      <div class="side pro">
-        <div id="pro-label" class="side-label"></div>
-        <div id="pro-column" class="speakers pro"></div>
-      </div>
+      <section class="team pro" data-side="pro" aria-labelledby="pro-label">
+        <div class="team-head">
+          <h2 id="pro-label" class="team-name"></h2>
+          <span class="team-status" aria-hidden="true"></span>
+        </div>
+        <ol id="pro-column" class="spk-list"></ol>
+      </section>
 
-      <section class="center">
+      <section class="focus" data-i18n-label="timerLabel" aria-label="Timer">
+        <div id="now" class="now" aria-live="polite" aria-atomic="true">
+          <div id="now-step" class="now-step"></div>
+          <div class="now-title"><span class="now-dot" aria-hidden="true"></span><span id="now-name" class="now-name"></span></div>
+        </div>
+
+        <!-- Before the round -->
+        <div id="idle-card" class="idle-card">
+          <div id="idle-ring" class="idle-ring">
+            <div class="idle-face">
+              <div id="idle-total" class="idle-total"></div>
+              <div id="idle-summary" class="idle-summary"></div>
+              <p class="idle-hint" data-i18n="idleHint">Press Begin to start the round.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Single ring timer (prep + speakers) -->
-        <div id="ring-timer" class="ring-timer hidden">
+        <div id="ring-timer" class="clock hidden" data-state="ready">
           <div class="ring-wrap">
-            <svg class="ring" viewBox="0 0 100 100">
+            <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
               <circle id="ring-bg" class="ring-bg" cx="50" cy="50" r="44" />
               <circle id="ring-fg" class="ring-fg" cx="50" cy="50" r="44" />
             </svg>
-            <div id="ring-text" class="ring-text">0:00</div>
+            <div class="ring-face">
+              <div id="ring-text" class="ring-digits" role="timer" aria-live="off">0:00</div>
+              <div id="ring-sub" class="ring-sub"></div>
+            </div>
           </div>
-          <div class="controls">
-            <button id="ring-start" class="btn btn-mint" data-i18n="start">Start</button>
-            <button id="ring-pause" class="btn btn-blue" data-i18n="pause">Pause</button>
-            <button id="ring-resume" class="btn btn-mint" data-i18n="resume">Resume</button>
-            <button id="ring-out" class="btn btn-grey" disabled data-i18n="timeout">Time ran out</button>
-            <button id="ring-reset" class="btn btn-red" data-i18n="reset">Reset</button>
+          <div class="ctl">
+            <button id="ring-start" class="cbtn go" data-i18n-title="startTitle"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg><span data-i18n="start">Start</span></button>
+            <button id="ring-pause" class="cbtn hold" data-i18n-title="pauseTitle"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.5" height="16" rx="1.2"/><rect x="14" y="4" width="4.5" height="16" rx="1.2"/></svg><span data-i18n="pause">Pause</span></button>
+            <button id="ring-resume" class="cbtn go" data-i18n-title="resumeTitle"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg><span data-i18n="resume">Resume</span></button>
+            <div id="ring-out" class="cbtn out" role="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4M10 2h4"/></svg><span data-i18n="timeout">Time ran out</span></div>
+            <button id="ring-reset" class="cbtn quiet" data-i18n-title="resetTitle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span data-i18n="reset">Reset</span></button>
           </div>
         </div>
 
         <!-- Double bar timer (free debate) -->
-        <div id="double-timer" class="double-timer hidden">
-          <div class="bar-timer" data-side="pro">
-            <div class="bar-label">
-              <img class="icon-timer" src="assets/icons/timer-icon.png" alt="" />
-              <img class="icon-arrow" src="assets/icons/arrow-1.png" alt="" />
+        <div id="double-timer" class="duel hidden">
+          <div class="duel-side bar-timer" data-side="pro" data-state="ready">
+            <div class="duel-head">
+              <span class="duel-team"><span class="duel-dot" aria-hidden="true"></span><span class="duel-name"></span></span>
+              <span class="duel-status"></span>
             </div>
-            <div class="bar-wrap">
+            <div class="bar-text duel-digits" role="timer" aria-live="off">0:00</div>
+            <div class="bar-wrap" aria-hidden="true">
               <div class="bar-bg"></div>
               <div class="bar-fg"></div>
             </div>
-            <div class="bar-text">0:00</div>
-            <div class="bar-controls">
-              <button class="btn btn-mint bar-start" data-i18n="start">Start</button>
-              <button class="btn btn-blue bar-pause" data-i18n="pause">Pause</button>
-              <button class="btn btn-mint bar-resume" data-i18n="resume">Resume</button>
-              <button class="btn btn-grey bar-out" disabled data-i18n="timeout">Time ran out</button>
-              <button class="btn btn-red bar-reset" data-i18n="reset">Reset</button>
+            <div class="ctl">
+              <button class="cbtn go bar-start"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg><span data-i18n="start">Start</span></button>
+              <button class="cbtn hold bar-pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.5" height="16" rx="1.2"/><rect x="14" y="4" width="4.5" height="16" rx="1.2"/></svg><span data-i18n="pause">Pause</span></button>
+              <button class="cbtn go bar-resume"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg><span data-i18n="resume">Resume</span></button>
+              <div class="cbtn out bar-out" role="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4M10 2h4"/></svg><span data-i18n="timeout">Time ran out</span></div>
+              <button class="cbtn quiet square bar-reset" data-i18n-title="reset" title="Reset" aria-label="Reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
             </div>
           </div>
 
-          <button id="btn-invert" class="invert-btn">
-            <img src="assets/icons/swap-icon.png" alt="" />
+          <button id="btn-invert" class="swap" data-i18n-title="invertTitle" title="Hand the clock to the other side (I)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
             <span data-i18n="invert">Invert</span>
+            <kbd>I</kbd>
           </button>
 
-          <div class="bar-timer" data-side="con">
-            <div class="bar-label">
-              <img class="icon-timer" src="assets/icons/timer-icon.png" alt="" />
-              <img class="icon-arrow" src="assets/icons/arrow-1.png" alt="" />
+          <div class="duel-side bar-timer" data-side="con" data-state="ready">
+            <div class="duel-head">
+              <span class="duel-team"><span class="duel-dot" aria-hidden="true"></span><span class="duel-name"></span></span>
+              <span class="duel-status"></span>
             </div>
-            <div class="bar-wrap">
+            <div class="bar-text duel-digits" role="timer" aria-live="off">0:00</div>
+            <div class="bar-wrap" aria-hidden="true">
               <div class="bar-bg"></div>
               <div class="bar-fg"></div>
             </div>
-            <div class="bar-text">0:00</div>
-            <div class="bar-controls">
-              <button class="btn btn-mint bar-start" data-i18n="start">Start</button>
-              <button class="btn btn-blue bar-pause" data-i18n="pause">Pause</button>
-              <button class="btn btn-mint bar-resume" data-i18n="resume">Resume</button>
-              <button class="btn btn-grey bar-out" disabled data-i18n="timeout">Time ran out</button>
-              <button class="btn btn-red bar-reset" data-i18n="reset">Reset</button>
+            <div class="ctl">
+              <button class="cbtn go bar-start"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg><span data-i18n="start">Start</span></button>
+              <button class="cbtn hold bar-pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.5" height="16" rx="1.2"/><rect x="14" y="4" width="4.5" height="16" rx="1.2"/></svg><span data-i18n="pause">Pause</span></button>
+              <button class="cbtn go bar-resume"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg><span data-i18n="resume">Resume</span></button>
+              <div class="cbtn out bar-out" role="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4M10 2h4"/></svg><span data-i18n="timeout">Time ran out</span></div>
+              <button class="cbtn quiet square bar-reset" data-i18n-title="reset" title="Reset" aria-label="Reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
             </div>
           </div>
         </div>
       </section>
 
-      <div class="side con">
-        <div id="con-label" class="side-label"></div>
-        <div id="con-column" class="speakers con"></div>
-      </div>
+      <section class="team con" data-side="con" aria-labelledby="con-label">
+        <div class="team-head">
+          <h2 id="con-label" class="team-name"></h2>
+          <span class="team-status" aria-hidden="true"></span>
+        </div>
+        <ol id="con-column" class="spk-list"></ol>
+      </section>
     </main>
 
     <footer class="bottom">
-      <button id="btn-next" class="btn btn-mint btn-next" data-i18n="begin">Begin</button>
-      <div class="timeline">
-        <div id="timeline-buttons" class="timeline-buttons"></div>
-        <div class="timeline-line"></div>
+      <nav class="tl" data-i18n-label="timelineLabel" aria-label="Order of speeches">
+        <ol id="timeline-buttons" class="tl-rail"></ol>
+      </nav>
+      <div class="nav-btns">
+        <button id="btn-prev" class="tbtn icon-only prev-btn" data-i18n-title="prevTitle" title="Previous (←)" aria-label="Previous (←)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button id="btn-next" class="next-btn">
+          <span class="next-txt"><span id="next-label" class="next-label">Begin</span><span id="next-hint" class="next-hint"></span></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
       </div>
     </footer>
 
@@ -165,12 +210,14 @@
     </div>
 
     <!-- End screen -->
-    <div id="end-overlay" class="overlay hidden">
-      <div class="end-card">
-        <h2 data-i18n="ended">Debate Ended</h2>
-        <div class="panel-actions">
-          <button id="btn-end-close" class="btn btn-mint" data-i18n="close">Close</button>
-          <button id="btn-end-reload" class="btn btn-lime" data-i18n="reload">Reload Scene</button>
+    <div id="end-overlay" class="overlay end-overlay hidden">
+      <div class="end-card" role="dialog" aria-modal="true" aria-labelledby="end-title" aria-describedby="end-text">
+        <div class="end-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h2 id="end-title" data-i18n="ended">Debate Ended</h2>
+        <p id="end-text" class="end-text"></p>
+        <div class="end-actions">
+          <button id="btn-end-close" class="cbtn quiet" data-i18n="close">Close</button>
+          <button id="btn-end-reload" class="cbtn go" data-i18n="reload">Reload Scene</button>
         </div>
       </div>
     </div>
