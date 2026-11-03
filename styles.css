@@ -158,7 +158,11 @@ body {
   gap: 0.5em;
   font-weight: 600;
   letter-spacing: 0.01em;
-  padding: 0.55em 1.15em;
+  /* Every main-screen button is 2.5× its font size tall, whatever is
+     inside it, so text, icon-only and icon+text buttons line up. */
+  height: 2.5em;
+  padding: 0 1.15em;
+  line-height: 1;
   border-radius: 0.75em;
   border: 1px solid transparent;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.08s, color 0.15s;
@@ -210,7 +214,8 @@ body {
   color: #b42323;
 }
 .btn-icon {
-  padding: 0.55em 0.62em;
+  width: 2.5em;
+  padding: 0;
 }
 .title {
   margin: 0;
@@ -537,7 +542,7 @@ body {
 }
 .controls .btn {
   min-width: calc(var(--ctl) * 7);
-  font-size: calc(var(--ctl) * 1.2);
+  font-size: calc(var(--ctl) * 1.15);
 }
 
 /* Double timer */
@@ -595,7 +600,7 @@ body {
 }
 .bar-controls .btn {
   min-width: calc(var(--ctl) * 7);
-  font-size: calc(var(--ctl) * 1.1);
+  font-size: calc(var(--ctl) * 1.15);
 }
 .bar-label {
   position: absolute;
@@ -663,7 +668,7 @@ body {
 .btn-next {
   font-size: calc(var(--ctl) * 1.6);
   min-width: 5em;
-  padding: 0.35em 1em;
+  padding: 0 1em;
 }
 /* The buttons and the line share one track, so a long order on a narrow
    screen scrolls sideways instead of being cut off. */
@@ -739,7 +744,8 @@ body {
     clip-path: inset(50%);
   }
   .top .btn {
-    padding: 0.55em 0.62em;
+    width: 2.5em;
+    padding: 0;
   }
   .double-timer {
     gap: 8px;
@@ -1952,7 +1958,7 @@ kbd {
 }
 .end-card .btn {
   min-width: calc(var(--ctl) * 7);
-  font-size: calc(var(--ctl) * 1.1);
+  font-size: calc(var(--ctl) * 1.15);
 }
 .end-card h2 {
   margin: 0;
