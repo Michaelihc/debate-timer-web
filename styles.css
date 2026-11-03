@@ -101,7 +101,6 @@ body {
   padding: 0.35em 0.9em;
 }
 .btn:focus-visible,
-.tl-btn:focus-visible,
 .invert-btn:focus-visible {
   outline: 3px solid var(--lime);
   outline-offset: 3px;
@@ -662,7 +661,7 @@ body {
 .bottom {
   display: grid;
   grid-template-columns: auto 1fr;
-  align-items: end;
+  align-items: center;
   gap: var(--gutter-x);
 }
 .btn-next {
@@ -670,68 +669,163 @@ body {
   min-width: 5em;
   padding: 0 1em;
 }
-/* The buttons and the line share one track, so a long order on a narrow
-   screen scrolls sideways instead of being cut off. */
+/* ---------- Timeline: a stepper ----------
+   One dot per part, all the same width, joined by a line from the first dot's
+   centre to the last; the lime fill reaches the current dot. Wide rounds
+   scroll sideways instead of being cut off. */
 .timeline {
-  position: relative;
+  --dot: calc(var(--ctl) * 1.55);
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(100%, max-content);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  padding-top: 4px;
-  padding-bottom: calc(var(--ctl) * 0.55);
+  /* room for the current dot's glow */
+  padding: calc(var(--dot) * 0.3) 0 4px;
 }
-.timeline-buttons {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 0 calc(var(--ctl) * 0.5);
-}
-.timeline-line {
-  height: clamp(5px, 0.9vh, 10px);
-  background: var(--line);
-  border-radius: 99px;
-  margin-top: calc(var(--ctl) * 0.9);
-}
-.tl-btn {
+.tl-steps {
   position: relative;
-  font-family: inherit;
-  font-size: var(--ctl);
-  min-width: 2.4em;
-  padding: 0.3em 0.5em;
-  border: 1px solid var(--surface-line);
-  border-radius: 0.5em;
-  /* opaque, so the stem behind it doesn't show through */
-  background: var(--bg) linear-gradient(var(--surface-hover), var(--surface-hover));
-  color: var(--fg);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  z-index: 1;
-  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+  display: flex;
+  min-width: calc(var(--n, 9) * var(--ctl) * 3.1);
 }
-.tl-btn::after {
-  content: "";
+.tl-track {
   position: absolute;
-  left: 50%;
-  top: 100%;
-  width: 3px;
-  height: calc(var(--ctl) * 1);
-  margin-left: -1.5px;
-  background: var(--line);
-  z-index: -1;
+  top: calc(var(--dot) / 2 - 2px);
+  left: calc(100% / var(--n, 9) / 2);
+  right: calc(100% / var(--n, 9) / 2);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-line);
 }
-.tl-btn:hover {
-  background: var(--bg) linear-gradient(var(--surface-line), var(--surface-line));
-}
-.tl-btn.active {
+.tl-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
   background: var(--lime);
-  border-color: var(--lime);
-  color: #111;
-  box-shadow: 0 0 0 4px rgba(195, 242, 106, 0.22), 0 0.3em 1em rgba(195, 242, 106, 0.3);
-  transform: translateY(-2px);
+  transition: width 0.35s ease;
+}
+.tl-step {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ctl) * 0.2);
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+}
+.tl-dot {
+  position: relative;
+  width: var(--dot);
+  height: var(--dot);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid var(--c);
+  /* opaque, so the line never shows through a dot */
+  background: var(--bg);
+  font-size: calc(var(--ctl) * 0.72);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.tl-dot svg {
+  width: 52%;
+  height: 52%;
+}
+.tl-check {
+  display: none;
+}
+.tl-name,
+.tl-time {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+.tl-name {
+  font-size: calc(var(--ctl) * 0.62);
+  font-weight: 600;
+}
+.tl-time {
+  font-size: calc(var(--ctl) * 0.56);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tl-step:hover .tl-dot {
+  transform: scale(1.08);
+}
+/* Done: a solid, dimmed dot with a tick (dimmed, not transparent). */
+.tl-step.done .tl-dot {
+  background: color-mix(in srgb, var(--c) 38%, var(--bg));
+  border-color: color-mix(in srgb, var(--c) 38%, var(--bg));
+  color: color-mix(in srgb, var(--fg) 70%, var(--bg));
+}
+.tl-step.done .tl-mark {
+  display: none;
+}
+.tl-step.done .tl-check {
+  display: contents;
+}
+.tl-step.done .tl-name,
+.tl-step.done .tl-time {
+  color: color-mix(in srgb, var(--fg) 38%, var(--bg));
+}
+/* Now: filled in the team colour, a white ring and a glow. */
+.tl-step.now .tl-dot {
+  background: var(--c);
+  border-color: var(--fg);
+  color: var(--c-ink, #fff);
+  transform: scale(1.22);
+  box-shadow: 0 0 0 calc(var(--dot) * 0.1) color-mix(in srgb, var(--c) 35%, transparent),
+    0 0 calc(var(--dot) * 0.6) color-mix(in srgb, var(--c) 60%, transparent);
+}
+.tl-step.now .tl-name,
+.tl-step.now .tl-time {
+  margin-top: calc(var(--dot) * 0.12);
+}
+.tl-step.now .tl-name {
+  color: var(--lime);
+}
+.tl-step.now .tl-time {
+  color: var(--fg);
+}
+:root.light-bg .tl-step.now .tl-name {
+  color: #4d7a00;
+}
+.tl-step:focus-visible {
+  outline: none;
+}
+.tl-step:focus-visible .tl-dot {
+  outline: 3px solid var(--lime);
+  outline-offset: 3px;
+}
+
+/* Next button: what comes next, under the label */
+.next-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+.next-text small {
+  max-width: 9em;
+  margin-top: 0.12em;
+  overflow: hidden;
+  font-size: 0.42em;
+  font-weight: 600;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.next-text small:empty {
+  display: none;
 }
 
 @media (max-width: 600px) {
@@ -766,13 +860,12 @@ body {
     height: 56px;
     font-size: 12px;
   }
-  .timeline-buttons {
-    gap: 2px;
-    padding: 0 2px;
+  .tl-name,
+  .tl-time {
+    display: none;
   }
-  .tl-btn {
-    min-width: 1.9em;
-    padding: 0.25em 0.3em;
+  .tl-steps {
+    min-width: calc(var(--n, 9) * var(--dot) * 1.25);
   }
   .btn-next {
     min-width: 0;

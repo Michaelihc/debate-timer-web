@@ -120,11 +120,10 @@
     </main>
 
     <footer class="bottom">
-      <button id="btn-next" class="btn btn-primary btn-next"><span id="btn-next-label">Begin</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-      <div class="timeline">
-        <div id="timeline-buttons" class="timeline-buttons"></div>
-        <div class="timeline-line"></div>
-      </div>
+      <button id="btn-next" class="btn btn-primary btn-next"><span class="next-text"><span id="btn-next-label">Begin</span><small id="btn-next-sub"></small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <nav class="timeline" aria-label="Order of speeches">
+        <div id="timeline-buttons" class="tl-steps"></div>
+      </nav>
     </footer>
 
     <!-- Settings panel -->

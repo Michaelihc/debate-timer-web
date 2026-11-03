@@ -148,6 +148,10 @@
       firstUp: "First up",
       roundTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min in all`,
       invertTitle: "Invert (I)",
+      timelineTitle: "Order of speeches",
+      prepShort: "Prep",
+      freeShort: "Free debate",
+      eachSide: (time) => `${time} each`,
       minutes: "Minutes",
       seconds: "Seconds",
       minShort: "min",
@@ -319,6 +323,10 @@
       firstUp: "第一项",
       roundTotal: (n, min) => `共 ${n} 项 · 全程约 ${min} 分钟`,
       invertTitle: "翻转 (I)",
+      timelineTitle: "发言顺序",
+      prepShort: "准备",
+      freeShort: "自由辩论",
+      eachSide: (time) => `每方 ${time}`,
       minutes: "分钟",
       seconds: "秒",
       minShort: "分",
@@ -589,6 +597,7 @@
     idleBar: $("idle-bar"),
     idleTotal: $("idle-total"),
     btnNextLabel: $("btn-next-label"),
+    btnNextSub: $("btn-next-sub"),
     btnSave: $("btn-save"),
     btnDiscard: $("btn-discard"),
     panelFoot: $("panel-foot"),
@@ -801,7 +810,7 @@
       }
     });
     els.btnLang.textContent = t("langBtn");
-    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    updateNextButton();
     if (state.data) {
       els.proLabel.textContent = state.data.settings.pro_label || t("proDefault");
       els.conLabel.textContent = state.data.settings.con_label || t("conDefault");
@@ -949,7 +958,7 @@
     show(els.ringTimer, Boolean(p.ringVisible));
     show(els.doubleTimer, Boolean(p.doubleVisible));
     updateTitle();
-    els.btnNextLabel.textContent = t("next");
+    updateNextButton();
     updateTimelineActive();
     updateSpeakerIndicators();
     return true;
@@ -1078,14 +1087,70 @@
     return ev === "prep" ? "P" : ev === "free" ? "F" : String(ev);
   }
 
+  const TL_SVG = (body) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const TL_ICONS = {
+    prep: TL_SVG(
+      '<path d="M5 22h14M5 2h14M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2"/>'
+    ),
+    free: TL_SVG('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'),
+    done: TL_SVG('<path d="M20 6 9 17l-5-5"/>'),
+  };
+
+  // What a part is called, e.g. "Pro 1", "Alice", "Preparation Time".
+  function partName(ev) {
+    if (ev === "prep") return t("prep");
+    if (ev === "free") return t("free");
+    const p = participant(Number(ev));
+    return p ? nameOf(Number(ev), p) : String(ev);
+  }
+
+  // The timeline is a stepper: one dot per part, joined by a line that fills
+  // up as the round goes on. The dot says who (team colour and number, or an
+  // icon for preparation and free debate); the caption adds only what the dot
+  // can't: a custom speaker name, and the time.
   function buildTimeline(order) {
+    const s = state.data.settings;
+    const dm = s.display_minutes;
     els.timeline.innerHTML = "";
+    els.timeline.style.setProperty("--n", String(Math.max(order.length, 1)));
+    els.timeline.parentElement.setAttribute("aria-label", t("timelineTitle"));
+    const track = document.createElement("div");
+    track.className = "tl-track";
+    track.innerHTML = '<i class="tl-fill"></i>';
+    els.timeline.appendChild(track);
     state.timelineButtons = order.map((ev, i) => {
+      const id = Number(ev);
+      const p = participant(id);
+      let color;
+      let dot;
+      let name = "";
+      let time;
+      if (ev === "prep") {
+        color = "var(--lime)";
+        dot = TL_ICONS.prep;
+        name = t("prepShort");
+        time = formatTime(s.time_prep, dm);
+      } else if (ev === "free") {
+        color = "var(--yellow)";
+        dot = TL_ICONS.free;
+        name = t("freeShort");
+        time = t("eachSide")(formatTime(s.time_free, dm));
+      } else {
+        color = id > 0 ? s.pro_colors : s.con_colors;
+        dot = String(Math.abs(id));
+        name = p && p.name ? p.name : "";
+        time = p ? formatTime(p.time, dm) : "–";
+      }
       const b = document.createElement("button");
-      b.className = "tl-btn";
-      b.textContent = eventLabel(ev);
-      const p = participant(Number(ev));
-      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? nameOf(Number(ev), p) : String(ev);
+      b.className = "tl-step";
+      b.style.setProperty("--c", color);
+      b.style.setProperty("--c-ink", color.startsWith("#") ? inkFor(color) : "#111");
+      b.innerHTML = `<span class="tl-dot"><span class="tl-mark">${dot}</span><span class="tl-check">${TL_ICONS.done}</span></span>${
+        name ? `<span class="tl-name">${esc(name)}</span>` : ""
+      }<span class="tl-time">${esc(time)}</span>`;
+      b.title = `${partName(ev)} · ${time}`;
+      b.setAttribute("aria-label", b.title);
       b.addEventListener("click", () => {
         state.eventIndex = i - 1; // TimelineButtonControl.OnButtonPress
         next();
@@ -1093,10 +1158,36 @@
       els.timeline.appendChild(b);
       return b;
     });
+    updateTimelineActive();
   }
 
   function updateTimelineActive() {
-    state.timelineButtons.forEach((b, i) => b.classList.toggle("active", i === state.eventIndex));
+    const i = state.eventIndex;
+    const n = state.timelineButtons.length;
+    state.timelineButtons.forEach((b, k) => {
+      b.classList.toggle("done", i >= 0 && k < i);
+      b.classList.toggle("now", k === i);
+      if (k === i) b.setAttribute("aria-current", "step");
+      else b.removeAttribute("aria-current");
+    });
+    const fill = els.timeline.querySelector(".tl-fill");
+    if (fill) fill.style.width = n > 1 && i > 0 ? `${(Math.min(i, n - 1) / (n - 1)) * 100}%` : "0%";
+    const cur = state.timelineButtons[i];
+    const strip = els.timeline.parentElement;
+    if (cur && strip.scrollWidth > strip.clientWidth) {
+      strip.scrollTo({ left: cur.offsetLeft + cur.offsetWidth / 2 - strip.clientWidth / 2, behavior: "smooth" });
+    }
+    updateNextButton();
+  }
+
+  // "Begin" / "Next", with what comes next underneath.
+  function updateNextButton() {
+    const d = state.data;
+    if (!d) return;
+    const i = state.eventIndex;
+    els.btnNextLabel.textContent = i < 0 ? t("begin") : t("next");
+    const upcoming = d.event_order[i + 1];
+    els.btnNextSub.textContent = upcoming === undefined ? "" : partName(upcoming);
   }
 
   // AnimationController.Update, evaluated every frame
@@ -1163,7 +1254,6 @@
     }
 
     updateTitle();
-    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     updateTimelineActive();
     updateSpeakerIndicators();
     persistProgress();

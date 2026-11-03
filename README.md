@@ -22,7 +22,8 @@ python -m http.server 8000
 - Current speaker (speech bubble) and next speaker (arrow, flashes when time runs out) indicators
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
-- Clickable timeline to jump to any event
+- Timeline as a stepper: one dot per part in its team colour (icons for preparation and free debate), done parts dimmed with a tick, a line that fills up to the current part, and each part's time underneath; click any dot to jump there
+- The Next button shows what comes next
 - Before the round, the centre previews what comes first on a full ring in its team colour, with the whole round as a coloured bar and its total length
 - Main-screen controls, timers, and the timeline scale with the screen within sensible limits, from phone landscape to a 1080p projector
 - Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
