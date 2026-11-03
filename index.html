@@ -13,7 +13,7 @@
     <div id="flash" class="flash" aria-hidden="true"></div>
 
     <header class="top">
-      <button id="btn-menu" class="btn btn-lime" data-i18n="menu">Menu</button>
+      <button id="btn-menu" class="btn btn-lime btn-gear" data-i18n-title="menuTitle" title="Settings (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span data-i18n="menu">Settings</span></button>
       <h1 id="title" class="title">Debate Timer</h1>
       <div class="top-right">
         <button id="btn-reload" class="btn btn-lime" data-i18n="reload">Reload Scene</button>
@@ -109,50 +109,57 @@
 
     <!-- Settings panel -->
     <div id="menu-overlay" class="overlay hidden">
-      <div class="panel">
+      <div class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
         <div class="panel-head">
-          <div class="tabs">
-            <button id="tab-form" class="tab active" data-i18n="tabSettings">Settings</button>
-            <button id="tab-json" class="tab" data-i18n="tabJson">JSON</button>
-          </div>
-          <h2 data-i18n="editSave">Settings</h2>
+          <h2 id="panel-title" data-i18n="editSave">Settings</h2>
           <div class="panel-head-right">
-            <button id="btn-lang" class="btn btn-lime">中文</button>
-            <button id="btn-close" class="btn btn-red btn-x" aria-label="Close">✕</button>
+            <button id="btn-lang" class="btn btn-quiet sm">中文</button>
+            <button id="btn-close" class="icon-btn" data-i18n-title="close" title="Close" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
           </div>
         </div>
-
-        <div id="form-view" class="panel-body">
-          <form id="settings-form" class="settings" autocomplete="off"></form>
-        </div>
-
-        <div id="json-view" class="panel-body hidden">
-          <textarea id="editor" spellcheck="false"></textarea>
-          <div class="json-tools">
-            <button id="btn-download" class="btn btn-lime" data-i18n="download">Download</button>
-            <button id="btn-upload" class="btn btn-lime" data-i18n="upload">Upload</button>
-            <input id="file-input" type="file" accept="application/json,.json" hidden />
+        <div class="panel-main">
+          <nav id="settings-nav" class="snav" role="tablist" aria-orientation="vertical"></nav>
+          <div class="panel-body">
+            <form id="settings-form" class="settings" autocomplete="off"></form>
           </div>
         </div>
-
-        <div id="editor-error" class="editor-error"></div>
-        <div class="panel-actions">
-          <button id="btn-save" class="btn btn-mint" data-i18n="saveApply">Save &amp; Apply</button>
-          <button id="btn-discard" class="btn btn-yellow" data-i18n="discard">Discard</button>
-          <button id="btn-reset-save" class="btn btn-red" data-i18n="resetDefaults">Reset to Defaults</button>
+        <div id="editor-error" class="editor-error" role="alert"></div>
+        <div id="panel-foot" class="panel-foot">
+          <span id="foot-note" class="foot-note" aria-live="polite"></span>
+          <div class="foot-actions">
+            <button id="btn-discard" class="btn btn-quiet" data-i18n="discard">Discard changes</button>
+            <button id="btn-save" class="btn btn-mint">Save &amp; Apply</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Unsaved changes prompt -->
+    <!-- Save / edit preset -->
+    <div id="preset-overlay" class="overlay confirm hidden">
+      <form id="preset-dialog" class="confirm-card preset-dialog" role="dialog" aria-modal="true" aria-labelledby="preset-dialog-title" autocomplete="off">
+        <h2 id="preset-dialog-title">Save as preset</h2>
+        <p id="preset-dialog-text"></p>
+        <label class="fstack"><span class="flabel" data-i18n="pdName">Name</span><input id="preset-name" type="text" maxlength="60" required /></label>
+        <div class="fstack"><span class="flabel" data-i18n="pdIcon">Icon</span><div id="preset-icons" class="icon-grid" role="radiogroup"></div></div>
+        <label id="preset-update-row" class="check-row"><input id="preset-update" type="checkbox" /><span data-i18n="pdUpdate">Also replace what it holds with the current setup</span></label>
+        <div class="panel-actions">
+          <button type="button" id="preset-cancel" class="btn btn-quiet" data-i18n="cancel">Cancel</button>
+          <button type="submit" id="preset-ok" class="btn btn-mint">Save preset</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Confirm prompt -->
     <div id="confirm-overlay" class="overlay confirm hidden">
-      <div class="confirm-card">
+      <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text">
         <h2 id="confirm-title" data-i18n="unsavedTitle">Unsaved changes</h2>
         <p id="confirm-text" data-i18n="unsavedText">You changed the settings. Save and apply them?</p>
         <div class="panel-actions">
-          <button id="confirm-save" class="btn btn-mint" data-i18n="saveApply">Save &amp; Apply</button>
+          <button id="confirm-cancel" class="btn btn-quiet" data-i18n="keepEditing">Keep editing</button>
           <button id="confirm-discard" class="btn btn-yellow" data-i18n="discard">Discard</button>
-          <button id="confirm-cancel" class="btn btn-grey" data-i18n="keepEditing">Keep editing</button>
+          <button id="confirm-save" class="btn btn-mint" data-i18n="saveApply">Save &amp; Apply</button>
         </div>
       </div>
     </div>
@@ -172,6 +179,7 @@
   <audio id="audio-warning" src="assets/audio/warning.wav" preload="auto"></audio>
   <audio id="audio-end" src="assets/audio/bell.ogg" preload="auto"></audio>
   <input id="audio-file-input" type="file" accept="audio/*" hidden />
+  <input id="file-input" type="file" accept="application/json,.json" hidden />
 
   <script src="app.js"></script>
 </body>
