@@ -13,11 +13,13 @@
     <div id="flash" class="flash" aria-hidden="true"></div>
 
     <header class="top">
-      <button id="btn-menu" class="btn btn-tonal btn-gear" data-i18n-title="menuTitle" title="Settings (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span data-i18n="menu">Settings</span></button>
-      <h1 id="title" class="title">Debate Timer</h1>
+      <div class="top-left">
+        <button id="btn-menu" class="btn btn-tonal btn-gear" data-i18n-title="menuTitle" title="Settings (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.3a1.8 1.8 0 0 1 3.4 0l.3.9a1.8 1.8 0 0 0 2.5 1l.8-.4a1.8 1.8 0 0 1 2.4 2.4l-.4.8a1.8 1.8 0 0 0 1 2.5l.9.3a1.8 1.8 0 0 1 0 3.4l-.9.3a1.8 1.8 0 0 0-1 2.5l.4.8a1.8 1.8 0 0 1-2.4 2.4l-.8-.4a1.8 1.8 0 0 0-2.5 1l-.3.9a1.8 1.8 0 0 1-3.4 0l-.3-.9a1.8 1.8 0 0 0-2.5-1l-.8.4a1.8 1.8 0 0 1-2.4-2.4l.4-.8a1.8 1.8 0 0 0-1-2.5l-.9-.3a1.8 1.8 0 0 1 0-3.4l.9-.3a1.8 1.8 0 0 0 1-2.5l-.4-.8a1.8 1.8 0 0 1 2.4-2.4l.8.4a1.8 1.8 0 0 0 2.5-1Z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="menu">Settings</span></button>
+        <button id="btn-fullscreen" class="btn btn-tonal btn-icon" data-i18n-title="fullscreen" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3"/></svg></button>
+      </div>
+      <h1 id="title" class="title"><span id="title-eyebrow" class="title-eyebrow"></span><span class="title-main"><i id="title-dot" class="title-dot" aria-hidden="true"></i><span id="title-text" class="title-text">Debate Timer</span></span></h1>
       <div class="top-right">
-        <button id="btn-reload" class="btn btn-tonal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg><span data-i18n="reload">Reload Scene</span></button>
-        <button id="btn-fullscreen" class="btn btn-tonal btn-icon" data-i18n-title="fullscreen" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+        <button id="btn-reload" class="btn btn-tonal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg><span data-i18n="reload">Reload Scene</span></button>
       </div>
     </header>
 
@@ -58,56 +60,50 @@
             <div id="ring-text" class="ring-text">0:00</div>
           </div>
           <div class="controls">
-            <button id="ring-start" class="btn btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="start">Start</span></button>
-            <button id="ring-pause" class="btn btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></span><span data-i18n="pause">Pause</span></button>
-            <button id="ring-resume" class="btn btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="resume">Resume</span></button>
-            <button id="ring-out" class="btn btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
-            <button id="ring-reset" class="btn btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
+            <button id="ring-start" class="btn btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 4.9v14.2a1.4 1.4 0 0 0 2.1 1.2l11.2-7.1a1.4 1.4 0 0 0 0-2.4L10.1 3.7A1.4 1.4 0 0 0 8 4.9Z"/></svg></span><span data-i18n="start">Start</span></button>
+            <button id="ring-pause" class="btn btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.6" height="16" rx="1.6"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.6"/></svg></span><span data-i18n="pause">Pause</span></button>
+            <button id="ring-resume" class="btn btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 4.9v14.2a1.4 1.4 0 0 0 2.1 1.2l11.2-7.1a1.4 1.4 0 0 0 0-2.4L10.1 3.7A1.4 1.4 0 0 0 8 4.9Z"/></svg></span><span data-i18n="resume">Resume</span></button>
+            <button id="ring-out" class="btn btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4.5M12 17v.01M9.5 2.5h5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
+            <button id="ring-reset" class="btn btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
           </div>
         </div>
 
         <!-- Double bar timer (free debate) -->
         <div id="double-timer" class="double-timer hidden">
           <div class="bar-timer" data-side="pro">
-            <div class="bar-label">
-              <img class="icon-timer" src="assets/icons/timer-icon.png" alt="" />
-              <img class="icon-arrow" src="assets/icons/arrow-1.png" alt="" />
-            </div>
+            <div class="bar-label" aria-hidden="true"></div>
             <div class="bar-wrap">
               <div class="bar-bg"></div>
               <div class="bar-fg"></div>
             </div>
             <div class="bar-text">0:00</div>
             <div class="bar-controls">
-              <button class="btn bar-start btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="start">Start</span></button>
-              <button class="btn bar-pause btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></span><span data-i18n="pause">Pause</span></button>
-              <button class="btn bar-resume btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="resume">Resume</span></button>
-              <button class="btn bar-out btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
-              <button class="btn bar-reset btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
+              <button class="btn bar-start btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 4.9v14.2a1.4 1.4 0 0 0 2.1 1.2l11.2-7.1a1.4 1.4 0 0 0 0-2.4L10.1 3.7A1.4 1.4 0 0 0 8 4.9Z"/></svg></span><span data-i18n="start">Start</span></button>
+              <button class="btn bar-pause btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.6" height="16" rx="1.6"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.6"/></svg></span><span data-i18n="pause">Pause</span></button>
+              <button class="btn bar-resume btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 4.9v14.2a1.4 1.4 0 0 0 2.1 1.2l11.2-7.1a1.4 1.4 0 0 0 0-2.4L10.1 3.7A1.4 1.4 0 0 0 8 4.9Z"/></svg></span><span data-i18n="resume">Resume</span></button>
+              <button class="btn bar-out btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4.5M12 17v.01M9.5 2.5h5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
+              <button class="btn bar-reset btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
             </div>
           </div>
 
           <button id="btn-invert" class="invert-btn" data-i18n-title="invertTitle" title="Invert (I)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 17h28"/><path d="M29 9l8 8-8 8"/><path d="M40 31H12"/><path d="M19 23l-8 8 8 8"/></svg>
             <span data-i18n="invert">Invert</span>
           </button>
 
           <div class="bar-timer" data-side="con">
-            <div class="bar-label">
-              <img class="icon-timer" src="assets/icons/timer-icon.png" alt="" />
-              <img class="icon-arrow" src="assets/icons/arrow-1.png" alt="" />
-            </div>
+            <div class="bar-label" aria-hidden="true"></div>
             <div class="bar-wrap">
               <div class="bar-bg"></div>
               <div class="bar-fg"></div>
             </div>
             <div class="bar-text">0:00</div>
             <div class="bar-controls">
-              <button class="btn bar-start btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="start">Start</span></button>
-              <button class="btn bar-pause btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></span><span data-i18n="pause">Pause</span></button>
-              <button class="btn bar-resume btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg></span><span data-i18n="resume">Resume</span></button>
-              <button class="btn bar-out btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 16.5v.5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
-              <button class="btn bar-reset btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
+              <button class="btn bar-start btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 4.9v14.2a1.4 1.4 0 0 0 2.1 1.2l11.2-7.1a1.4 1.4 0 0 0 0-2.4L10.1 3.7A1.4 1.4 0 0 0 8 4.9Z"/></svg></span><span data-i18n="start">Start</span></button>
+              <button class="btn bar-pause btn-tonal"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5.5" y="4" width="4.6" height="16" rx="1.6"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.6"/></svg></span><span data-i18n="pause">Pause</span></button>
+              <button class="btn bar-resume btn-primary"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 4.9v14.2a1.4 1.4 0 0 0 2.1 1.2l11.2-7.1a1.4 1.4 0 0 0 0-2.4L10.1 3.7A1.4 1.4 0 0 0 8 4.9Z"/></svg></span><span data-i18n="resume">Resume</span></button>
+              <button class="btn bar-out btn-alert" disabled><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4.5M12 17v.01M9.5 2.5h5"/></svg></span><span data-i18n="timeout">Time ran out</span></button>
+              <button class="btn bar-reset btn-tonal btn-reset"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg></span><span data-i18n="reset">Reset</span></button>
             </div>
           </div>
         </div>
@@ -120,11 +116,11 @@
     </main>
 
     <footer class="bottom">
-      <button id="btn-next" class="btn btn-primary btn-next"><span id="btn-next-label">Begin</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-      <div class="timeline">
-        <div id="timeline-buttons" class="timeline-buttons"></div>
-        <div class="timeline-line"></div>
-      </div>
+      <button id="btn-prev" class="btn btn-tonal btn-step btn-prev" data-i18n-title="backTitle" title="Back (P)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.5 12h-15M10.5 6l-6 6 6 6"/></svg><span class="next-text"><span data-i18n="back">Back</span><small id="btn-prev-sub"></small></span></button>
+      <nav class="timeline" aria-label="Order of speeches">
+        <div id="timeline-buttons" class="tl-steps"></div>
+      </nav>
+      <button id="btn-next" class="btn btn-primary btn-step btn-next"><span class="next-text"><span id="btn-next-label">Begin</span><small id="btn-next-sub"></small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12h15M13.5 6l6 6-6 6"/></svg></button>
     </footer>
 
     <!-- Settings panel -->

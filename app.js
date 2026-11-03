@@ -148,6 +148,14 @@
       firstUp: "First up",
       roundTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min in all`,
       invertTitle: "Invert (I)",
+      timelineTitle: "Order of speeches",
+      back: "Back",
+      motion: "Motion",
+      partOf: (i, n) => `Part ${i} of ${n}`,
+      backTitle: "Back (P)",
+      prepShort: "Prep",
+      freeShort: "Free debate",
+      eachSide: (time) => `${time} each`,
       minutes: "Minutes",
       seconds: "Seconds",
       minShort: "min",
@@ -319,6 +327,14 @@
       firstUp: "第一项",
       roundTotal: (n, min) => `共 ${n} 项 · 全程约 ${min} 分钟`,
       invertTitle: "翻转 (I)",
+      timelineTitle: "发言顺序",
+      back: "上一项",
+      motion: "辩题",
+      partOf: (i, n) => `第 ${i} / ${n} 项`,
+      backTitle: "上一项 (P)",
+      prepShort: "准备",
+      freeShort: "自由辩论",
+      eachSide: (time) => `每方 ${time}`,
       minutes: "分钟",
       seconds: "秒",
       minShort: "分",
@@ -561,6 +577,9 @@
 
   const els = {
     title: $("title"),
+    titleText: $("title-text"),
+    titleEyebrow: $("title-eyebrow"),
+    titleDot: $("title-dot"),
     flash: $("flash"),
     proCol: $("pro-column"),
     conCol: $("con-column"),
@@ -589,12 +608,40 @@
     idleBar: $("idle-bar"),
     idleTotal: $("idle-total"),
     btnNextLabel: $("btn-next-label"),
+    btnNextSub: $("btn-next-sub"),
+    btnPrev: $("btn-prev"),
+    btnPrevSub: $("btn-prev-sub"),
     btnSave: $("btn-save"),
     btnDiscard: $("btn-discard"),
     panelFoot: $("panel-foot"),
     footNote: $("foot-note"),
   };
   const RING_CIRC = 2 * Math.PI * 44;
+
+  // ---------------------------------------------------------------------------
+  // Pictograms: one colour each, details cut out with a mask, so they work on
+  // any background. Masks need ids, so each copy gets its own.
+  // ---------------------------------------------------------------------------
+  let iconSeq = 0;
+  const PICTO = {
+    // Free debate: a thought cloud with "…": anyone on the team can jump in.
+    thinking: (id) => `<svg viewBox="0 0 64 46" aria-hidden="true"><defs><mask id="${id}"><rect width="64" height="46" fill="#fff"/><circle cx="27" cy="17.5" r="3.2" fill="#000"/><circle cx="37" cy="17.5" r="3.2" fill="#000"/><circle cx="47" cy="17.5" r="3.2" fill="#000"/></mask></defs><g fill="currentColor"><path mask="url(#${id})" d="M21 30.5c-5.2 0-9-3.4-9-8 0-3.9 2.8-7 6.6-7.8C20 8.3 25.7 4 32.5 4c5.3 0 9.9 2.6 12.3 6.4 1-.3 2.1-.4 3.2-.4 6.6 0 12 4.4 12 10.2 0 5.8-5.4 10.3-12 10.3Z"/><circle cx="11.5" cy="35" r="3.6"/><circle cx="5" cy="41.5" r="2.3"/></g></svg>`,
+    // Up next: two rounded chevrons pointing at the speaker.
+    next: () => `<svg viewBox="0 0 48 48" fill="currentColor" stroke="currentColor" stroke-width="4" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5 22 24 6 38.5Z"/><path d="M24 9.5 40 24 24 38.5Z"/></svg>`,
+    // This side's free-debate clock is running.
+    stopwatch: (id) => `<svg viewBox="0 0 48 48" aria-hidden="true"><defs><mask id="${id}"><rect width="48" height="48" fill="#fff"/><path d="M24 28V18.5" stroke="#000" stroke-width="3.4" stroke-linecap="round"/><circle cx="24" cy="28" r="3" fill="#000"/></mask></defs><g fill="currentColor"><rect x="19" y="2" width="10" height="5" rx="2"/><rect x="22" y="5" width="4" height="5"/><path d="M36.6 9.8a2.2 2.2 0 0 1 3.1 0l2.5 2.5a2.2 2.2 0 0 1 0 3.1l-1.6 1.6-5.6-5.6Z"/><circle mask="url(#${id})" cx="24" cy="28" r="17"/></g></svg>`,
+    // …pointing at that side's bar.
+    go: () => `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 24h30M27 12l12 12-12 12"/></svg>`,
+    // Preparation (timeline): notepad with lines and a pencil.
+    prep: (id) => `<svg viewBox="0 0 48 48" aria-hidden="true"><defs><mask id="${id}"><rect width="48" height="48" fill="#fff"/><rect x="15" y="3" width="12" height="7" rx="2.5" fill="#000"/><path d="M12.5 19h17M12.5 26h17M12.5 33h10" stroke="#000" stroke-width="3" stroke-linecap="round"/><path d="M30 44 44.5 29.5" stroke="#000" stroke-width="11" stroke-linecap="round"/></mask></defs><g fill="currentColor"><rect mask="url(#${id})" x="5" y="6" width="32" height="38" rx="6"/><rect x="17" y="2" width="8" height="6" rx="2"/><path d="M41.2 25.9a3 3 0 0 1 4.2 0l.7.7a3 3 0 0 1 0 4.2L33.9 43l-6.4 1.5a.9.9 0 0 1-1.1-1.1L28 37.1Z"/></g></svg>`,
+    // Done (timeline).
+    done: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7"/></svg>`,
+  };
+  const picto = (name) => PICTO[name](`ic${++iconSeq}`);
+
+  document.querySelectorAll(".bar-label").forEach((el) => {
+    el.innerHTML = `<span class="icon-timer">${picto("stopwatch")}</span><span class="icon-arrow">${picto("go")}</span>`;
+  });
 
   function playSound(audio) {
     try {
@@ -801,7 +848,7 @@
       }
     });
     els.btnLang.textContent = t("langBtn");
-    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
+    updateNextButton();
     if (state.data) {
       els.proLabel.textContent = state.data.settings.pro_label || t("proDefault");
       els.conLabel.textContent = state.data.settings.con_label || t("conDefault");
@@ -868,16 +915,27 @@
     updateIdleHint();
     const order = d.event_order;
     const i = state.eventIndex;
+    // Two tiers: a small line for context (the motion, or the part and the
+    // motion during the round) over the main line, which carries a dot in
+    // the colour of whoever has the floor.
+    const set = (eyebrow, text, dot) => {
+      els.titleEyebrow.textContent = eyebrow;
+      els.titleText.textContent = text;
+      els.titleDot.style.background = dot || "";
+      els.title.classList.toggle("has-dot", Boolean(dot));
+    };
     if (i < 0 || i >= order.length) {
-      els.title.textContent = d.title;
+      set(d.title ? t("motion") : "", d.title, "");
       return;
     }
     const ev = order[i];
-    if (ev === "prep") els.title.textContent = t("prep");
-    else if (ev === "free") els.title.textContent = t("free");
+    const eyebrow = t("partOf")(i + 1, order.length) + (d.title ? " · " + d.title : "");
+    if (ev === "prep") set(eyebrow, t("prep"), "var(--lime)");
+    else if (ev === "free") set(eyebrow, t("free"), "var(--yellow)");
     else {
-      const p = participant(speakerIdAt(i));
-      els.title.textContent = p ? t("speakerTurn")(nameOf(speakerIdAt(i), p)) : `${t("fNoSpeaker")} (${ev})`;
+      const id = speakerIdAt(i);
+      const p = participant(id);
+      set(eyebrow, p ? t("speakerTurn")(nameOf(id, p)) : `${t("fNoSpeaker")} (${ev})`, id > 0 ? d.settings.pro_colors : d.settings.con_colors);
     }
   }
 
@@ -949,7 +1007,7 @@
     show(els.ringTimer, Boolean(p.ringVisible));
     show(els.doubleTimer, Boolean(p.doubleVisible));
     updateTitle();
-    els.btnNextLabel.textContent = t("next");
+    updateNextButton();
     updateTimelineActive();
     updateSpeakerIndicators();
     return true;
@@ -1036,11 +1094,11 @@
       const row = document.createElement("div");
       row.className = "speaker";
       row.innerHTML = `
-        <div class="slot outer"><img class="icon-next" src="assets/icons/next-icon.png" alt="" /></div>
+        <div class="slot outer"><span class="icon-next">${picto("next")}</span></div>
         <div class="figure" style="background-color:${color}"><div class="figure-num">${i}</div></div>
         <div class="slot inner">
           <img class="icon-clipboard" src="assets/icons/clipboard.png" alt="" />
-          <img class="icon-group" src="assets/icons/group-icon.png" alt="" />
+          <span class="icon-group">${picto("thinking")}</span>
           <img class="icon-speech" src="assets/icons/speech-icon.png" alt="" />
         </div>`;
       col.appendChild(row);
@@ -1078,14 +1136,61 @@
     return ev === "prep" ? "P" : ev === "free" ? "F" : String(ev);
   }
 
+
+  // What a part is called, e.g. "Pro 1", "Alice", "Preparation Time".
+  function partName(ev) {
+    if (ev === "prep") return t("prep");
+    if (ev === "free") return t("free");
+    const p = participant(Number(ev));
+    return p ? nameOf(Number(ev), p) : String(ev);
+  }
+
+  // The timeline is a stepper: one dot per part, joined by a line that fills
+  // up as the round goes on. The dot says who (team colour and number, or an
+  // icon for preparation and free debate); the caption adds only what the dot
+  // can't: a custom speaker name, and the time.
   function buildTimeline(order) {
+    const s = state.data.settings;
+    const dm = s.display_minutes;
     els.timeline.innerHTML = "";
+    els.timeline.style.setProperty("--n", String(Math.max(order.length, 1)));
+    els.timeline.parentElement.setAttribute("aria-label", t("timelineTitle"));
+    const track = document.createElement("div");
+    track.className = "tl-track";
+    track.innerHTML = '<i class="tl-fill"></i>';
+    els.timeline.appendChild(track);
     state.timelineButtons = order.map((ev, i) => {
+      const id = Number(ev);
+      const p = participant(id);
+      let color;
+      let dot;
+      let name = "";
+      let time;
+      if (ev === "prep") {
+        color = "var(--lime)";
+        dot = picto("prep");
+        name = t("prepShort");
+        time = formatTime(s.time_prep, dm);
+      } else if (ev === "free") {
+        color = "var(--yellow)";
+        dot = picto("thinking");
+        name = t("freeShort");
+        time = t("eachSide")(formatTime(s.time_free, dm));
+      } else {
+        color = id > 0 ? s.pro_colors : s.con_colors;
+        dot = String(Math.abs(id));
+        name = p && p.name ? p.name : "";
+        time = p ? formatTime(p.time, dm) : "–";
+      }
       const b = document.createElement("button");
-      b.className = "tl-btn";
-      b.textContent = eventLabel(ev);
-      const p = participant(Number(ev));
-      b.title = ev === "prep" ? t("prep") : ev === "free" ? t("free") : p ? nameOf(Number(ev), p) : String(ev);
+      b.className = "tl-step";
+      b.style.setProperty("--c", color);
+      b.style.setProperty("--c-ink", color.startsWith("#") ? inkFor(color) : "#111");
+      b.innerHTML = `<span class="tl-dot"><span class="tl-mark">${dot}</span><span class="tl-check">${picto("done")}</span></span>${
+        name ? `<span class="tl-name">${esc(name)}</span>` : ""
+      }<span class="tl-time">${esc(time)}</span>`;
+      b.title = `${partName(ev)} · ${time}`;
+      b.setAttribute("aria-label", b.title);
       b.addEventListener("click", () => {
         state.eventIndex = i - 1; // TimelineButtonControl.OnButtonPress
         next();
@@ -1093,10 +1198,52 @@
       els.timeline.appendChild(b);
       return b;
     });
+    updateTimelineActive();
   }
 
   function updateTimelineActive() {
-    state.timelineButtons.forEach((b, i) => b.classList.toggle("active", i === state.eventIndex));
+    const i = state.eventIndex;
+    const n = state.timelineButtons.length;
+    state.timelineButtons.forEach((b, k) => {
+      b.classList.toggle("done", i >= 0 && k < i);
+      b.classList.toggle("now", k === i);
+      if (k === i) b.setAttribute("aria-current", "step");
+      else b.removeAttribute("aria-current");
+    });
+    const fill = els.timeline.querySelector(".tl-fill");
+    if (fill) fill.style.width = n > 1 && i > 0 ? `${(Math.min(i, n - 1) / (n - 1)) * 100}%` : "0%";
+    const cur = state.timelineButtons[i];
+    const strip = els.timeline.parentElement;
+    if (cur && strip.scrollWidth > strip.clientWidth) {
+      strip.scrollTo({ left: cur.offsetLeft + cur.offsetWidth / 2 - strip.clientWidth / 2, behavior: "smooth" });
+    }
+    updateNextButton();
+  }
+
+  const shortPartName = (ev) => (ev === "prep" ? t("prepShort") : ev === "free" ? t("freeShort") : partName(ev));
+
+  // "Begin" / "Next" and "Back", each with the part they lead to underneath.
+  function updateNextButton() {
+    const d = state.data;
+    if (!d) return;
+    const i = state.eventIndex;
+    els.btnNextLabel.textContent = i < 0 ? t("begin") : t("next");
+    const upcoming = d.event_order[i + 1];
+    els.btnNextSub.textContent = upcoming === undefined ? "" : shortPartName(upcoming);
+    const canGoBack = i > 0;
+    els.btnPrev.disabled = !canGoBack;
+    els.btnPrevSub.textContent = canGoBack ? shortPartName(d.event_order[i - 1]) : "";
+    syncStepWidths();
+  }
+
+  // Back and Next are as wide as the wider of the two needs, no wider, so
+  // the timeline between them stays centred.
+  function syncStepWidths() {
+    const a = els.btnPrev;
+    const b = els.btnNext;
+    a.style.width = b.style.width = "";
+    const w = Math.ceil(Math.max(a.offsetWidth, b.offsetWidth));
+    if (w) a.style.width = b.style.width = `${w}px`;
   }
 
   // AnimationController.Update, evaluated every frame
@@ -1163,7 +1310,6 @@
     }
 
     updateTitle();
-    els.btnNextLabel.textContent = state.eventIndex < 0 ? t("begin") : t("next");
     updateTimelineActive();
     updateSpeakerIndicators();
     persistProgress();
@@ -2552,6 +2698,7 @@
   $("btn-end-reload").addEventListener("click", loadScene);
   $("btn-end-close").addEventListener("click", () => show(els.endOverlay, false));
   els.btnNext.addEventListener("click", next);
+  els.btnPrev.addEventListener("click", previous);
 
   // Fullscreen
   function toggleFullscreen() {
@@ -2627,7 +2774,10 @@
     }
   });
 
-  window.addEventListener("resize", fitSpeakerSize);
+  window.addEventListener("resize", () => {
+    fitSpeakerSize();
+    syncStepWidths();
+  });
   // The stage also changes height when the title wraps onto a second line.
   if ("ResizeObserver" in window) new ResizeObserver(() => fitSpeakerSize()).observe(els.proCol.parentElement);
 

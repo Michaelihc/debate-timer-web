@@ -101,7 +101,6 @@ body {
   padding: 0.35em 0.9em;
 }
 .btn:focus-visible,
-.tl-btn:focus-visible,
 .invert-btn:focus-visible {
   outline: 3px solid var(--lime);
   outline-offset: 3px;
@@ -141,6 +140,7 @@ body {
 .top > :first-child {
   justify-self: start;
 }
+.top-left,
 .top-right {
   display: flex;
   gap: calc(var(--ctl) * 0.45);
@@ -158,7 +158,11 @@ body {
   gap: 0.5em;
   font-weight: 600;
   letter-spacing: 0.01em;
-  padding: 0.55em 1.15em;
+  /* Every main-screen button is 2.5× its font size tall, whatever is
+     inside it, so text, icon-only and icon+text buttons line up. */
+  height: 2.5em;
+  padding: 0 1.15em;
+  line-height: 1;
   border-radius: 0.75em;
   border: 1px solid transparent;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.08s, color 0.15s;
@@ -210,16 +214,58 @@ body {
   color: #b42323;
 }
 .btn-icon {
-  padding: 0.55em 0.62em;
+  width: 2.5em;
+  padding: 0;
 }
+/* Title: a small context line over the main line, which has a dot in
+   the colour of whoever has the floor. */
 .title {
   margin: 0;
-  font-weight: 400;
-  font-size: clamp(22px, 5.6vmin, 76px);
-  line-height: 1.12;
-  text-align: center;
-  text-wrap: balance;
   max-width: 62vw;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25em;
+  text-align: center;
+  font-size: clamp(22px, 5.2vmin, 70px);
+}
+.title-eyebrow {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: max(12px, 0.38em);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.title-eyebrow:empty {
+  display: none;
+}
+.title-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  max-width: 100%;
+}
+.title-dot {
+  display: none;
+  flex: none;
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.1em color-mix(in srgb, currentColor 12%, transparent);
+}
+.title.has-dot .title-dot {
+  display: block;
+}
+.title-text {
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -288,18 +334,26 @@ body {
   align-items: center;
   flex: none;
 }
-.slot img {
+.slot > * {
   display: none;
 }
-.slot img.show {
+.slot > .show {
   display: block;
 }
 .slot.outer {
   justify-content: flex-end;
 }
-.slot.outer img {
-  max-width: 100%;
-  max-height: 50%;
+/* Up next: chevrons pointing at the speaker */
+.slot .icon-next {
+  width: 78%;
+  aspect-ratio: 1;
+  color: #d6d6d6;
+}
+.slot .icon-next svg,
+.slot .icon-group svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .slot.inner {
   justify-content: flex-start;
@@ -319,14 +373,14 @@ body {
   max-width: none;
   filter: drop-shadow(0 0.3vh 0.6vh rgba(0, 0, 0, 0.35));
 }
-/* Thought bubble: dots lead down to the head. */
+/* Thought cloud: its trail leads down to the head. */
 .slot .icon-group {
   position: absolute;
-  left: 0;
-  bottom: 74%;
-  height: 44%;
-  width: auto;
-  max-width: none;
+  left: -2%;
+  bottom: 66%;
+  height: 40%;
+  aspect-ratio: 64 / 46;
+  color: #d6d6d6;
 }
 
 .figure {
@@ -363,7 +417,7 @@ body {
     opacity: 0;
   }
 }
-.slot img.flashing {
+.slot .flashing {
   animation: blink 0.5s steps(1) infinite;
 }
 
@@ -537,7 +591,7 @@ body {
 }
 .controls .btn {
   min-width: calc(var(--ctl) * 7);
-  font-size: calc(var(--ctl) * 1.2);
+  font-size: calc(var(--ctl) * 1.15);
 }
 
 /* Double timer */
@@ -595,7 +649,7 @@ body {
 }
 .bar-controls .btn {
   min-width: calc(var(--ctl) * 7);
-  font-size: calc(var(--ctl) * 1.1);
+  font-size: calc(var(--ctl) * 1.15);
 }
 .bar-label {
   position: absolute;
@@ -615,12 +669,18 @@ body {
 .bar-label.show {
   display: flex;
 }
-.bar-label img {
+.bar-label .icon-timer {
   width: 100%;
+  color: #d6d6d6;
 }
 .bar-label .icon-arrow {
-  width: 80%;
-  filter: sepia(1) saturate(3) hue-rotate(90deg);
+  width: 78%;
+  color: var(--lime);
+}
+.bar-label svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .invert-btn {
@@ -654,82 +714,202 @@ body {
 }
 
 /* ---------- Bottom / timeline ---------- */
+/* Back | timeline | Next: the two buttons are the same width, so the
+   timeline sits centred under the timer. */
 .bottom {
   display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: end;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--gutter-x);
 }
-.btn-next {
-  font-size: calc(var(--ctl) * 1.6);
-  min-width: 5em;
-  padding: 0.35em 1em;
+/* Back and Next: same width (set by syncStepWidths), sized to content */
+.btn-step {
+  font-size: calc(var(--ctl) * 1.3);
+  padding: 0 0.8em;
+  gap: 0.55em;
+  justify-content: space-between;
 }
-/* The buttons and the line share one track, so a long order on a narrow
-   screen scrolls sideways instead of being cut off. */
+.btn-prev .next-text {
+  align-items: flex-end;
+}
+.btn-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.btn-step:disabled:hover {
+  background: var(--surface);
+}
+/* ---------- Timeline: a stepper ----------
+   One dot per part, all the same width, joined by a line from the first dot's
+   centre to the last; the lime fill reaches the current dot. Wide rounds
+   scroll sideways instead of being cut off. */
 .timeline {
-  position: relative;
+  --dot: calc(var(--ctl) * 1.55);
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(100%, max-content);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  padding-top: 4px;
-  padding-bottom: calc(var(--ctl) * 0.55);
+  /* room for the current dot's glow */
+  padding: calc(var(--dot) * 0.3) 0 4px;
 }
-.timeline-buttons {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 0 calc(var(--ctl) * 0.5);
-}
-.timeline-line {
-  height: clamp(5px, 0.9vh, 10px);
-  background: var(--line);
-  border-radius: 99px;
-  margin-top: calc(var(--ctl) * 0.9);
-}
-.tl-btn {
+.tl-steps {
   position: relative;
-  font-family: inherit;
-  font-size: var(--ctl);
-  min-width: 2.4em;
-  padding: 0.3em 0.5em;
-  border: 1px solid var(--surface-line);
-  border-radius: 0.5em;
-  /* opaque, so the stem behind it doesn't show through */
-  background: var(--bg) linear-gradient(var(--surface-hover), var(--surface-hover));
-  color: var(--fg);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  z-index: 1;
-  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+  display: flex;
+  min-width: calc(var(--n, 9) * var(--ctl) * 3.1);
 }
-.tl-btn::after {
-  content: "";
+.tl-track {
   position: absolute;
-  left: 50%;
-  top: 100%;
-  width: 3px;
-  height: calc(var(--ctl) * 1);
-  margin-left: -1.5px;
-  background: var(--line);
-  z-index: -1;
+  top: calc(var(--dot) / 2 - 2px);
+  left: calc(100% / var(--n, 9) / 2);
+  right: calc(100% / var(--n, 9) / 2);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-line);
 }
-.tl-btn:hover {
-  background: var(--bg) linear-gradient(var(--surface-line), var(--surface-line));
-}
-.tl-btn.active {
+.tl-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
   background: var(--lime);
-  border-color: var(--lime);
-  color: #111;
-  box-shadow: 0 0 0 4px rgba(195, 242, 106, 0.22), 0 0.3em 1em rgba(195, 242, 106, 0.3);
-  transform: translateY(-2px);
+  transition: width 0.35s ease;
+}
+.tl-step {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--ctl) * 0.2);
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+}
+.tl-dot {
+  position: relative;
+  width: var(--dot);
+  height: var(--dot);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid var(--c);
+  /* opaque, so the line never shows through a dot */
+  background: var(--bg);
+  font-size: calc(var(--ctl) * 0.72);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.tl-dot svg {
+  width: 52%;
+  height: 52%;
+}
+.tl-check {
+  display: none;
+}
+.tl-name,
+.tl-time {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+.tl-name {
+  font-size: calc(var(--ctl) * 0.62);
+  font-weight: 600;
+}
+.tl-time {
+  font-size: calc(var(--ctl) * 0.56);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tl-step:hover .tl-dot {
+  transform: scale(1.08);
+}
+/* Done: a solid, dimmed dot with a tick (dimmed, not transparent). */
+.tl-step.done .tl-dot {
+  background: color-mix(in srgb, var(--c) 38%, var(--bg));
+  border-color: color-mix(in srgb, var(--c) 38%, var(--bg));
+  color: color-mix(in srgb, var(--fg) 70%, var(--bg));
+}
+.tl-step.done .tl-mark {
+  display: none;
+}
+.tl-step.done .tl-check {
+  display: contents;
+}
+.tl-step.done .tl-name,
+.tl-step.done .tl-time {
+  color: color-mix(in srgb, var(--fg) 38%, var(--bg));
+}
+/* Now: filled in the team colour, a white ring and a glow. */
+.tl-step.now .tl-dot {
+  background: var(--c);
+  border-color: var(--fg);
+  color: var(--c-ink, #fff);
+  transform: scale(1.22);
+  box-shadow: 0 0 0 calc(var(--dot) * 0.1) color-mix(in srgb, var(--c) 35%, transparent),
+    0 0 calc(var(--dot) * 0.6) color-mix(in srgb, var(--c) 60%, transparent);
+}
+.tl-step.now .tl-name,
+.tl-step.now .tl-time {
+  margin-top: calc(var(--dot) * 0.12);
+}
+.tl-step.now .tl-name {
+  color: var(--lime);
+}
+.tl-step.now .tl-time {
+  color: var(--fg);
+}
+:root.light-bg .tl-step.now .tl-name {
+  color: #4d7a00;
+}
+.tl-step:focus-visible {
+  outline: none;
+}
+.tl-step:focus-visible .tl-dot {
+  outline: 3px solid var(--lime);
+  outline-offset: 3px;
+}
+
+/* Next button: what comes next, under the label */
+.next-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+.next-text small {
+  max-width: 6em;
+  margin-top: 0.12em;
+  overflow: hidden;
+  font-size: 0.42em;
+  font-weight: 600;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.next-text small:empty {
+  display: none;
 }
 
 @media (max-width: 600px) {
+  .btn-step {
+    font-size: calc(var(--ctl) * 1.2);
+    padding: 0 0.6em;
+  }
+  .btn-prev {
+    justify-content: center;
+  }
+  .btn-prev .next-text,
+  .btn-next .next-text small {
+    display: none;
+  }
   /* icon-only top bar buttons, so the title has room */
   .top .btn > span {
     position: absolute;
@@ -739,7 +919,8 @@ body {
     clip-path: inset(50%);
   }
   .top .btn {
-    padding: 0.55em 0.62em;
+    width: 2.5em;
+    padding: 0;
   }
   .double-timer {
     gap: 8px;
@@ -760,17 +941,12 @@ body {
     height: 56px;
     font-size: 12px;
   }
-  .timeline-buttons {
-    gap: 2px;
-    padding: 0 2px;
+  .tl-name,
+  .tl-time {
+    display: none;
   }
-  .tl-btn {
-    min-width: 1.9em;
-    padding: 0.25em 0.3em;
-  }
-  .btn-next {
-    min-width: 0;
-    padding: 0.35em 0.7em;
+  .tl-steps {
+    min-width: calc(var(--n, 9) * var(--dot) * 1.25);
   }
 }
 
@@ -1952,7 +2128,7 @@ kbd {
 }
 .end-card .btn {
   min-width: calc(var(--ctl) * 7);
-  font-size: calc(var(--ctl) * 1.1);
+  font-size: calc(var(--ctl) * 1.15);
 }
 .end-card h2 {
   margin: 0;

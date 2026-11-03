@@ -22,7 +22,9 @@ python -m http.server 8000
 - Current speaker (speech bubble) and next speaker (arrow, flashes when time runs out) indicators
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
-- Clickable timeline to jump to any event
+- Timeline as a stepper: one dot per part in its team colour (icons for preparation and free debate), done parts dimmed with a tick, a line that fills up to the current part, and each part's time underneath; click any dot to jump there
+- Back and Next buttons on either side of the timeline, each showing the part it leads to
+- A two-tier title: a small line with the motion (and the part number during the round) over the main line, with a dot in the colour of whoever has the floor
 - Before the round, the centre previews what comes first on a full ring in its team colour, with the whole round as a coloured bar and its total length
 - Main-screen controls, timers, and the timeline scale with the screen within sensible limits, from phone landscape to a 1080p projector
 - Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
@@ -145,5 +147,5 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
 ## Files
 
 - `index.html`, `styles.css`, `app.js`: the app
-- `assets/icons/`: icons from the original project
+- `assets/icons/`: the speaker figure, speech bubble, and clipboard from the original project; the other icons are inline SVG in `index.html` and `app.js`
 - `assets/audio/`: default warning and end sounds from the original project
