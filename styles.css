@@ -502,6 +502,9 @@ body {
   .idle-ring-fg {
     animation: none;
   }
+  .timeline {
+    --tl-move: 0s;
+  }
 }
 .idle-time {
   position: absolute;
@@ -534,6 +537,16 @@ body {
   font-size: clamp(13px, 2.5vmin, 30px);
   color: var(--fg);
   opacity: 0.8;
+}
+.idle-begin {
+  display: inline-block;
+  margin: 0 0.15em;
+  padding: 0.08em 0.55em 0.12em;
+  border-radius: 0.5em;
+  background: linear-gradient(180deg, #8ef2bc, #58d892);
+  color: #08281a;
+  font-weight: 700;
+  box-shadow: 0 0.15em 0.6em rgba(88, 216, 146, 0.3);
 }
 .idle-text {
   margin: 0;
@@ -745,6 +758,8 @@ body {
    scroll sideways instead of being cut off. */
 .timeline {
   --dot: calc(var(--ctl) * 1.55);
+  /* how long the lime line takes to move to the next dot */
+  --tl-move: 0.4s;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -772,7 +787,7 @@ body {
   width: 0;
   border-radius: inherit;
   background: var(--lime);
-  transition: width 0.35s ease;
+  transition: width var(--tl-move) cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tl-step {
   position: relative;
@@ -802,7 +817,7 @@ body {
   font-size: calc(var(--ctl) * 0.72);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s, color 0.2s;
 }
 .tl-dot svg {
   width: 52%;
@@ -817,7 +832,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.15;
+  line-height: 1.15;  transition: color 0.2s, margin-top 0.2s;
 }
 .tl-name {
   font-size: calc(var(--ctl) * 0.62);
@@ -848,6 +863,12 @@ body {
   color: color-mix(in srgb, var(--fg) 38%, var(--bg));
 }
 /* Now: filled in the team colour, a white ring and a glow. */
+/* The current dot lights up once the line has reached it. */
+.tl-step.now .tl-dot,
+.tl-step.now .tl-name,
+.tl-step.now .tl-time {
+  transition-delay: calc(var(--tl-move) * 0.6);
+}
 .tl-step.now .tl-dot {
   background: var(--c);
   border-color: var(--fg);

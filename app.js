@@ -144,7 +144,7 @@
       proDefault: "Pro",
       conDefault: "Con",
       speakerTurn: (name) => `${name}’s Turn`,
-      idleHint: "Press Begin when the first speaker is ready.",
+      idleHint: "Press {begin} when the first speaker is ready.",
       firstUp: "First up",
       roundTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min in all`,
       invertTitle: "Invert (I)",
@@ -323,7 +323,7 @@
       proDefault: "正方",
       conDefault: "反方",
       speakerTurn: (name) => `辩手 ${name} 发言`,
-      idleHint: "第一位辩手准备好后，按“开始”。",
+      idleHint: "第一位辩手准备好后，按{begin}。",
       firstUp: "第一项",
       roundTotal: (n, min) => `共 ${n} 项 · 全程约 ${min} 分钟`,
       invertTitle: "翻转 (I)",
@@ -607,6 +607,7 @@
     idleTime: $("idle-time"),
     idleBar: $("idle-bar"),
     idleTotal: $("idle-total"),
+    idleText: $("idle-text"),
     btnNextLabel: $("btn-next-label"),
     btnNextSub: $("btn-next-sub"),
     btnPrev: $("btn-prev"),
@@ -907,6 +908,8 @@
       .map((g, i) => `<i style="flex-grow:${g.sec || 1};background:${colorOf(d.event_order[i])}"></i>`)
       .join("");
     els.idleTotal.textContent = t("roundTotal")(d.event_order.length, Math.round(stats.total / 60));
+    // "Begin" looks like the button it refers to.
+    els.idleText.innerHTML = esc(t("idleHint")).replace("{begin}", `<span class="idle-begin">${esc(t("begin"))}</span>`);
   }
 
   function updateTitle() {
