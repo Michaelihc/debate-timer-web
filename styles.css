@@ -502,6 +502,9 @@ body {
   .idle-ring-fg {
     animation: none;
   }
+  .timeline {
+    --tl-move: 0s;
+  }
 }
 .idle-time {
   position: absolute;
@@ -535,6 +538,16 @@ body {
   color: var(--fg);
   opacity: 0.8;
 }
+.idle-begin {
+  display: inline-block;
+  margin: 0 0.15em;
+  padding: 0.08em 0.55em 0.12em;
+  border-radius: 0.5em;
+  background: linear-gradient(180deg, #8ef2bc, #58d892);
+  color: #08281a;
+  font-weight: 700;
+  box-shadow: 0 0.15em 0.6em rgba(88, 216, 146, 0.3);
+}
 .idle-text {
   margin: 0;
   font-size: clamp(13px, 2.3vmin, 28px);
@@ -545,7 +558,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(14px, 4vh, 44px);
+  /* 1/φ⁵ of the ring */
+  gap: calc(var(--ring) * 0.09);
 }
 .ring-wrap {
   position: relative;
@@ -569,6 +583,8 @@ body {
   fill: none;
   stroke: var(--ring-fg);
   stroke-width: 10;
+  /* rounded ends, so the edge that sweeps round is soft rather than a hard cut */
+  stroke-linecap: round;
   stroke-dasharray: 276.46;
   stroke-dashoffset: 0;
 }
@@ -581,7 +597,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(var(--ring) * 0.24);
+  /* 1/φ³ of the ring */
+  font-size: calc(var(--ring) * 0.236);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
@@ -717,9 +734,11 @@ body {
 /* Back | timeline | Next: the two buttons are the same width, so the
    timeline sits centred under the timer. */
 .bottom {
+  /* Back/Next height, so the timeline's dots can sit on their centre line */
+  --step-h: calc(var(--ctl) * 1.3 * 2.5);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: var(--gutter-x);
 }
 /* Back and Next: same width (set by syncStepWidths), sized to content */
@@ -745,12 +764,16 @@ body {
    scroll sideways instead of being cut off. */
 .timeline {
   --dot: calc(var(--ctl) * 1.55);
+  /* how long the lime line takes to move to the next dot */
+  --tl-move: 0.4s;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
   /* room for the current dot's glow */
   padding: calc(var(--dot) * 0.3) 0 4px;
+  /* line the dots up with the middle of Back and Next; captions hang below */
+  margin-top: calc(var(--step-h) / 2 - var(--dot) * 0.8);
 }
 .tl-steps {
   position: relative;
@@ -772,7 +795,7 @@ body {
   width: 0;
   border-radius: inherit;
   background: var(--lime);
-  transition: width 0.35s ease;
+  transition: width var(--tl-move) cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tl-step {
   position: relative;
@@ -802,7 +825,7 @@ body {
   font-size: calc(var(--ctl) * 0.72);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s, color 0.2s;
 }
 .tl-dot svg {
   width: 52%;
@@ -817,7 +840,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.15;
+  line-height: 1.15;  transition: color 0.2s, margin-top 0.2s;
 }
 .tl-name {
   font-size: calc(var(--ctl) * 0.62);
@@ -848,6 +871,12 @@ body {
   color: color-mix(in srgb, var(--fg) 38%, var(--bg));
 }
 /* Now: filled in the team colour, a white ring and a glow. */
+/* The current dot lights up once the line has reached it. */
+.tl-step.now .tl-dot,
+.tl-step.now .tl-name,
+.tl-step.now .tl-time {
+  transition-delay: calc(var(--tl-move) * 0.6);
+}
 .tl-step.now .tl-dot {
   background: var(--c);
   border-color: var(--fg);
@@ -899,6 +928,9 @@ body {
 }
 
 @media (max-width: 600px) {
+  .bottom {
+    --step-h: calc(var(--ctl) * 1.2 * 2.5);
+  }
   .btn-step {
     font-size: calc(var(--ctl) * 1.2);
     padding: 0 0.6em;
