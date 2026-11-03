@@ -769,6 +769,8 @@
     reset: $("ring-reset"),
     paint: (frac) => {
       els.ringFg.style.strokeDashoffset = String(RING_CIRC * (1 - frac));
+      // The rounded ends would leave a dot at the top once the time is up.
+      els.ringFg.style.opacity = frac > 0.001 ? "" : "0";
     },
   });
 
