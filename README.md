@@ -23,14 +23,15 @@ python -m http.server 8000
 - Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
 - Double bar timer for free debate with an Invert button to hand time between sides
 - Clickable timeline to jump to any event
-- Round presets in the settings menu: **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating `1, -1, 2, -2, 3, -3, 4, -4`, no free debate, warning at 15 s). Picking a preset replaces the title, speakers, event order, and warning/prep/free times, and keeps colors, labels, sounds, and language; editing the format afterwards shows the preset as "Custom"
-- Settings menu with a form editor and a raw JSON editor; event order defaults to a detailed vertical list, with an optional compact view, categorized add controls, robust drag-and-drop reordering, and animated removal
+- Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
+- Presets: built-in **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating, no free debate, warning at 15 s), plus your own presets with a name and icon. Presets can be downloaded and opened as `.json` files to share between computers
+- Event order as a detailed vertical list or compact chips, with drag-and-drop reordering, an "Alternate Pro and Con" shortcut, and a running total. Removing a speaker also removes and renumbers their turns
 - Custom background color (text and ring colors adapt to light backgrounds)
 - Custom warning and end sounds, from a URL or an uploaded file
 - English and Simplified Chinese UI
-- Download / upload of the save file as JSON
+- Download / upload of the whole settings file as JSON
 
-Settings are stored in the browser's `localStorage`. **Save & Apply** in the menu stores the settings and reloads the scene. **Reload Scene** restarts the debate from the stored settings and asks for confirmation while a debate is in progress.
+Settings and your presets are stored in the browser's `localStorage`. **Save & Apply** in the settings panel stores the settings and reloads the scene; the footer shows when there are unsaved changes. **Reload Scene** restarts the debate from the stored settings and asks for confirmation while a debate is in progress.
 
 Debate progress (current event and timers) survives an accidental page refresh within the same tab. While a debate is in progress the screen is kept awake where the browser supports it.
 
@@ -43,7 +44,47 @@ Debate progress (current event and timers) survives an accidental page refresh w
 | Left arrow or P | Previous event |
 | I | Invert (free debate only) |
 | F | Toggle fullscreen |
-| Esc | Close the menu, dialog, or end screen |
+| S | Open settings |
+| Ctrl+S (Cmd+S) | Save & Apply, while settings are open |
+| Esc | Close settings, a dialog, or the end screen |
+
+## Presets
+
+A preset is the round itself: topic, team names and colours, speakers, event order, and the warning, preparation, and free-debate times. Language, timer format, background, and sounds belong to the screen and are left alone when a preset is loaded. A preset without a topic keeps the current topic.
+
+A preset file is a save file holding just those fields, plus a `name` and an `icon`:
+
+```json
+{
+  "name": "Round robin (quick)",
+  "icon": "⚡",
+  "title": "",
+  "settings": {
+    "pro_label": "",
+    "con_label": "",
+    "pro_colors": "#0000FF",
+    "con_colors": "#FF0000",
+    "time_warning": 15,
+    "time_prep": 300,
+    "time_free": 300
+  },
+  "pro_side": [
+    { "name": "正一", "time": 120 },
+    { "name": "正二", "time": 60 },
+    { "name": "正三", "time": 60 },
+    { "name": "正四", "time": 120 }
+  ],
+  "con_side": [
+    { "name": "反一", "time": 120 },
+    { "name": "反二", "time": 60 },
+    { "name": "反三", "time": 60 },
+    { "name": "反四", "time": 120 }
+  ],
+  "event_order": [1, -1, 2, -2, 3, -3, 4, -4]
+}
+```
+
+**Open preset file…** also accepts a full settings file; its round becomes a new preset.
 
 ## Save file format
 

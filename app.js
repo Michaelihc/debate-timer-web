@@ -11,164 +11,269 @@
     end: "assets/audio/bell.ogg",
   };
 
-  // Round presets. A preset sets the debate format (title, speakers, event
-  // order, warning/prep/free times); colors, labels, sounds and language are kept.
-  const sideOf = (prefix, times) => times.map((time, i) => ({ name: prefix + "一二三四五六七八九十"[i], time }));
-  const PRESETS = {
-    default: {
-      title: "",
-      time_warning: 30,
-      time_prep: 300,
-      time_free: 300,
-      pro_side: sideOf("正", [180, 120, 120, 180]),
-      con_side: sideOf("反", [180, 120, 120, 180]),
-      event_order: [1, -1, -2, 3, 2, -3, "free", 4, -4],
-    },
-    round_robin: {
-      title: "",
-      time_warning: 15,
-      time_prep: 300,
-      time_free: 300,
-      pro_side: sideOf("正", [120, 60, 60, 120]),
-      con_side: sideOf("反", [120, 60, 60, 120]),
-      event_order: [1, -1, 2, -2, 3, -3, 4, -4],
-    },
-  };
-  const PRESET_KEYS = Object.keys(PRESETS);
+  // ---------------------------------------------------------------------------
+  // Presets
+  // ---------------------------------------------------------------------------
+  // A preset is the round itself: topic, both teams (name, colour, speakers),
+  // the order of speeches and its times. Language, timer format, background and
+  // sounds belong to this screen, not to the round, so presets leave them alone.
+  // A preset file is a save file holding only those fields plus a name and icon.
+  const ROUND_SETTINGS = ["pro_label", "con_label", "pro_colors", "con_colors", "time_warning", "time_prep", "time_free"];
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const CN_NUM = "一二三四五六七八九十";
+  const speakerName = (side, i) => (side === "pro" ? "正" : "反") + (i < CN_NUM.length ? CN_NUM[i] : String(i + 1));
+  const team = (side, times) => times.map((time, i) => ({ name: speakerName(side, i), time }));
 
-  // Deep copy of a preset's format fields, shaped like a save file's top level.
-  function presetFormat(key) {
-    const p = JSON.parse(JSON.stringify(PRESETS[key]));
-    return { title: p.title, pro_side: p.pro_side, con_side: p.con_side, event_order: p.event_order };
-  }
-  const PRESET_LABELS = { default: "presetDefault", round_robin: "presetRoundRobin" };
-
-  // Loads a preset's format into a save, keeping its other settings.
-  function applyPreset(save, key) {
-    Object.assign(save, presetFormat(key));
-    save.settings.time_warning = PRESETS[key].time_warning;
-    save.settings.time_prep = PRESETS[key].time_prep;
-    save.settings.time_free = PRESETS[key].time_free;
+  function makeRound(o) {
+    return {
+      title: "",
+      settings: {
+        pro_label: "",
+        con_label: "",
+        pro_colors: "#0000FF",
+        con_colors: "#FF0000",
+        time_warning: o.warning,
+        time_prep: o.prep,
+        time_free: o.free,
+      },
+      pro_side: team("pro", o.times),
+      con_side: team("con", o.times),
+      event_order: o.order,
+    };
   }
 
-  // The preset whose format a save matches exactly (ignoring the title), or "".
-  function matchPreset(save) {
-    const fmt = (o) =>
-      JSON.stringify([o.pro_side, o.con_side, o.event_order, o.time_warning, o.time_prep, o.time_free]);
-    const mine = fmt({ ...save, ...save.settings });
-    return PRESET_KEYS.find((k) => fmt(PRESETS[k]) === mine) || "";
+  const BUILTIN_PRESETS = [
+    {
+      id: "builtin:default",
+      builtin: true,
+      icon: "⚖️",
+      nameKey: "presetDefault",
+      round: makeRound({ times: [180, 120, 120, 180], order: [1, -1, -2, 3, 2, -3, "free", 4, -4], warning: 30, prep: 300, free: 300 }),
+    },
+    {
+      id: "builtin:round_robin",
+      builtin: true,
+      icon: "⚡",
+      nameKey: "presetRoundRobin",
+      round: makeRound({ times: [120, 60, 60, 120], order: [1, -1, 2, -2, 3, -3, 4, -4], warning: 15, prep: 300, free: 300 }),
+    },
+  ];
+
+  // The round part of a save, as a fresh copy.
+  function roundOf(save) {
+    const settings = {};
+    ROUND_SETTINGS.forEach((k) => (settings[k] = save.settings[k]));
+    return clone({ title: save.title, settings, pro_side: save.pro_side, con_side: save.con_side, event_order: save.event_order });
+  }
+
+  // Loads a round into a save. A round without a topic keeps the current one.
+  function applyRound(save, round) {
+    const r = clone(round);
+    Object.assign(save.settings, r.settings);
+    if (r.title) save.title = r.title;
+    save.pro_side = r.pro_side;
+    save.con_side = r.con_side;
+    save.event_order = r.event_order;
+  }
+
+  // True when the save is set up exactly like the preset (its topic too, if it has one).
+  function presetMatches(preset, save) {
+    const key = (r, withTitle) =>
+      JSON.stringify([ROUND_SETTINGS.map((k) => r.settings[k]), r.pro_side, r.con_side, r.event_order, withTitle ? r.title : ""]);
+    const withTitle = Boolean(preset.round.title);
+    return key(preset.round, withTitle) === key(save, withTitle);
   }
 
   const DEFAULT_SAVE = {
+    title: "",
     settings: {
-      pro_colors: "#0000FF",
-      con_colors: "#FF0000",
-      pro_label: "",
-      con_label: "",
       background_color: "#000000",
-      time_warning: PRESETS.default.time_warning,
-      time_prep: PRESETS.default.time_prep,
-      time_free: PRESETS.default.time_free,
       display_minutes: true,
       language: "en",
       audio_warning: "",
       audio_end: "",
     },
-    ...presetFormat("default"),
   };
+  applyRound(DEFAULT_SAVE, BUILTIN_PRESETS[0].round);
   const DEFAULT_TEXT = JSON.stringify(DEFAULT_SAVE, null, 2);
 
   const I18N = {
     en: {
-      menu: "Menu",
+      menu: "Settings",
+      menuTitle: "Settings (S)",
       reload: "Reload Scene",
       begin: "Begin",
       next: "Next",
       save: "Save",
       saveApply: "Save & Apply",
-      discard: "Discard",
+      done: "Done",
+      discard: "Discard changes",
       reset: "Reset",
-      resetDefaults: "Reset to Defaults",
+      resetDefaults: "Reset to defaults",
       pause: "Pause",
       resume: "Resume",
       start: "Start",
       invert: "Invert",
       editSave: "Settings",
-      tabSettings: "Settings",
-      tabJson: "JSON",
       timeout: "Time ran out",
       prep: "Preparation Time",
       free: "Free Debate Time",
       ended: "Debate Ended",
       close: "Close",
-      download: "Download JSON",
-      upload: "Upload JSON",
+      download: "Download settings file",
+      upload: "Open settings file…",
       langBtn: "中文",
-      invalidJson: "Invalid JSON: ",
+      invalidJson: "The settings file has a mistake: ",
       proDefault: "Pro",
       conDefault: "Con",
       speakerTurn: (name) => `Speaker ${name}'s Turn`,
-      // settings form
-      fGeneral: "General",
-      fTitle: "Debate title",
-      fPreset: "Preset",
+      minutes: "Minutes",
+      seconds: "Seconds",
+      minShort: "min",
+      secShort: "sec",
+      // navigation
+      navPresets: "Presets",
+      navDebate: "Teams & speakers",
+      navOrder: "Order & times",
+      navDisplay: "Display & sound",
+      navAdvanced: "Advanced",
+      // presets page
+      presetsTitle: "Presets",
+      presetsIntro: "A preset is a ready-made round: the teams, speakers, order and times. Click one to load it, then press Save & Apply.",
+      currentSetup: "Current setup",
+      customSetup: "Custom setup",
+      saveAsPreset: "Save as preset",
+      builtinPresets: "Built in",
+      myPresets: "My presets",
+      openPresetFile: "Open preset file…",
+      noPresets: "No saved presets yet. Set up a round the way you like it, then press “Save as preset”.",
+      inUse: "In use",
+      usePreset: "Click to load",
+      editPreset: "Rename",
+      downloadPreset: "Download file",
+      deletePreset: "Delete",
       presetDefault: "Default",
       presetRoundRobin: "Round robin (quick)",
-      presetCustom: "Custom",
-      fLanguage: "Language",
-      fDisplayMinutes: "Show minutes (m:ss)",
-      fBackground: "Background color",
-      fTimes: "Times (seconds)",
-      fWarning: "Warning at",
-      fPrep: "Preparation",
-      fFree: "Free debate (per side)",
-      fSounds: "Sounds",
-      fWarningSound: "Warning sound",
-      fEndSound: "End sound",
-      fChooseFile: "Choose file…",
-      fDefault: "Default",
-      fPlay: "Play",
-      fUrlPlaceholder: "URL or leave empty for default",
-      fProSide: "Pro side",
-      fConSide: "Con side",
-      fLabel: "Label",
-      fLabelPlaceholder: "Shown above the column",
-      fColor: "Color",
-      fSpeakers: "Speakers",
+      summary: (n, min) => `${n} ${n === 1 ? "speech" : "speeches"} · about ${min} min`,
+      presetLoaded: (name) => `Loaded “${name}”.`,
+      presetSaved: (name) => `Saved preset “${name}”.`,
+      presetsAdded: (n) => `Added ${n} ${n === 1 ? "preset" : "presets"}.`,
+      presetImportFailed: "Could not open: ",
+      notAPreset: "no speakers found",
+      newPresetName: "My preset",
+      newPresetTitle: "Save as preset",
+      savePreset: "Save preset",
+      newPresetText: "Saves the teams, speakers, order and times so you can load them again later.",
+      editPresetTitle: "Edit preset",
+      editPresetText: "Change the name or icon.",
+      deletePresetTitle: (name) => `Delete “${name}”?`,
+      deletePresetText: "This removes the preset from this browser. Download it first if you might need it again.",
+      pdName: "Name",
+      pdIcon: "Icon",
+      pdUpdate: "Also replace what it holds with the current setup",
+      // teams page
+      debateTitle: "Teams & speakers",
+      debateIntro: "Set the topic, name each team, and list who speaks and for how long.",
+      fTitle: "Topic",
+      fTitlePlaceholder: "Shown at the top of the screen",
+      fProSide: "Pro team name",
+      fConSide: "Con team name",
+      fColor: "Team colour",
       fName: "Name",
-      fSeconds: "Seconds",
-      fAdd: "+ Add speaker",
+      fSpeakingTime: "Speaking time",
+      fAdd: "Add speaker",
       fRemove: "Remove",
-      fEvents: "Event order",
-      fEventsHint: "Drag to reorder. Hover an item and click × to remove it.",
-      viewSimple: "Simple",
+      noSpeakers: "No speakers yet.",
+      notInOrder: "Not in order",
+      notInOrderHint: "This speaker never speaks. Add them under Order & times.",
+      // order page
+      orderTitle: "Order & times",
+      orderIntro: "Choose who speaks when, and set the other timers.",
+      fEvents: "Order of speeches",
+      fEventsHint: "Drag to reorder. Click an item below to add it to the end.",
+      viewSimple: "Compact",
       viewDetailed: "Detailed",
       perSide: "per side",
       fAddLabel: "Add",
       fPhases: "Phases",
-      fEmptyOrder: "No events yet. Click an item below to add it.",
-      fFileTooBig: "Audio file is too large (max 2 MB). Use a URL instead.",
+      fEmptyOrder: "Nothing here yet. Click an item below to add it.",
       fNoSpeaker: "Speaker does not exist",
-      unsavedTitle: "Unsaved changes",
+      orderTotal: (n, min) => `${n} ${n === 1 ? "part" : "parts"} · about ${min} min`,
+      orderAlternate: "Alternate Pro and Con",
+      orderAlternateTitle: "Replace the order?",
+      orderAlternateText: "The order becomes Pro 1, Con 1, Pro 2, Con 2 and so on, with no preparation or free debate.",
+      orderClear: "Clear",
+      orderClearTitle: "Clear the order?",
+      orderClearText: "Removes every item from the order of speeches.",
+      fTimes: "Other timers",
+      fWarning: "Warning",
+      fWarningHint: "A sound plays when this much time is left.",
+      fPrep: "Preparation",
+      fPrepHint: "Length of each preparation phase.",
+      fFree: "Free debate",
+      fFreeHint: "Time for each team in free debate.",
+      // display page
+      displayTitle: "Display & sound",
+      displayIntro: "How the timer looks and sounds on this screen. Presets don't change these.",
+      fScreen: "Screen",
+      fLanguage: "Language",
+      fClock: "Timer shows",
+      clockMinutes: "Minutes (3:00)",
+      clockSeconds: "Seconds (180)",
+      fBackground: "Background colour",
+      fSounds: "Sounds",
+      fWarningSound: "Warning sound",
+      fEndSound: "Time's up sound",
+      fBuiltinSound: "Built-in sound (or paste a link)",
+      fUploadedFile: "Your sound file",
+      fChooseFile: "Choose file…",
+      fDefault: "Default",
+      fPlay: "Play",
+      fFileTooBig: "That sound file is too large (2 MB max). Paste a link to it instead.",
+      fCannotPlay: "Could not play that sound. Check the link or choose another file.",
+      // advanced page
+      advancedTitle: "Advanced",
+      advancedIntro: "Tools for experienced users. You never need these to run a debate.",
+      fJson: "Settings file (JSON)",
+      fJsonHint: "Everything on the other pages, as text. Edits here show up there too.",
+      fShortcuts: "Keyboard shortcuts",
+      kSpace: "Pause or resume the timer",
+      kNext: "Next speech",
+      kPrev: "Previous speech",
+      kInvert: "Switch sides in free debate",
+      kFull: "Full screen",
+      kSettings: "Open settings",
+      kSave: "Save & Apply (in settings)",
+      kEsc: "Close settings or a dialog",
+      fReset: "Start over",
+      fResetHint: "Puts every setting back to how it was the first time you opened the timer. Your saved presets are kept.",
+      resetTitle: "Reset all settings?",
+      resetText: "Every setting goes back to its default. Nothing changes until you press Save & Apply.",
+      // footer and prompts
+      unsavedNote: "Unsaved changes.",
+      unsavedRestart: "Unsaved changes. Saving restarts the debate in progress.",
+      unsavedTitle: "Save your changes?",
       unsavedText: "You changed the settings. Save and apply them?",
-      invalidTitle: "Invalid JSON",
-      invalidText: "The JSON tab has errors and cannot be saved. Discard the changes?",
+      invalidTitle: "The settings file has a mistake",
+      invalidText: "The text on the Advanced page can't be read, so it can't be saved. Throw away the changes?",
       keepEditing: "Keep editing",
       reloadTitle: "Restart the debate?",
       reloadText: "A debate is in progress. Reload Scene resets it to the beginning.",
       reloadConfirm: "Reload",
       cancel: "Cancel",
       saveFailed: "Could not save (storage full?): ",
-      invalidEvents: "The event order refers to speakers that do not exist: ",
+      invalidEvents: "The order of speeches includes speakers who don't exist: ",
       fullscreen: "Fullscreen (F)",
     },
     zh: {
-      menu: "菜单",
+      menu: "设置",
+      menuTitle: "设置 (S)",
       reload: "刷新",
       begin: "开始",
       next: "下一项",
       save: "保存",
       saveApply: "保存并应用",
+      done: "完成",
       discard: "放弃更改",
       reset: "重置",
       resetDefaults: "恢复默认",
@@ -177,71 +282,147 @@
       start: "开始",
       invert: "翻转",
       editSave: "设置",
-      tabSettings: "设置",
-      tabJson: "JSON",
       timeout: "时间到",
       prep: "准备时间",
       free: "自由辩论",
       ended: "辩论结束",
       close: "关闭",
-      download: "下载 JSON",
-      upload: "导入 JSON",
+      download: "下载设置文件",
+      upload: "打开设置文件…",
       langBtn: "English",
-      invalidJson: "JSON 格式错误：",
+      invalidJson: "设置文件有错误：",
       proDefault: "正方",
       conDefault: "反方",
       speakerTurn: (name) => `辩手 ${name} 发言`,
-      fGeneral: "常规",
-      fTitle: "辩题",
-      fPreset: "预设",
+      minutes: "分钟",
+      seconds: "秒",
+      minShort: "分",
+      secShort: "秒",
+      navPresets: "预设",
+      navDebate: "队伍与辩手",
+      navOrder: "流程与时间",
+      navDisplay: "显示与声音",
+      navAdvanced: "高级",
+      presetsTitle: "预设",
+      presetsIntro: "预设是一套现成的赛制：队伍、辩手、流程和时间。点击即可载入，然后按“保存并应用”。",
+      currentSetup: "当前设置",
+      customSetup: "自定义设置",
+      saveAsPreset: "存为预设",
+      builtinPresets: "内置",
+      myPresets: "我的预设",
+      openPresetFile: "打开预设文件…",
+      noPresets: "还没有保存的预设。按需要设置好比赛后，点击“存为预设”。",
+      inUse: "使用中",
+      usePreset: "点击载入",
+      editPreset: "重命名",
+      downloadPreset: "下载文件",
+      deletePreset: "删除",
       presetDefault: "默认",
       presetRoundRobin: "循环赛（快速）",
-      presetCustom: "自定义",
-      fLanguage: "语言",
-      fDisplayMinutes: "显示分钟 (m:ss)",
-      fBackground: "背景颜色",
-      fTimes: "时间（秒）",
-      fWarning: "警告提示",
-      fPrep: "准备时间",
-      fFree: "自由辩论（每方）",
-      fSounds: "音效",
-      fWarningSound: "警告音效",
-      fEndSound: "结束音效",
-      fChooseFile: "选择文件…",
-      fDefault: "默认",
-      fPlay: "试听",
-      fUrlPlaceholder: "输入 URL，留空使用默认",
-      fProSide: "正方",
-      fConSide: "反方",
-      fLabel: "标签",
-      fLabelPlaceholder: "显示在辩手上方",
-      fColor: "颜色",
-      fSpeakers: "辩手",
+      summary: (n, min) => `${n} 次发言 · 约 ${min} 分钟`,
+      presetLoaded: (name) => `已载入“${name}”。`,
+      presetSaved: (name) => `已保存预设“${name}”。`,
+      presetsAdded: (n) => `已添加 ${n} 个预设。`,
+      presetImportFailed: "无法打开：",
+      notAPreset: "没有找到辩手",
+      newPresetName: "我的预设",
+      newPresetTitle: "存为预设",
+      savePreset: "保存预设",
+      newPresetText: "保存队伍、辩手、流程和时间，以后可以再次载入。",
+      editPresetTitle: "编辑预设",
+      editPresetText: "修改名称或图标。",
+      deletePresetTitle: (name) => `删除“${name}”？`,
+      deletePresetText: "将从此浏览器中删除该预设。如果以后可能还要用，请先下载。",
+      pdName: "名称",
+      pdIcon: "图标",
+      pdUpdate: "同时用当前设置替换其内容",
+      debateTitle: "队伍与辩手",
+      debateIntro: "填写辩题、队伍名称，以及每位辩手的发言时间。",
+      fTitle: "辩题",
+      fTitlePlaceholder: "显示在屏幕顶部",
+      fProSide: "正方名称",
+      fConSide: "反方名称",
+      fColor: "队伍颜色",
       fName: "姓名",
-      fSeconds: "秒",
-      fAdd: "+ 添加辩手",
+      fSpeakingTime: "发言时间",
+      fAdd: "添加辩手",
       fRemove: "删除",
-      fEvents: "流程顺序",
-      fEventsHint: "拖动调整顺序，悬停后点击 × 删除。",
+      noSpeakers: "还没有辩手。",
+      notInOrder: "未排入流程",
+      notInOrderHint: "该辩手不会发言。请在“流程与时间”中添加。",
+      orderTitle: "流程与时间",
+      orderIntro: "安排发言顺序，并设置其他计时。",
+      fEvents: "发言顺序",
+      fEventsHint: "拖动调整顺序。点击下方项目添加到末尾。",
       viewSimple: "简洁",
       viewDetailed: "详细",
       perSide: "每方",
       fAddLabel: "添加",
       fPhases: "环节",
       fEmptyOrder: "暂无流程，点击下方项目添加。",
-      fFileTooBig: "音频文件过大（最大 2 MB），请改用 URL。",
       fNoSpeaker: "辩手不存在",
-      unsavedTitle: "未保存的更改",
+      orderTotal: (n, min) => `共 ${n} 项 · 约 ${min} 分钟`,
+      orderAlternate: "正反方交替",
+      orderAlternateTitle: "替换发言顺序？",
+      orderAlternateText: "顺序将变为正一、反一、正二、反二……，不含准备时间和自由辩论。",
+      orderClear: "清空",
+      orderClearTitle: "清空发言顺序？",
+      orderClearText: "将删除发言顺序中的所有项目。",
+      fTimes: "其他计时",
+      fWarning: "提醒",
+      fWarningHint: "剩余这么多时间时播放提示音。",
+      fPrep: "准备时间",
+      fPrepHint: "每个准备环节的时长。",
+      fFree: "自由辩论",
+      fFreeHint: "自由辩论中每方的时间。",
+      displayTitle: "显示与声音",
+      displayIntro: "计时器在本屏幕上的外观和声音。预设不会改变这些。",
+      fScreen: "屏幕",
+      fLanguage: "语言",
+      fClock: "计时显示",
+      clockMinutes: "分钟 (3:00)",
+      clockSeconds: "秒 (180)",
+      fBackground: "背景颜色",
+      fSounds: "声音",
+      fWarningSound: "提醒音效",
+      fEndSound: "结束音效",
+      fBuiltinSound: "内置音效（或粘贴链接）",
+      fUploadedFile: "你的音频文件",
+      fChooseFile: "选择文件…",
+      fDefault: "默认",
+      fPlay: "试听",
+      fFileTooBig: "音频文件过大（最大 2 MB），请改为粘贴链接。",
+      fCannotPlay: "无法播放该音效，请检查链接或换一个文件。",
+      advancedTitle: "高级",
+      advancedIntro: "供熟练用户使用的工具，正常比赛不需要。",
+      fJson: "设置文件 (JSON)",
+      fJsonHint: "其他页面的全部内容，以文本形式显示。在这里的修改也会同步到其他页面。",
+      fShortcuts: "键盘快捷键",
+      kSpace: "暂停或继续计时",
+      kNext: "下一项",
+      kPrev: "上一项",
+      kInvert: "自由辩论中切换双方",
+      kFull: "全屏",
+      kSettings: "打开设置",
+      kSave: "保存并应用（在设置中）",
+      kEsc: "关闭设置或对话框",
+      fReset: "重新开始",
+      fResetHint: "把所有设置恢复为第一次打开时的样子。已保存的预设会保留。",
+      resetTitle: "恢复所有默认设置？",
+      resetText: "所有设置都会恢复默认。按“保存并应用”之前不会生效。",
+      unsavedNote: "有未保存的更改。",
+      unsavedRestart: "有未保存的更改。保存后正在进行的辩论会重新开始。",
+      unsavedTitle: "保存更改？",
       unsavedText: "设置已修改，是否保存并应用？",
-      invalidTitle: "JSON 格式错误",
-      invalidText: "JSON 内容有错误，无法保存。是否放弃更改？",
+      invalidTitle: "设置文件有错误",
+      invalidText: "“高级”页面中的文本无法读取，因此不能保存。是否放弃更改？",
       keepEditing: "继续编辑",
       reloadTitle: "重新开始辩论？",
       reloadText: "辩论正在进行中，刷新将回到开始状态。",
       reloadConfirm: "刷新",
       cancel: "取消",
       saveFailed: "保存失败（存储空间不足？）：",
-      invalidEvents: "流程顺序中引用了不存在的辩手：",
+      invalidEvents: "发言顺序中包含不存在的辩手：",
       fullscreen: "全屏 (F)",
     },
   };
@@ -369,7 +550,6 @@
     timeline: $("timeline-buttons"),
     menuOverlay: $("menu-overlay"),
     endOverlay: $("end-overlay"),
-    editor: $("editor"),
     editorError: $("editor-error"),
     btnLang: $("btn-lang"),
     fileInput: $("file-input"),
@@ -377,10 +557,11 @@
     audioWarning: $("audio-warning"),
     audioEnd: $("audio-end"),
     form: $("settings-form"),
-    formView: $("form-view"),
-    jsonView: $("json-view"),
-    tabForm: $("tab-form"),
-    tabJson: $("tab-json"),
+    nav: $("settings-nav"),
+    btnSave: $("btn-save"),
+    btnDiscard: $("btn-discard"),
+    panelFoot: $("panel-foot"),
+    footNote: $("foot-note"),
   };
   const RING_CIRC = 2 * Math.PI * 44;
 
@@ -567,7 +748,12 @@
   };
 
   function t(key) {
-    return I18N[state.lang][key];
+    const v = I18N[state.lang][key];
+    if (v === undefined) {
+      console.warn("Missing text: " + key);
+      return key;
+    }
+    return v;
   }
 
   function applyI18n() {
@@ -909,29 +1095,218 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Settings panel: form view + JSON view over a shared draft
+  // Settings panel: pages over a shared draft, saved with Save & Apply
   // ---------------------------------------------------------------------------
-  let draft = null;
-  let activeTab = "form";
+  const svg = (body) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const ICONS = {
+    layers: svg('<path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>'),
+    users: svg(
+      '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+    ),
+    clock: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+    sliders: svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'),
+    code: svg('<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>'),
+    pencil: svg('<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>'),
+    download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'),
+    upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>'),
+    trash: svg('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
+    plus: svg('<path d="M12 5v14M5 12h14"/>'),
+    check: svg('<path d="M20 6 9 17l-5-5"/>'),
+    play: svg('<path d="m6 3 14 9-14 9Z"/>'),
+    bookmark: svg('<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/><path d="M12 7v6M9 10h6"/>'),
+    folder: svg(
+      '<path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/>'
+    ),
+    repeat: svg('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>'),
+    rotate: svg('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'),
+    music: svg('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
+    arrow: svg('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  };
 
+  const PAGES = [
+    { id: "presets", icon: "layers", label: "navPresets" },
+    { id: "debate", icon: "users", label: "navDebate" },
+    { id: "order", icon: "clock", label: "navOrder" },
+    { id: "display", icon: "sliders", label: "navDisplay" },
+    { id: "advanced", icon: "code", label: "navAdvanced" },
+  ];
+  const PRESET_ICONS = ["⭐", "⚖️", "⚡", "🏆", "🎓", "🗣️", "🎤", "⏱️", "📚", "🧠", "🎯", "🌏", "🔥", "🏫", "☕", "🐉"];
+  const PRESETS_KEY = "debate-timer-presets";
+  const PAGE_KEY = "debate-timer-settings-page";
+  const ORDER_VIEW_KEY = "debate-timer-order-view";
+
+  function readLocal(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (_) {
+      return null;
+    }
+  }
+  function writeLocal(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      return null;
+    } catch (e) {
+      return e && e.message ? e.message : String(e);
+    }
+  }
+
+  let draft = null;
+  let storedJson = ""; // the saved settings as the draft would serialize them
+  let page = PAGES.some((p) => p.id === readLocal(PAGE_KEY)) ? readLocal(PAGE_KEY) : "presets";
+  let notice = ""; // a one-off line for the footer, e.g. after loading a preset
+  // "detailed": vertical list with side, name and duration; "simple": compact chips.
+  let orderView = readLocal(ORDER_VIEW_KEY) === "simple" ? "simple" : "detailed";
+
+  // ---- User presets (stored in this browser) ------------------------------
+  const newId = () => "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const validIcon = (v) => (typeof v === "string" && v.trim() && v.length <= 8 ? v.trim() : PRESET_ICONS[0]);
+  const cleanName = (v) => String(v == null ? "" : v).trim().slice(0, 60);
+
+  function loadUserPresets() {
+    try {
+      const list = JSON.parse(readLocal(PRESETS_KEY) || "[]");
+      if (!Array.isArray(list)) return [];
+      return list
+        .filter((p) => p && typeof p === "object" && p.round && typeof p.round === "object")
+        .map((p) => ({
+          id: String(p.id || newId()),
+          name: cleanName(p.name) || "Preset",
+          icon: validIcon(p.icon),
+          round: roundOf(parseSave(p.round)),
+        }));
+    } catch (_) {
+      return [];
+    }
+  }
+  let userPresets = loadUserPresets();
+  function storeUserPresets() {
+    return writeLocal(PRESETS_KEY, JSON.stringify(userPresets));
+  }
+
+  const allPresets = () => BUILTIN_PRESETS.concat(userPresets);
+  const findPreset = (id) => allPresets().find((p) => p.id === id) || null;
+  const presetName = (p) => (p.builtin ? t(p.nameKey) : p.name);
+
+  // The file a preset downloads as: a save file with just the round, plus name and icon.
+  function presetFile(p) {
+    return Object.assign({ name: presetName(p), icon: p.icon }, clone(p.round));
+  }
+  function fileNameFor(name) {
+    return (String(name).replace(/[\\/:*?"<>|]+/g, "").trim() || "preset") + ".json";
+  }
+  function parsePresetFile(text, fileName) {
+    const raw = JSON.parse(text);
+    const save = parseSave(raw);
+    if (!save.pro_side.length && !save.con_side.length) throw new Error(t("notAPreset"));
+    const name = cleanName(raw.name) || cleanName(String(fileName || "").replace(/\.json$/i, "")) || t("newPresetName");
+    return { id: newId(), name, icon: validIcon(raw.icon), round: roundOf(save) };
+  }
+
+  function downloadJson(obj, fileName) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // Picks files and hands back [{name, text}].
+  function pickFiles(accept, multiple, onFiles) {
+    const input = els.fileInput;
+    input.accept = accept;
+    input.multiple = multiple;
+    input.onchange = () => {
+      const files = Array.from(input.files || []);
+      input.value = "";
+      if (!files.length) return;
+      Promise.all(files.map((f) => f.text().then((text) => ({ name: f.name, text })))).then(onFiles);
+    };
+    input.click();
+  }
+
+  // ---- Round facts for summaries --------------------------------------------
+  function roundStats(r) {
+    let speeches = 0;
+    let total = 0;
+    const segs = r.event_order.map((ev) => {
+      let sec = 0;
+      let kind;
+      if (ev === "prep") {
+        kind = "prep";
+        sec = r.settings.time_prep;
+      } else if (ev === "free") {
+        kind = "free";
+        sec = r.settings.time_free * 2;
+      } else {
+        kind = ev > 0 ? "pro" : "con";
+        const p = ev > 0 ? r.pro_side[ev - 1] : r.con_side[-ev - 1];
+        sec = p ? p.time : 0;
+        speeches++;
+      }
+      total += sec;
+      return { kind, sec };
+    });
+    return { speeches, total, segs };
+  }
+  const roundSummary = (r) => {
+    const s = roundStats(r);
+    return t("summary")(s.speeches, Math.round(s.total / 60));
+  };
+  // A thin bar showing each part of the round in proportion to its length.
+  function miniBar(r) {
+    const { segs, total } = roundStats(r);
+    if (!total) return "";
+    const color = (k) =>
+      k === "pro" ? r.settings.pro_colors : k === "con" ? r.settings.con_colors : k === "free" ? "var(--yellow)" : "var(--lime)";
+    return `<span class="mbar" aria-hidden="true">${segs
+      .map((g) => `<i style="flex-grow:${g.sec || 1};background:${color(g.kind)}"></i>`)
+      .join("")}</span>`;
+  }
+
+  // Black or white, whichever reads better on the colour.
+  function inkFor(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150 ? "#111" : "#fff";
+  }
+
+  // ---- Panel open / close / save -------------------------------------------
   function setError(msg) {
     els.editorError.textContent = msg || "";
   }
 
-  function openMenu() {
+  function storedDraft() {
     try {
-      draft = parseSave(loadText());
+      return parseSave(loadText());
     } catch (_) {
-      draft = parseSave(DEFAULT_TEXT);
+      return parseSave(DEFAULT_TEXT);
     }
+  }
+
+  function isDirty() {
+    return JSON.stringify(draft) !== storedJson;
+  }
+
+  function openMenu() {
+    draft = storedDraft();
+    storedJson = JSON.stringify(draft);
+    userPresets = loadUserPresets();
+    notice = "";
     setError("");
-    switchTab(activeTab, true);
+    renderForm();
     show(els.menuOverlay, true);
+    const active = els.nav.querySelector(".snav-btn.active");
+    if (active) active.focus();
   }
 
   function closeMenu() {
     show(els.menuOverlay, false);
     show(confirmOverlay, false);
+    show(presetOverlay, false);
     // Undo any language preview that was not saved.
     if (state.data && state.lang !== state.data.settings.language) {
       state.lang = state.data.settings.language;
@@ -964,18 +1339,6 @@
     (opts.primary ? $("confirm-save") : opts.secondary ? $("confirm-discard") : c).focus();
   }
 
-  function storedDraft() {
-    try {
-      return parseSave(loadText());
-    } catch (_) {
-      return parseSave(DEFAULT_TEXT);
-    }
-  }
-
-  function isDirty() {
-    return JSON.stringify(draft) !== JSON.stringify(storedDraft());
-  }
-
   // Close the panel, prompting first if there are unsaved (or unparsable) edits.
   const confirmOverlay = $("confirm-overlay");
   function requestClose() {
@@ -1004,11 +1367,12 @@
     if (e.target === confirmOverlay) show(confirmOverlay, false);
   });
 
-  // Pull the current view's edits into `draft`. Returns false on invalid JSON.
+  // Pull edits from the JSON editor into `draft`. Returns false on invalid JSON.
   function commitView() {
-    if (activeTab === "json") {
+    const ed = $("editor");
+    if (page === "advanced" && ed) {
       try {
-        draft = parseSave(els.editor.value);
+        draft = parseSave(ed.value);
       } catch (e) {
         setError(t("invalidJson") + e.message);
         return false;
@@ -1018,22 +1382,23 @@
     return true;
   }
 
-  function switchTab(tab, force) {
-    if (!force && tab === activeTab) return;
-    if (!force && !commitView()) return;
-    activeTab = tab;
-    els.tabForm.classList.toggle("active", tab === "form");
-    els.tabJson.classList.toggle("active", tab === "json");
-    show(els.formView, tab === "form");
-    show(els.jsonView, tab === "json");
-    if (tab === "form") renderForm();
-    else els.editor.value = JSON.stringify(draft, null, 2);
+  function goPage(id) {
+    if (id === page || !commitView()) return;
+    page = id;
+    writeLocal(PAGE_KEY, page);
+    renderForm();
+    els.form.scrollTop = 0;
   }
 
   function saveAndApply() {
     if (!commitView()) return;
+    if (!isDirty()) {
+      closeMenu();
+      return;
+    }
     const missing = draft.event_order.filter((ev) => typeof ev === "number" && !participant2(ev));
     if (missing.length) {
+      if (page !== "order") goPage("order");
       setError(t("invalidEvents") + missing.join(", "));
       return;
     }
@@ -1046,192 +1411,349 @@
     loadScene();
   }
 
-  els.tabForm.addEventListener("click", () => switchTab("form"));
-  els.tabJson.addEventListener("click", () => switchTab("json"));
-  $("btn-menu").addEventListener("click", () => {
-    if (els.menuOverlay.classList.contains("hidden")) openMenu();
-    else requestClose();
-  });
-  $("btn-close").addEventListener("click", requestClose);
-  $("btn-save").addEventListener("click", saveAndApply);
-  $("btn-discard").addEventListener("click", () => {
-    try {
-      draft = parseSave(loadText());
-    } catch (_) {
-      draft = parseSave(DEFAULT_TEXT);
-    }
-    setError("");
-    switchTab(activeTab, true);
-  });
-  $("btn-reset-save").addEventListener("click", () => {
-    draft = parseSave(DEFAULT_TEXT);
-    draft.settings.language = state.lang;
-    setError("");
-    switchTab(activeTab, true);
-  });
-
-  $("btn-download").addEventListener("click", () => {
-    if (!commitView()) return;
-    const blob = new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "save.json";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  });
-  $("btn-upload").addEventListener("click", () => els.fileInput.click());
-  els.fileInput.addEventListener("change", () => {
-    const f = els.fileInput.files && els.fileInput.files[0];
-    els.fileInput.value = "";
-    if (!f) return;
-    f.text().then((txt) => {
-      els.editor.value = txt;
-      setError("");
-    });
-  });
-
-  // Language toggle: applies immediately and is persisted into the save file.
-  // Language toggle: edits the draft and previews the UI; saved with Save & Apply.
-  els.btnLang.addEventListener("click", () => {
-    if (!commitView()) return;
-    state.lang = state.lang === "en" ? "zh" : "en";
-    draft.settings.language = state.lang;
-    applyI18n();
-    switchTab(activeTab, true);
-  });
-
-  // ---- Form rendering ------------------------------------------------------
-  function field(labelKey, inner, extraClass) {
-    return `<label class="f ${extraClass || ""}"><span>${esc(t(labelKey))}</span>${inner}</label>`;
+  // Footer: what is unsaved, and what the main button will do.
+  function updateFoot() {
+    const dirty = isDirty();
+    els.btnDiscard.disabled = !dirty;
+    els.btnSave.textContent = t(dirty ? "saveApply" : "done");
+    els.panelFoot.classList.toggle("dirty", dirty);
+    const parts = [];
+    if (notice) parts.push(notice);
+    if (dirty) parts.push(t(state.eventIndex >= 0 ? "unsavedRestart" : "unsavedNote"));
+    els.footNote.textContent = parts.join(" ");
   }
+
+  // ---- Rendering -------------------------------------------------------------
+  function renderNav() {
+    els.nav.innerHTML = PAGES.map(
+      (p) =>
+        `<button type="button" class="snav-btn ${p.id === page ? "active" : ""}" data-page="${p.id}" role="tab" aria-selected="${
+          p.id === page
+        }">${ICONS[p.icon]}<span>${esc(t(p.label))}</span></button>`
+    ).join("");
+  }
+
+  const PAGE_RENDER = {
+    presets: () => pagePresets(),
+    debate: () => pageDebate(),
+    order: () => pageOrder(),
+    display: () => pageDisplay(),
+    advanced: () => pageAdvanced(),
+  };
 
   function renderForm() {
-    const s = draft.settings;
-    els.form.innerHTML = `
-      <section class="sgroup">
-        <h3>${esc(t("fGeneral"))}</h3>
-        <div class="frow">
-          ${field("fPreset", presetSelect())}
-          ${field("fTitle", `<input type="text" data-path="title" value="${esc(draft.title)}" />`, "grow")}
-          ${field(
-            "fLanguage",
-            `<select data-path="settings.language">
-              <option value="en" ${s.language === "en" ? "selected" : ""}>English</option>
-              <option value="zh" ${s.language === "zh" ? "selected" : ""}>中文</option>
-            </select>`
-          )}
-          ${field("fBackground", `<input type="color" data-path="settings.background_color" value="${esc(s.background_color)}" />`)}
-          <label class="f check"><input type="checkbox" data-path="settings.display_minutes" ${s.display_minutes ? "checked" : ""} /><span>${esc(t("fDisplayMinutes"))}</span></label>
-        </div>
-      </section>
-
-      <section class="sgroup">
-        <h3>${esc(t("fTimes"))}</h3>
-        <div class="frow">
-          ${field("fWarning", `<input type="number" min="0" step="1" data-path="settings.time_warning" value="${s.time_warning}" />`)}
-          ${field("fPrep", `<input type="number" min="0" step="1" data-path="settings.time_prep" value="${s.time_prep}" />`)}
-          ${field("fFree", `<input type="number" min="0" step="1" data-path="settings.time_free" value="${s.time_free}" />`)}
-        </div>
-      </section>
-
-      <section class="sgroup">
-        <h3>${esc(t("fSounds"))}</h3>
-        ${audioRow("fWarningSound", "audio_warning", DEFAULT_AUDIO.warning)}
-        ${audioRow("fEndSound", "audio_end", DEFAULT_AUDIO.end)}
-      </section>
-
-      ${sideSection("pro")}
-      ${sideSection("con")}
-
-      <section class="sgroup">
-        <div class="sgroup-head">
-          <h3>${esc(t("fEvents"))}</h3>
-          <div class="seg" role="group">
-            <button type="button" class="seg-btn ${orderView === "detailed" ? "active" : ""}" data-view="detailed">${esc(t("viewDetailed"))}</button>
-            <button type="button" class="seg-btn ${orderView === "simple" ? "active" : ""}" data-view="simple">${esc(t("viewSimple"))}</button>
-          </div>
-        </div>
-        <p class="hint">${esc(t("fEventsHint"))}</p>
-        <div class="chips order" id="event-chips"></div>
-        <div class="palette-row">
-          <span class="palette-label">${esc(t("fAddLabel"))}</span>
-          <div class="chips palette" id="event-palette"></div>
-        </div>
-      </section>`;
-
-    renderSpeakerList("pro");
-    renderSpeakerList("con");
-    renderEventChips();
+    renderNav();
+    els.form.innerHTML = PAGE_RENDER[page]();
+    if (page === "debate") {
+      renderSpeakerList("pro");
+      renderSpeakerList("con");
+    } else if (page === "order") {
+      renderEventChips();
+    }
+    updateFoot();
   }
 
-  function presetSelect() {
-    const current = matchPreset(draft);
-    const opt = (value, labelKey) =>
-      `<option value="${value}" ${current === value ? "selected" : ""}>${esc(t(labelKey))}</option>`;
-    return `<select data-preset>
-      ${current ? "" : opt("", "presetCustom")}
-      ${PRESET_KEYS.map((k) => opt(k, PRESET_LABELS[k])).join("")}
-    </select>`;
+  function pageIntro(titleKey, textKey) {
+    return `<div class="page-intro"><h3>${esc(t(titleKey))}</h3><p>${esc(t(textKey))}</p></div>`;
   }
 
-  function audioRow(labelKey, key, defaultSrc) {
-    const v = draft.settings[key];
-    const shown = v.startsWith("data:") ? "(uploaded file)" : v;
-    return `<div class="frow audio-row" data-audio="${key}">
-      <span class="flabel">${esc(t(labelKey))}</span>
-      <input type="text" class="grow" data-audio-url="${key}" placeholder="${esc(t("fUrlPlaceholder"))}"
-        value="${esc(shown)}" ${v.startsWith("data:") ? "readonly" : ""} />
-      <button type="button" class="btn btn-lime sm" data-audio-file="${key}">${esc(t("fChooseFile"))}</button>
-      <button type="button" class="btn btn-mint sm" data-audio-play="${key}" data-default="${defaultSrc}">${esc(t("fPlay"))}</button>
-      <button type="button" class="btn btn-grey sm" data-audio-default="${key}">${esc(t("fDefault"))}</button>
+  // Minutes and seconds boxes for one duration. `key` is a draft path or "sp:side:index".
+  function durInput(key, sec, label) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `<span class="dur" data-dur="${key}" role="group" aria-label="${esc(label || "")}">
+      <input class="dur-m" type="text" inputmode="numeric" maxlength="3" value="${m}" aria-label="${esc(t("minutes"))}" /><span class="dur-u">${esc(
+      t("minShort")
+    )}</span>
+      <input class="dur-s" type="text" inputmode="numeric" maxlength="3" value="${s < 10 ? "0" : ""}${s}" aria-label="${esc(
+      t("seconds")
+    )}" /><span class="dur-u">${esc(t("secShort"))}</span>
+    </span>`;
+  }
+
+  function seg(path, options, current) {
+    return `<div class="seg" role="radiogroup">${options
+      .map(
+        ([value, label]) =>
+          `<button type="button" class="seg-btn ${value === current ? "active" : ""}" role="radio" aria-checked="${
+            value === current
+          }" data-set-path="${path}" data-value="${esc(JSON.stringify(value))}">${esc(label)}</button>`
+      )
+      .join("")}</div>`;
+  }
+
+  // -- Presets page
+  function pagePresets() {
+    const current = allPresets().find((p) => presetMatches(p, draft));
+    return `
+      ${pageIntro("presetsTitle", "presetsIntro")}
+      <section class="current">
+        <span class="picon">${current ? esc(current.icon) : "✏️"}</span>
+        <div class="current-txt">
+          <span class="eyebrow">${esc(t("currentSetup"))}</span>
+          <strong>${esc(current ? presetName(current) : t("customSetup"))}</strong>
+          <span class="psum">${esc(roundSummary(draft))}</span>
+          ${miniBar(draft)}
+        </div>
+        <button type="button" class="btn btn-lime" data-preset-new>${ICONS.bookmark}<span>${esc(t("saveAsPreset"))}</span></button>
+      </section>
+      <div class="list-head-row"><h4 class="list-head">${esc(t("builtinPresets"))}</h4></div>
+      <div class="pgrid">${BUILTIN_PRESETS.map(presetCard).join("")}</div>
+      <div class="list-head-row">
+        <h4 class="list-head">${esc(t("myPresets"))}</h4>
+        <button type="button" class="btn btn-quiet sm" data-preset-import>${ICONS.folder}<span>${esc(t("openPresetFile"))}</span></button>
+      </div>
+      ${
+        userPresets.length
+          ? `<div class="pgrid">${userPresets.map(presetCard).join("")}</div>`
+          : `<p class="empty-note">${esc(t("noPresets"))}</p>`
+      }`;
+  }
+
+  function presetCard(p) {
+    const inUse = presetMatches(p, draft);
+    const name = presetName(p);
+    const tool = (attr, icon, labelKey, extra) =>
+      `<button type="button" class="icon-btn ${extra || ""}" ${attr}="${esc(p.id)}" title="${esc(t(labelKey))}" aria-label="${esc(
+        t(labelKey) + ": " + name
+      )}">${ICONS[icon]}</button>`;
+    return `<div class="pcard ${inUse ? "in-use" : ""}">
+      <button type="button" class="pcard-main" data-use-preset="${esc(p.id)}">
+        <span class="pcard-top">
+          <span class="picon">${esc(p.icon)}</span>
+          <span class="pcard-txt"><span class="pname">${esc(name)}</span><span class="psum">${esc(roundSummary(p.round))}</span></span>
+        </span>
+        ${miniBar(p.round)}
+      </button>
+      <div class="pcard-foot">
+        ${
+          inUse
+            ? `<span class="pbadge">${ICONS.check}${esc(t("inUse"))}</span>`
+            : `<span class="puse">${esc(t("usePreset"))}</span>`
+        }
+        <span class="pcard-tools">
+          ${p.builtin ? "" : tool("data-edit-preset", "pencil", "editPreset")}
+          ${tool("data-download-preset", "download", "downloadPreset")}
+          ${p.builtin ? "" : tool("data-delete-preset", "trash", "deletePreset", "danger")}
+        </span>
+      </div>
     </div>`;
   }
 
-  function sideSection(side) {
+  // -- Debate page
+  function pageDebate() {
+    return `
+      ${pageIntro("debateTitle", "debateIntro")}
+      <section class="sgroup">
+        <label class="fstack"><span class="flabel">${esc(t("fTitle"))}</span>
+          <input type="text" data-path="title" value="${esc(draft.title)}" placeholder="${esc(t("fTitlePlaceholder"))}" /></label>
+      </section>
+      <div class="sides">${sideCard("pro")}${sideCard("con")}</div>`;
+  }
+
+  function sideCard(side) {
     const s = draft.settings;
     const isPro = side === "pro";
-    return `<section class="sgroup side-${side}">
-      <h3>${esc(t(isPro ? "fProSide" : "fConSide"))}</h3>
-      <div class="frow">
-        ${field(
-          "fLabel",
-          `<input type="text" data-path="settings.${side}_label" placeholder="${esc(t("fLabelPlaceholder"))}" value="${esc(
-            isPro ? s.pro_label : s.con_label
-          )}" />`,
-          "grow"
-        )}
-        ${field("fColor", `<input type="color" data-path="settings.${side}_colors" value="${esc(isPro ? s.pro_colors : s.con_colors)}" />`)}
+    const color = isPro ? s.pro_colors : s.con_colors;
+    return `<section class="sgroup side-card" data-side="${side}" style="--side:${color};--side-ink:${inkFor(color)}">
+      <div class="side-head">
+        <label class="swatch" title="${esc(t("fColor"))}"><input type="color" data-path="settings.${side}_colors" value="${esc(
+      color
+    )}" aria-label="${esc(t("fColor"))}" /></label>
+        <label class="fstack grow"><span class="flabel">${esc(t(isPro ? "fProSide" : "fConSide"))}</span>
+          <input type="text" data-path="settings.${side}_label" value="${esc(isPro ? s.pro_label : s.con_label)}" placeholder="${esc(
+      t(isPro ? "proDefault" : "conDefault")
+    )}" /></label>
       </div>
       <div class="speaker-list" id="list-${side}"></div>
-      <button type="button" class="btn btn-lime sm" data-add-speaker="${side}">${esc(t("fAdd"))}</button>
+      <button type="button" class="btn btn-quiet sm" data-add-speaker="${side}">${ICONS.plus}<span>${esc(t("fAdd"))}</span></button>
     </section>`;
   }
 
   function renderSpeakerList(side) {
     const list = draft[side + "_side"];
     const root = $("list-" + side);
-    root.innerHTML = `<div class="srow head"><span></span><span>${esc(t("fName"))}</span><span>${esc(t("fSeconds"))}</span><span></span></div>`;
+    if (!root) return;
+    const sign = side === "pro" ? 1 : -1;
+    root.innerHTML = list.length
+      ? `<div class="srow head"><span></span><span>${esc(t("fName"))}</span><span>${esc(t("fSpeakingTime"))}</span><span></span></div>`
+      : `<p class="empty-note sm">${esc(t("noSpeakers"))}</p>`;
     list.forEach((p, i) => {
+      const scheduled = draft.event_order.includes(sign * (i + 1));
       const row = document.createElement("div");
       row.className = "srow";
       row.innerHTML = `<span class="num">${i + 1}</span>
-        <input type="text" data-sp="${side}:${i}:name" value="${esc(p.name)}" />
-        <input type="number" min="0" step="1" data-sp="${side}:${i}:time" value="${p.time}" />
-        <button type="button" class="btn btn-red sm" data-del-speaker="${side}:${i}" title="${esc(t("fRemove"))}">✕</button>`;
+        <span class="name-cell">
+          <input type="text" data-sp="${side}:${i}:name" value="${esc(p.name)}" aria-label="${esc(t("fName") + " " + (i + 1))}" />
+          ${scheduled ? "" : `<span class="tag-warn" title="${esc(t("notInOrderHint"))}">${esc(t("notInOrder"))}</span>`}
+        </span>
+        ${durInput(`sp:${side}:${i}`, p.time, t("fSpeakingTime"))}
+        <button type="button" class="icon-btn danger" data-del-speaker="${side}:${i}" title="${esc(t("fRemove"))}" aria-label="${esc(
+        t("fRemove") + " " + p.name
+      )}">${ICONS.trash}</button>`;
       root.appendChild(row);
     });
   }
 
+  // -- Order & time page
+  function pageOrder() {
+    const s = draft.settings;
+    const timeField = (labelKey, hintKey, path, v) =>
+      `<div class="tfield"><span class="flabel">${esc(t(labelKey))}</span>${durInput(path, v, t(labelKey))}<span class="fhint">${esc(
+        t(hintKey)
+      )}</span></div>`;
+    return `
+      ${pageIntro("orderTitle", "orderIntro")}
+      <section class="sgroup">
+        <div class="sgroup-head">
+          <h3>${esc(t("fEvents"))}</h3>
+          ${segView()}
+        </div>
+        <p class="hint">${esc(t("fEventsHint"))}</p>
+        <div class="chips order" id="event-chips"></div>
+        <div class="order-tools">
+          <span id="order-total" class="order-total"></span>
+          <button type="button" class="btn btn-quiet sm" data-order-alternate>${ICONS.repeat}<span>${esc(t("orderAlternate"))}</span></button>
+          <button type="button" class="btn btn-quiet sm" data-order-clear>${ICONS.trash}<span>${esc(t("orderClear"))}</span></button>
+        </div>
+        <div class="palette-row">
+          <span class="palette-label">${esc(t("fAddLabel"))}</span>
+          <div class="chips palette" id="event-palette"></div>
+        </div>
+      </section>
+      <section class="sgroup">
+        <h3>${esc(t("fTimes"))}</h3>
+        <div class="tgrid">
+          ${timeField("fWarning", "fWarningHint", "settings.time_warning", s.time_warning)}
+          ${timeField("fPrep", "fPrepHint", "settings.time_prep", s.time_prep)}
+          ${timeField("fFree", "fFreeHint", "settings.time_free", s.time_free)}
+        </div>
+      </section>`;
+  }
+
+  function segView() {
+    return `<div class="seg" role="radiogroup" aria-label="${esc(t("fEvents"))}">
+      <button type="button" class="seg-btn ${orderView === "detailed" ? "active" : ""}" role="radio" aria-checked="${
+      orderView === "detailed"
+    }" data-view="detailed">${esc(t("viewDetailed"))}</button>
+      <button type="button" class="seg-btn ${orderView === "simple" ? "active" : ""}" role="radio" aria-checked="${
+      orderView === "simple"
+    }" data-view="simple">${esc(t("viewSimple"))}</button>
+    </div>`;
+  }
+
+  function updateOrderTotal() {
+    const el = $("order-total");
+    if (el) el.textContent = t("orderTotal")(draft.event_order.length, Math.round(roundStats(draft).total / 60));
+  }
+
+  // -- Display & sound page
+  function pageDisplay() {
+    const s = draft.settings;
+    return `
+      ${pageIntro("displayTitle", "displayIntro")}
+      <section class="sgroup">
+        <h3>${esc(t("fScreen"))}</h3>
+        <div class="opt-row"><span class="flabel">${esc(t("fLanguage"))}</span>${seg(
+      "settings.language",
+      [
+        ["en", "English"],
+        ["zh", "中文"],
+      ],
+      s.language
+    )}</div>
+        <div class="opt-row"><span class="flabel">${esc(t("fClock"))}</span>${seg(
+      "settings.display_minutes",
+      [
+        [true, t("clockMinutes")],
+        [false, t("clockSeconds")],
+      ],
+      s.display_minutes
+    )}</div>
+        <div class="opt-row"><span class="flabel">${esc(t("fBackground"))}</span>
+          <span class="inline">
+            <label class="swatch"><input type="color" data-path="settings.background_color" value="${esc(
+              s.background_color
+            )}" aria-label="${esc(t("fBackground"))}" /></label>
+            ${
+              s.background_color === DEFAULT_SAVE.settings.background_color
+                ? ""
+                : `<button type="button" class="btn btn-quiet sm" data-bg-default>${ICONS.rotate}<span>${esc(t("fDefault"))}</span></button>`
+            }
+          </span>
+        </div>
+      </section>
+      <section class="sgroup">
+        <h3>${esc(t("fSounds"))}</h3>
+        ${audioRow("fWarningSound", "audio_warning", DEFAULT_AUDIO.warning)}
+        ${audioRow("fEndSound", "audio_end", DEFAULT_AUDIO.end)}
+      </section>`;
+  }
+
+  function audioRow(labelKey, key, defaultSrc) {
+    const v = draft.settings[key];
+    const isFile = v.startsWith("data:");
+    return `<div class="opt-row audio-row" data-audio="${key}">
+      <span class="flabel">${esc(t(labelKey))}</span>
+      <span class="audio-ctl">
+        <input type="text" data-audio-url="${key}" placeholder="${esc(t("fBuiltinSound"))}"
+          value="${esc(isFile ? t("fUploadedFile") : v)}" ${isFile ? "readonly" : ""} aria-label="${esc(t(labelKey) + " URL")}" />
+        <button type="button" class="btn btn-mint sm" data-audio-play="${key}" data-default="${defaultSrc}">${ICONS.play}<span>${esc(
+      t("fPlay")
+    )}</span></button>
+        <button type="button" class="btn btn-quiet sm" data-audio-file="${key}">${ICONS.music}<span>${esc(t("fChooseFile"))}</span></button>
+        ${
+          v
+            ? `<button type="button" class="btn btn-quiet sm" data-audio-default="${key}">${ICONS.rotate}<span>${esc(
+                t("fDefault")
+              )}</span></button>`
+            : ""
+        }
+      </span>
+    </div>`;
+  }
+
+  // -- Advanced page
+  function pageAdvanced() {
+    const keys = [
+      ["Space", "kSpace"],
+      ["→ / N", "kNext"],
+      ["← / P", "kPrev"],
+      ["I", "kInvert"],
+      ["F", "kFull"],
+      ["S", "kSettings"],
+      ["Ctrl + S", "kSave"],
+      ["Esc", "kEsc"],
+    ];
+    return `
+      ${pageIntro("advancedTitle", "advancedIntro")}
+      <section class="sgroup">
+        <h3>${esc(t("fJson"))}</h3>
+        <p class="hint">${esc(t("fJsonHint"))}</p>
+        <textarea id="editor" spellcheck="false" aria-label="${esc(t("fJson"))}">${esc(JSON.stringify(draft, null, 2))}</textarea>
+        <div class="json-tools">
+          <button type="button" class="btn btn-quiet sm" data-json-download>${ICONS.download}<span>${esc(t("download"))}</span></button>
+          <button type="button" class="btn btn-quiet sm" data-json-upload>${ICONS.upload}<span>${esc(t("upload"))}</span></button>
+        </div>
+      </section>
+      <section class="sgroup">
+        <h3>${esc(t("fShortcuts"))}</h3>
+        <dl class="keys">${keys.map(([k, d]) => `<dt><kbd>${esc(k)}</kbd></dt><dd>${esc(t(d))}</dd>`).join("")}</dl>
+      </section>
+      <section class="sgroup danger-zone">
+        <h3>${esc(t("fReset"))}</h3>
+        <p class="hint">${esc(t("fResetHint"))}</p>
+        <button type="button" class="btn btn-red sm" data-reset-all>${ICONS.rotate}<span>${esc(t("resetDefaults"))}</span></button>
+      </section>`;
+  }
+
+  // ---- Event order ------------------------------------------------------------
   function eventName(ev) {
     if (ev === "prep") return t("prep");
     if (ev === "free") return t("free");
     const p = participant2(Number(ev));
     return p ? p.name : t("fNoSpeaker");
   }
-
-  // "simple": compact chips in a row; "detailed": vertical list with side, name and duration.
-  const ORDER_VIEW_KEY = "debate-timer-order-view";
-  let orderView = localStorage.getItem(ORDER_VIEW_KEY) === "simple" ? "simple" : "detailed";
 
   function sideName(id) {
     const s = draft.settings;
@@ -1263,23 +1785,18 @@
     chip.title = eventName(ev);
     if (orderView === "detailed") {
       const d = eventDetail(ev);
-      chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span><span class="txt">${esc(d.text)}</span><span class="dur">${esc(d.time)}</span>`;
+      chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span><span class="txt">${esc(d.text)}</span><span class="dur-t">${esc(
+        d.time
+      )}</span>`;
     } else {
       chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span>`;
     }
     return chip;
   }
 
-  // Re-pick the preset dropdown after an edit, so it shows "Custom" once the
-  // format no longer matches a preset.
-  function refreshPresetSelect() {
-    const sel = els.form.querySelector("select[data-preset]");
-    if (sel) sel.outerHTML = presetSelect();
-  }
-
   function renderEventChips() {
-    refreshPresetSelect();
     const root = $("event-chips");
+    if (!root) return;
     root.innerHTML = "";
     root.classList.toggle("vertical", orderView === "detailed");
     $("event-palette").classList.toggle("detailed", orderView === "detailed");
@@ -1290,11 +1807,15 @@
       const chip = makeChip(ev);
       chip.insertAdjacentHTML(
         "beforeend",
-        `<button type="button" class="x" data-del-event="${i}" title="${esc(t("fRemove"))}">×</button>`
+        `<button type="button" class="x" data-del-event="${i}" title="${esc(t("fRemove"))}" aria-label="${esc(
+          t("fRemove") + " " + eventName(ev)
+        )}">×</button>`
       );
       root.appendChild(chip);
     });
     renderPalette();
+    updateOrderTotal();
+    updateFoot();
   }
 
   function renderPalette() {
@@ -1313,6 +1834,7 @@
         const chip = makeChip(ev, "add");
         chip.dataset.addEv = String(ev);
         chip.setAttribute("role", "button");
+        chip.tabIndex = 0;
         group.appendChild(chip);
       });
       root.appendChild(group);
@@ -1531,59 +2053,281 @@
     setTimeout(finish, duration + 100);
   }
 
-  // Delegated form events
+  // ---- Durations --------------------------------------------------------------
+  function setDur(key, sec) {
+    if (key.startsWith("sp:")) {
+      const [, side, idx] = key.split(":");
+      const p = draft[side + "_side"][Number(idx)];
+      if (p) p.time = sec;
+    } else {
+      setPath(draft, key, sec);
+    }
+  }
+  const digits = (v) => Number(String(v).replace(/\D/g, "")) || 0;
+  function durValue(group) {
+    return digits(group.querySelector(".dur-m").value) * 60 + digits(group.querySelector(".dur-s").value);
+  }
+  // Tidy the boxes once editing is done, e.g. 0 min 90 sec becomes 1 min 30 sec.
+  function normalizeDur(group) {
+    const total = durValue(group);
+    const s = total % 60;
+    group.querySelector(".dur-m").value = String(Math.floor(total / 60));
+    group.querySelector(".dur-s").value = (s < 10 ? "0" : "") + s;
+  }
+
+  // ---- Speakers -----------------------------------------------------------------
+  function addSpeaker(side) {
+    const list = draft[side + "_side"];
+    const last = list[list.length - 1];
+    list.push({ name: speakerName(side, list.length), time: last ? last.time : 120 });
+    renderSpeakerList(side);
+    const inputs = $("list-" + side).querySelectorAll("input[data-sp$=':name']");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+    updateFoot();
+  }
+
+  // Remove a speaker, and drop or renumber their turns so the order still
+  // points at the same people.
+  function removeSpeaker(side, idx) {
+    const sign = side === "pro" ? 1 : -1;
+    const n = idx + 1;
+    draft[side + "_side"].splice(idx, 1);
+    draft.event_order = draft.event_order
+      .filter((ev) => ev !== sign * n)
+      .map((ev) => (typeof ev === "number" && Math.sign(ev) === sign && Math.abs(ev) > n ? ev - sign : ev));
+    renderSpeakerList(side);
+    updateFoot();
+  }
+
+  // ---- Presets ------------------------------------------------------------------
+  const presetOverlay = $("preset-overlay");
+  let presetCtx = null; // { mode: "new" | "edit", preset?, icon }
+
+  function renderIconGrid() {
+    const icons = PRESET_ICONS.includes(presetCtx.icon) ? PRESET_ICONS : [presetCtx.icon].concat(PRESET_ICONS);
+    $("preset-icons").innerHTML = icons
+      .map(
+        (ic) =>
+          `<button type="button" class="icon-opt" role="radio" aria-checked="${ic === presetCtx.icon}" data-icon="${esc(ic)}">${esc(
+            ic
+          )}</button>`
+      )
+      .join("");
+  }
+
+  function openPresetDialog(mode, preset) {
+    presetCtx = { mode, preset, icon: preset ? preset.icon : PRESET_ICONS[0] };
+    const isEdit = mode === "edit";
+    $("preset-dialog-title").textContent = t(isEdit ? "editPresetTitle" : "newPresetTitle");
+    $("preset-dialog-text").textContent = t(isEdit ? "editPresetText" : "newPresetText");
+    $("preset-name").value = isEdit ? preset.name : cleanName(draft.title) || t("newPresetName");
+    $("preset-update").checked = false;
+    show($("preset-update-row"), isEdit);
+    $("preset-ok").textContent = t(isEdit ? "save" : "savePreset");
+    renderIconGrid();
+    show(presetOverlay, true);
+    $("preset-name").focus();
+    $("preset-name").select();
+  }
+
+  function closePresetDialog() {
+    show(presetOverlay, false);
+    presetCtx = null;
+  }
+
+  $("preset-dialog").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = cleanName($("preset-name").value);
+    if (!name) {
+      $("preset-name").focus();
+      return;
+    }
+    if (!commitView()) return;
+    let p;
+    if (presetCtx.mode === "edit") {
+      p = userPresets.find((x) => x.id === presetCtx.preset.id);
+      if (!p) return closePresetDialog();
+      p.name = name;
+      p.icon = presetCtx.icon;
+      if ($("preset-update").checked) p.round = roundOf(draft);
+    } else {
+      p = { id: newId(), name, icon: presetCtx.icon, round: roundOf(draft) };
+      userPresets.push(p);
+    }
+    const err = storeUserPresets();
+    closePresetDialog();
+    notice = err ? "" : t("presetSaved")(name);
+    renderForm();
+    if (err) setError(t("saveFailed") + err);
+  });
+  $("preset-cancel").addEventListener("click", closePresetDialog);
+  presetOverlay.addEventListener("click", (e) => {
+    if (e.target === presetOverlay) closePresetDialog();
+    const b = e.target.closest("[data-icon]");
+    if (!b) return;
+    presetCtx.icon = b.dataset.icon;
+    renderIconGrid();
+    const sel = $("preset-icons").querySelector(`[aria-checked="true"]`);
+    if (sel) sel.focus();
+  });
+
+  function usePreset(id) {
+    const p = findPreset(id);
+    if (!p || !commitView()) return;
+    applyRound(draft, p.round);
+    notice = t("presetLoaded")(presetName(p));
+    renderForm();
+  }
+
+  function importPresets() {
+    pickFiles("application/json,.json", true, (files) => {
+      const added = [];
+      const failed = [];
+      files.forEach((f) => {
+        try {
+          added.push(parsePresetFile(f.text, f.name));
+        } catch (e) {
+          failed.push(`${f.name} (${e.message})`);
+        }
+      });
+      if (added.length) {
+        userPresets = userPresets.concat(added);
+        const err = storeUserPresets();
+        if (err) {
+          userPresets = userPresets.slice(0, userPresets.length - added.length);
+          failed.push(t("saveFailed") + err);
+          added.length = 0;
+        }
+      }
+      notice = added.length ? t("presetsAdded")(added.length) : "";
+      renderForm();
+      setError(failed.length ? t("presetImportFailed") + failed.join("; ") : "");
+    });
+  }
+
+  // ---- Delegated form events --------------------------------------------------
+  els.nav.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-page]");
+    if (b) goPage(b.dataset.page);
+  });
+  els.nav.addEventListener("keydown", (e) => {
+    if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    e.preventDefault();
+    const i = PAGES.findIndex((p) => p.id === page);
+    const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
+    goPage(PAGES[(i + step + PAGES.length) % PAGES.length].id);
+    const active = els.nav.querySelector(".snav-btn.active");
+    if (active) active.focus();
+  });
+
   els.form.addEventListener("input", (e) => {
     const el = e.target;
-    if (el.dataset.path) {
+    notice = "";
+    if (el.id === "editor") {
+      try {
+        draft = parseSave(el.value);
+        setError("");
+      } catch (_) {
+        /* reported on save or when leaving the page */
+      }
+    } else if (el.closest(".dur")) {
+      const group = el.closest(".dur");
+      setDur(group.dataset.dur, durValue(group));
+      if (page === "order") {
+        updateOrderTotal();
+        renderEventChips();
+      }
+    } else if (el.dataset.path) {
       let v;
       if (el.type === "checkbox") v = el.checked;
-      else if (el.type === "number") v = Math.max(0, Number(el.value) || 0);
       else if (el.type === "color") v = el.value.toUpperCase();
       else v = el.value;
       setPath(draft, el.dataset.path, v);
-      if (el.dataset.path === "settings.language") {
-        state.lang = v;
-        applyI18n();
-        renderForm();
+      if (el.type === "color") {
+        const card = el.closest(".side-card");
+        if (card) {
+          card.style.setProperty("--side", v);
+          card.style.setProperty("--side-ink", inkFor(v));
+        }
       }
     } else if (el.dataset.sp) {
-      const [side, idx, key] = el.dataset.sp.split(":");
+      const [side, idx] = el.dataset.sp.split(":");
       const p = draft[side + "_side"][Number(idx)];
-      if (!p) return;
-      if (key === "time") p.time = Math.max(0, Number(el.value) || 0);
-      else p.name = el.value;
-      if (key === "name") renderEventChips();
+      if (p) p.name = el.value;
     } else if (el.dataset.audioUrl) {
       draft.settings[el.dataset.audioUrl] = el.value.trim();
-    } else if ("preset" in el.dataset) {
-      if (el.value) applyPreset(draft, el.value);
-      renderForm();
-      return;
     }
-    refreshPresetSelect();
+    updateFoot();
+  });
+
+  els.form.addEventListener("change", (e) => {
+    const group = e.target.closest(".dur");
+    if (group) normalizeDur(group);
+    if (e.target.dataset.path === "settings.background_color" && page === "display") renderForm();
+  });
+
+  // Palette chips act as buttons for the keyboard too.
+  els.form.addEventListener("keydown", (e) => {
+    const chip = e.target.closest && e.target.closest(".chip.add");
+    if (chip && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      chip.click();
+    }
   });
 
   els.form.addEventListener("click", (e) => {
     const b = e.target.closest("button, .chip.add");
     if (!b) return;
     const d = b.dataset;
-    if (d.addSpeaker) {
-      const side = d.addSpeaker;
-      const list = draft[side + "_side"];
-      list.push({ name: `${side === "pro" ? "正" : "反"}${list.length + 1}`, time: 180 });
-      renderSpeakerList(side);
-      renderEventChips();
+    if (d.usePreset) {
+      usePreset(d.usePreset);
+    } else if (d.presetNew !== undefined) {
+      if (commitView()) openPresetDialog("new");
+    } else if (d.presetImport !== undefined) {
+      importPresets();
+    } else if (d.editPreset) {
+      const p = findPreset(d.editPreset);
+      if (p) openPresetDialog("edit", p);
+    } else if (d.downloadPreset) {
+      const p = findPreset(d.downloadPreset);
+      if (p) downloadJson(presetFile(p), fileNameFor(presetName(p)));
+    } else if (d.deletePreset) {
+      const p = findPreset(d.deletePreset);
+      if (!p) return;
+      confirmDialog({
+        title: t("deletePresetTitle")(p.name),
+        text: t("deletePresetText"),
+        primary: {
+          label: t("deletePreset"),
+          cls: "btn-red",
+          action: () => {
+            userPresets = userPresets.filter((x) => x.id !== p.id);
+            storeUserPresets();
+            notice = "";
+            renderForm();
+          },
+        },
+      });
+    } else if (d.addSpeaker) {
+      addSpeaker(d.addSpeaker);
     } else if (d.delSpeaker) {
       const [side, idx] = d.delSpeaker.split(":");
-      slideRemove(b.closest(".srow"), () => {
-        draft[side + "_side"].splice(Number(idx), 1);
-        renderSpeakerList(side);
-        renderEventChips();
-      });
+      slideRemove(b.closest(".srow"), () => removeSpeaker(side, Number(idx)));
+    } else if (d.setPath) {
+      const v = JSON.parse(d.value);
+      setPath(draft, d.setPath, v);
+      if (d.setPath === "settings.language") {
+        state.lang = v;
+        applyI18n();
+      }
+      renderForm();
     } else if (d.view) {
       orderView = d.view === "detailed" ? "detailed" : "simple";
-      localStorage.setItem(ORDER_VIEW_KEY, orderView);
-      els.form.querySelectorAll(".seg-btn").forEach((s) => s.classList.toggle("active", s.dataset.view === orderView));
+      writeLocal(ORDER_VIEW_KEY, orderView);
+      els.form.querySelectorAll("[data-view]").forEach((s) => {
+        s.classList.toggle("active", s.dataset.view === orderView);
+        s.setAttribute("aria-checked", String(s.dataset.view === orderView));
+      });
       renderEventChips();
     } else if (d.addEv !== undefined) {
       draft.event_order.push(chipValue(b));
@@ -1593,6 +2337,41 @@
         draft.event_order.splice(Number(d.delEvent), 1);
         renderEventChips();
       });
+    } else if (d.orderAlternate !== undefined) {
+      confirmDialog({
+        title: t("orderAlternateTitle"),
+        text: t("orderAlternateText"),
+        primary: {
+          label: t("orderAlternate"),
+          cls: "btn-mint",
+          action: () => {
+            const order = [];
+            for (let i = 1; i <= Math.max(draft.pro_side.length, draft.con_side.length); i++) {
+              if (i <= draft.pro_side.length) order.push(i);
+              if (i <= draft.con_side.length) order.push(-i);
+            }
+            draft.event_order = order;
+            renderEventChips();
+          },
+        },
+      });
+    } else if (d.orderClear !== undefined) {
+      if (!draft.event_order.length) return;
+      confirmDialog({
+        title: t("orderClearTitle"),
+        text: t("orderClearText"),
+        primary: {
+          label: t("orderClear"),
+          cls: "btn-red",
+          action: () => {
+            draft.event_order = [];
+            renderEventChips();
+          },
+        },
+      });
+    } else if (d.bgDefault !== undefined) {
+      draft.settings.background_color = DEFAULT_SAVE.settings.background_color;
+      renderForm();
     } else if (d.audioFile) {
       const key = d.audioFile;
       els.audioFileInput.onchange = () => {
@@ -1619,11 +2398,66 @@
       const src = draft.settings[d.audioPlay] || d.default;
       const a = new Audio(src);
       const p = a.play();
-      if (p && p.catch) p.catch(() => setError("Could not play: " + src));
+      if (p && p.catch) p.catch(() => setError(t("fCannotPlay")));
+    } else if (d.jsonDownload !== undefined) {
+      if (commitView()) downloadJson(draft, "debate-timer-settings.json");
+    } else if (d.jsonUpload !== undefined) {
+      pickFiles("application/json,.json", false, (files) => {
+        const ed = $("editor");
+        if (!ed) return;
+        ed.value = files[0].text;
+        ed.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    } else if (d.resetAll !== undefined) {
+      confirmDialog({
+        title: t("resetTitle"),
+        text: t("resetText"),
+        primary: {
+          label: t("resetDefaults"),
+          cls: "btn-red",
+          action: () => {
+            draft = parseSave(DEFAULT_TEXT);
+            draft.settings.language = state.lang;
+            notice = "";
+            setError("");
+            renderForm();
+          },
+        },
+      });
     }
   });
 
   els.form.addEventListener("submit", (e) => e.preventDefault());
+
+  $("btn-menu").addEventListener("click", () => {
+    if (els.menuOverlay.classList.contains("hidden")) openMenu();
+    else requestClose();
+  });
+  $("btn-close").addEventListener("click", requestClose);
+  els.btnSave.addEventListener("click", saveAndApply);
+  els.btnDiscard.addEventListener("click", () => {
+    draft = storedDraft();
+    notice = "";
+    setError("");
+    if (state.lang !== draft.settings.language) {
+      state.lang = draft.settings.language;
+      applyI18n();
+    }
+    renderForm();
+  });
+  els.menuOverlay.addEventListener("click", (e) => {
+    if (e.target === els.menuOverlay) requestClose();
+  });
+
+  // Language button: edits the draft and previews the UI; saved with Save & Apply.
+  els.btnLang.addEventListener("click", () => {
+    if (!commitView()) return;
+    state.lang = state.lang === "en" ? "zh" : "en";
+    draft.settings.language = state.lang;
+    applyI18n();
+    renderForm();
+  });
+
 
   // ---------------------------------------------------------------------------
   // Global buttons, keyboard, end screen
@@ -1667,13 +2501,20 @@
   document.addEventListener("keydown", (e) => {
     const menuOpen = !els.menuOverlay.classList.contains("hidden");
     const confirmOpen = !confirmOverlay.classList.contains("hidden");
+    const presetOpen = !presetOverlay.classList.contains("hidden");
     if (e.key === "Escape") {
       if (confirmOpen) show(confirmOverlay, false);
+      else if (presetOpen) closePresetDialog();
       else if (menuOpen) requestClose();
       else if (!els.endOverlay.classList.contains("hidden")) show(els.endOverlay, false);
       return;
     }
-    if (menuOpen || confirmOpen) return;
+    if (menuOpen && !confirmOpen && !presetOpen && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      saveAndApply();
+      return;
+    }
+    if (menuOpen || confirmOpen || presetOpen) return;
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     const key = e.key.toLowerCase();
@@ -1694,6 +2535,9 @@
       invert();
     } else if (key === "f") {
       toggleFullscreen();
+    } else if (key === "s" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      openMenu();
     }
   });
 
