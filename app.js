@@ -12,11 +12,12 @@
   };
 
   // Round presets. A preset sets the debate format (title, speakers, event
-  // order, prep/free times); colors, labels, sounds and language are kept.
+  // order, warning/prep/free times); colors, labels, sounds and language are kept.
   const sideOf = (prefix, times) => times.map((time, i) => ({ name: prefix + "一二三四五六七八九十"[i], time }));
   const PRESETS = {
     default: {
       title: "",
+      time_warning: 30,
       time_prep: 300,
       time_free: 300,
       pro_side: sideOf("正", [180, 120, 120, 180]),
@@ -25,6 +26,7 @@
     },
     round_robin: {
       title: "",
+      time_warning: 15,
       time_prep: 300,
       time_free: 300,
       pro_side: sideOf("正", [120, 60, 60, 120]),
@@ -44,6 +46,7 @@
   // Loads a preset's format into a save, keeping its other settings.
   function applyPreset(save, key) {
     Object.assign(save, presetFormat(key));
+    save.settings.time_warning = PRESETS[key].time_warning;
     save.settings.time_prep = PRESETS[key].time_prep;
     save.settings.time_free = PRESETS[key].time_free;
   }
@@ -51,7 +54,7 @@
   // The preset whose format a save matches exactly (ignoring the title), or "".
   function matchPreset(save) {
     const fmt = (o) =>
-      JSON.stringify([o.pro_side, o.con_side, o.event_order, o.time_prep, o.time_free]);
+      JSON.stringify([o.pro_side, o.con_side, o.event_order, o.time_warning, o.time_prep, o.time_free]);
     const mine = fmt({ ...save, ...save.settings });
     return PRESET_KEYS.find((k) => fmt(PRESETS[k]) === mine) || "";
   }
@@ -63,7 +66,7 @@
       pro_label: "",
       con_label: "",
       background_color: "#000000",
-      time_warning: 30,
+      time_warning: PRESETS.default.time_warning,
       time_prep: PRESETS.default.time_prep,
       time_free: PRESETS.default.time_free,
       display_minutes: true,
