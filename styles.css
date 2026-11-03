@@ -62,7 +62,7 @@
 :root.light-bg {
   --fg: #141418;
   --fg-2: rgba(0, 0, 0, 0.7);
-  --fg-3: rgba(0, 0, 0, 0.52);
+  --fg-3: rgba(0, 0, 0, 0.6);
   --surface: rgba(0, 0, 0, 0.035);
   --surface-2: rgba(0, 0, 0, 0.065);
   --surface-3: rgba(0, 0, 0, 0.11);

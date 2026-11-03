@@ -18,15 +18,19 @@ python -m http.server 8000
 
 ## Features
 
-- Visualized debate layout with numbered pro and con speakers in custom colors and custom side labels
-- Current speaker (speech bubble) and next speaker (arrow, flashes when time runs out) indicators
-- Ring timer for preparation and speeches, with a warning color, warning sound, red flash, and end bell
-- Double bar timer for free debate with an Invert button to hand time between sides
-- Clickable timeline to jump to any event
+- A debate screen built for a projector: the time left is the largest thing on screen, with who is speaking and who is next right beside it. It scales from a phone to a 1080p projector and works in 4:3
+- Speaker cards for any number of pro and con speakers, in custom team colours and with custom side labels. Each card shows the speaker's name and speaking time; the current speaker is filled in the team colour and tagged **Speaking**, and the next speaker is tagged **Next**, turning yellow once the current time runs out
+- Ring timer for preparation and speeches, with a status line (Ready, "of 3:00", Paused, Time ran out), a warning colour, warning sound, red flash, and end bell
+- Free debate shows a card per side with its own clock and controls, and an **Invert** button that hands the clock to the other side. The side on the clock is highlighted
+- Before the round, a ring split into the round's parts shows how long it will take
+- The topic stays at the top of the screen; the centre shows the current part ("Part 3 of 9") and whose turn it is
+- Clickable timeline to jump to any part, coloured by side (lime for preparation, yellow for free debate)
+- The **Begin** / **Next** button names the part that comes next and reads **Finish** on the last part; a **Previous** button sits beside it
 - Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
 - Presets: built-in **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating, no free debate, warning at 15 s), plus your own presets with a name and icon. Presets can be downloaded and opened as `.json` files to share between computers
 - Event order as a detailed vertical list or compact chips, with drag-and-drop reordering, an "Alternate Pro and Con" shortcut, and a running total. Removing a speaker also removes and renumbers their turns
 - Custom background color (text and ring colors adapt to light backgrounds)
+- Respects the system's reduced-motion setting: the warning flash becomes a single fade and nothing pulses
 - Custom warning and end sounds, from a URL or an uploaded file
 - English and Simplified Chinese UI
 - Download / upload of the whole settings file as JSON
@@ -143,5 +147,5 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
 ## Files
 
 - `index.html`, `styles.css`, `app.js`: the app
-- `assets/icons/`: icons from the original project
+- `assets/icons/`: icons from the original project (the speaker figure is used on the debate screen)
 - `assets/audio/`: default warning and end sounds from the original project
