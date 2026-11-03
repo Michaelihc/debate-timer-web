@@ -143,7 +143,7 @@
       invalidJson: "The settings file has a mistake: ",
       proDefault: "Pro",
       conDefault: "Con",
-      speakerTurn: (name) => `Speaker ${name}'s Turn`,
+      speakerTurn: (name) => `${name}’s Turn`,
       minutes: "Minutes",
       seconds: "Seconds",
       minShort: "min",
