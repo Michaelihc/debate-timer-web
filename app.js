@@ -18,7 +18,27 @@
   // the order of speeches and its times. Language, timer format, background and
   // sounds belong to this screen, not to the round, so presets leave them alone.
   // A preset file is a save file holding only those fields plus a name and icon.
-  const ROUND_SETTINGS = ["pro_label", "con_label", "pro_colors", "con_colors", "time_warning", "time_prep", "time_free"];
+  const ROUND_SETTINGS = [
+    "pro_label",
+    "con_label",
+    "pro_label_zh",
+    "con_label_zh",
+    "pro_colors",
+    "con_colors",
+    "time_warning",
+    "warning_tone",
+    "extra_cues",
+    "time_grace",
+    "overtime_cap",
+    "time_prep",
+    "time_free",
+    "free_exclusive",
+  ];
+  // Bells: the two sound files, or a knock played by the browser.
+  const TONES = ["warning", "end", "soft", "single", "double", "triple"];
+  const EV_KINDS = ["speech", "prep", "free", "shared", "break"];
+  // Shared clocks (e.g. crossfire) and breaks have no setting of their own to fall back on.
+  const KIND_DEFAULT_TIME = { shared: 180, break: 300 };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const CN_NUM = "一二三四五六七八九十";
   // Default speaker names follow the screen language: 正一 / 反一 in Chinese,
@@ -34,14 +54,22 @@
   function makeRound(o) {
     return {
       title: "",
+      title_zh: "",
       settings: {
         pro_label: "",
         con_label: "",
+        pro_label_zh: "",
+        con_label_zh: "",
         pro_colors: "#0000FF",
         con_colors: "#FF0000",
         time_warning: o.warning,
+        warning_tone: "warning",
+        extra_cues: [],
+        time_grace: 0,
+        overtime_cap: 300,
         time_prep: o.prep,
         time_free: o.free,
+        free_exclusive: false,
       },
       pro_side: team("pro", o.times),
       con_side: team("con", o.times),
@@ -70,14 +98,24 @@
   function roundOf(save) {
     const settings = {};
     ROUND_SETTINGS.forEach((k) => (settings[k] = save.settings[k]));
-    return clone({ title: save.title, settings, pro_side: save.pro_side, con_side: save.con_side, event_order: save.event_order });
+    return clone({
+      title: save.title,
+      title_zh: save.title_zh || "",
+      settings,
+      pro_side: save.pro_side,
+      con_side: save.con_side,
+      event_order: save.event_order,
+    });
   }
 
   // Loads a round into a save. A round without a topic keeps the current one.
   function applyRound(save, round) {
     const r = clone(round);
     Object.assign(save.settings, r.settings);
-    if (r.title) save.title = r.title;
+    if (r.title) {
+      save.title = r.title;
+      save.title_zh = r.title_zh || "";
+    }
     save.pro_side = r.pro_side;
     save.con_side = r.con_side;
     save.event_order = r.event_order;
@@ -86,7 +124,13 @@
   // True when the save is set up exactly like the preset (its topic too, if it has one).
   function presetMatches(preset, save) {
     const key = (r, withTitle) =>
-      JSON.stringify([ROUND_SETTINGS.map((k) => r.settings[k]), r.pro_side, r.con_side, r.event_order, withTitle ? r.title : ""]);
+      JSON.stringify([
+        ROUND_SETTINGS.map((k) => r.settings[k]),
+        r.pro_side,
+        r.con_side,
+        r.event_order,
+        withTitle ? [r.title, r.title_zh || ""] : "",
+      ]);
     const withTitle = Boolean(preset.round.title);
     return key(preset.round, withTitle) === key(save, withTitle);
   }
@@ -103,16 +147,131 @@
 
   const DEFAULT_SAVE = {
     title: "",
+    title_zh: "",
     settings: {
       background_color: "#000000",
       display_minutes: true,
       language: browserLang(),
+      sound: true,
       audio_warning: "",
       audio_end: "",
+      advance_starts: true,
+      overtime: false,
     },
   };
   applyRound(DEFAULT_SAVE, BUILTIN_PRESETS[0].round);
   const DEFAULT_TEXT = JSON.stringify(DEFAULT_SAVE, null, 2);
+
+  // ---------------------------------------------------------------------------
+  // Parts of the round
+  // ---------------------------------------------------------------------------
+  // An entry in event_order is a speaker number (1 is Pro 1, -2 is Con 2),
+  // "prep" or "free", or an object for a part with settings of its own:
+  //   { speaker: 1, time, protected, cues, label, label_zh }      a speech
+  //   { kind: "prep", side: "pro" | "con", time, cues, label, label_zh }
+  //   { kind: "free", first: "pro" | "con", time, cues, label, label_zh }  (time per team)
+  //   { kind: "shared", live: ["pro"], time, cues, label, label_zh }      one clock, e.g. crossfire
+  //   { kind: "break", time, cues, label, label_zh }
+  // Anything left out falls back to the round's settings. `cues` replaces the
+  // round's warnings for that part; an empty list means no warnings at all.
+  function evKind(ev) {
+    if (ev === "prep" || ev === "free") return ev;
+    if (typeof ev === "number") return "speech";
+    if (ev && typeof ev === "object") return ev.kind || "speech";
+    return null;
+  }
+  const evOpts = (ev) => (ev && typeof ev === "object" ? ev : {});
+  const evSpeaker = (ev) => (evKind(ev) !== "speech" ? null : typeof ev === "number" ? ev : Number(ev.speaker));
+  // The long form of an entry, as a fresh object to edit.
+  function expandEvent(ev) {
+    if (typeof ev === "number") return { speaker: ev };
+    if (ev === "prep" || ev === "free") return { kind: ev };
+    return clone(ev);
+  }
+
+  const secs = (v) => Math.max(0, Math.round(Number(v) || 0));
+  function normalizeCues(arr) {
+    if (!Array.isArray(arr)) return null;
+    return arr
+      .filter((c) => c && typeof c === "object")
+      .map((c) => ({ at: Math.max(1, secs(c.at)), tone: TONES.includes(c.tone) ? c.tone : "warning" }));
+  }
+
+  // Cleans one entry, and writes it the short way when it has nothing of its own.
+  function normalizeEvent(e) {
+    if (e === "prep" || e === "free") return e;
+    if (!e || typeof e !== "object" || Array.isArray(e)) {
+      const n = Number(e);
+      return Number.isInteger(n) && n !== 0 ? n : null;
+    }
+    const kind = e.kind || (e.speaker != null ? "speech" : null);
+    if (!EV_KINDS.includes(kind)) return null;
+    const o = kind === "speech" ? {} : { kind };
+    if (kind === "speech") {
+      const n = Number(e.speaker);
+      if (!Number.isInteger(n) || n === 0) return null;
+      o.speaker = n;
+    }
+    if (e.time != null && e.time !== "") o.time = secs(e.time);
+    if (kind === "speech" && secs(e.protected) > 0) o.protected = secs(e.protected);
+    if (kind === "prep" && (e.side === "pro" || e.side === "con")) o.side = e.side;
+    if (kind === "free" && (e.first === "pro" || e.first === "con")) o.first = e.first;
+    if (kind === "shared" && Array.isArray(e.live)) {
+      const live = ["pro", "con"].filter((s) => e.live.includes(s));
+      if (live.length === 1) o.live = live;
+    }
+    const cues = normalizeCues(e.cues);
+    if (cues) o.cues = cues;
+    if (e.label) o.label = String(e.label);
+    if (e.label_zh) o.label_zh = String(e.label_zh);
+    const own = Object.keys(o).filter((k) => k !== "kind" && k !== "speaker");
+    if (!own.length && kind === "speech") return o.speaker;
+    if (!own.length && (kind === "prep" || kind === "free")) return kind;
+    return o;
+  }
+
+  function speakerOf(d, id) {
+    if (id > 0) return d.pro_side[id - 1] || null;
+    if (id < 0) return d.con_side[-id - 1] || null;
+    return null;
+  }
+
+  // How long a part runs (per team, for free debate).
+  function evTime(d, ev) {
+    const o = evOpts(ev);
+    if (o.time != null) return o.time;
+    const k = evKind(ev);
+    if (k === "prep") return d.settings.time_prep;
+    if (k === "free") return d.settings.time_free;
+    if (k === "shared" || k === "break") return KIND_DEFAULT_TIME[k];
+    const p = speakerOf(d, evSpeaker(ev));
+    return p ? p.time : 0;
+  }
+
+  // The team a part belongs to, if it belongs to one.
+  function evSide(ev) {
+    const k = evKind(ev);
+    const o = evOpts(ev);
+    if (k === "speech") return evSpeaker(ev) > 0 ? "pro" : "con";
+    if (k === "prep") return o.side || null;
+    if (k === "shared") return o.live && o.live.length === 1 ? o.live[0] : null;
+    return null;
+  }
+
+  function evColor(d, ev) {
+    const side = evSide(ev);
+    if (side) return side === "pro" ? d.settings.pro_colors : d.settings.con_colors;
+    return { prep: "var(--lime)", free: "var(--yellow)", shared: "var(--violet)", break: "var(--grey)" }[evKind(ev)] || "var(--grey)";
+  }
+
+  // The warnings a part rings: its own, or the round's.
+  function cuesFor(d, ev) {
+    const o = evOpts(ev);
+    if (o.cues) return o.cues.slice();
+    const s = d.settings;
+    const first = s.time_warning > 0 ? [{ at: s.time_warning, tone: s.warning_tone }] : [];
+    return first.concat(s.extra_cues);
+  }
 
   const I18N = {
     en: {
@@ -293,6 +452,76 @@
       saveFailed: "Could not save (storage full?): ",
       invalidEvents: "The order of speeches includes speakers who don't exist: ",
       fullscreen: "Fullscreen (F)",
+      // restored part and timing settings
+      prepOf: (team) => `${team} preparation`,
+      shared: "Shared time",
+      sharedShort: "Shared",
+      breakName: "Break",
+      protectedNow: "Protected time",
+      partTitle: (i, name) => `Part ${i}: ${name}`,
+      partSettings: "Settings for this part",
+      partCustom: "Has its own settings",
+      pTime: "Time",
+      pTimePerTeam: "Time for each team",
+      pUsualTime: (time) => `Usual time (${time})`,
+      pSpeakerTime: (name, time) => `${name}'s time (${time})`,
+      pOwnTime: "Own time for this part",
+      pThisSpeech: "This speech only",
+      pTimeHint: "Changes only this part. The usual time is set on the other pages.",
+      pProtected: "Protected time",
+      pProtectedHint: "A single knock this long after the start and again this long before the end. 0 means none.",
+      pPrepFor: "Preparation for",
+      pBothTeams: "Both teams",
+      pFirst: "Who starts",
+      pOperator: "Operator chooses",
+      pFirstHint: "That team's clock starts with the part, or when you press Space.",
+      pLive: "Who speaks",
+      pLabel: "Name",
+      pLabelZh: "Name in Chinese",
+      pLabelHint: "Replaces the usual name. The Chinese name is used when the screen is in Chinese.",
+      pCues: "Warnings",
+      pCuesRound: "Same as the round",
+      pCuesOwn: "Own warnings",
+      cuesNone: "No warnings.",
+      cueAdd: "Add warning",
+      cueLeft: "left",
+      cueTone: "Tone",
+      toneWarning: "Warning sound",
+      toneEnd: "Time's up sound",
+      toneSoft: "Soft knock",
+      toneSingle: "Single knock",
+      toneDouble: "Double knock",
+      toneTriple: "Triple knock",
+      fBells: "Warnings and bells",
+      fBellsHint: "What rings, and when, in every part that has no warnings of its own.",
+      fWarningTone: "Warning tone",
+      fMoreWarnings: "More warnings",
+      fMoreWarningsHint: "Each rings once when that much time is left. The ring turns yellow at the earliest one.",
+      fGrace: "Grace bell",
+      fGraceHint: "A triple knock this long after time runs out. 0 means none.",
+      fBehaviour: "Timing behaviour",
+      fAdvance: "When you press Next",
+      advStart: "Start the clock",
+      advPause: "Load it paused",
+      fAdvanceHint: "Paused: the next part waits at its full time until you press Start or Space.",
+      fFreeClocks: "Free debate clocks",
+      freeBoth: "Both may run at once",
+      freeOne: "One team at a time",
+      fFreeClocksHint: "One team at a time: starting one team's clock pauses the other.",
+      fOvertime: "When time runs out",
+      otStop: "Stop at zero",
+      otCount: "Count overtime",
+      fOvertimeHint: "Overtime counts up in red, e.g. +0:12.",
+      fCap: "Stop bells after",
+      fCapHint: "No bell rings once a part is this far over time, the grace bell included.",
+      fBilingual: "Chinese names",
+      fBilingualHint: "Shown instead of the usual names when the screen is in Chinese. Leave empty to use the same names in both languages.",
+      fTitleZh: "Topic in Chinese",
+      fProZh: "Pro team name in Chinese",
+      fConZh: "Con team name in Chinese",
+      fSoundOn: "Play sounds",
+      on: "On",
+      off: "Off",
     },
     zh: {
       menu: "设置",
@@ -403,6 +632,75 @@
       fEmptyOrder: "暂无流程，点击下方项目添加。",
       fNoSpeaker: "辩手不存在",
       orderTotal: (n, min) => `共 ${n} 项 · 约 ${min} 分钟`,
+      prepOf: (team) => `${team}准备时间`,
+      shared: "共用计时",
+      sharedShort: "共用",
+      breakName: "休息",
+      protectedNow: "保护时间",
+      partTitle: (i, name) => `第 ${i} 项：${name}`,
+      partSettings: "本项设置",
+      partCustom: "有单独设置",
+      pTime: "时长",
+      pTimePerTeam: "每方时长",
+      pUsualTime: (time) => `默认时长（${time}）`,
+      pSpeakerTime: (name, time) => `${name}的时长（${time}）`,
+      pOwnTime: "本项单独设置",
+      pThisSpeech: "仅本次发言",
+      pTimeHint: "只改变这一项。默认时长在其他页面设置。",
+      pProtected: "保护时间",
+      pProtectedHint: "开始后和结束前各到这个时长时敲一下。0 表示不设。",
+      pPrepFor: "准备方",
+      pBothTeams: "双方",
+      pFirst: "先发言方",
+      pOperator: "由计时员选择",
+      pFirstHint: "该方的计时随本项开始，或在按空格时开始。",
+      pLive: "发言方",
+      pLabel: "名称",
+      pLabelZh: "中文名称",
+      pLabelHint: "替换默认名称。界面为中文时使用中文名称。",
+      pCues: "提示",
+      pCuesRound: "与全场相同",
+      pCuesOwn: "单独设置",
+      cuesNone: "没有提示。",
+      cueAdd: "添加提示",
+      cueLeft: "剩余",
+      cueTone: "音色",
+      toneWarning: "提示音",
+      toneEnd: "结束铃",
+      toneSoft: "轻敲一下",
+      toneSingle: "敲一下",
+      toneDouble: "敲两下",
+      toneTriple: "敲三下",
+      fBells: "提示与铃声",
+      fBellsHint: "没有单独设置提示的环节，在什么时候响什么。",
+      fWarningTone: "提示音色",
+      fMoreWarnings: "更多提示",
+      fMoreWarningsHint: "剩余时间到达时各响一次。圆环在最早的提示时变黄。",
+      fGrace: "宽限铃",
+      fGraceHint: "时间到后再过这么久，敲三下。0 表示不设。",
+      fBehaviour: "计时方式",
+      fAdvance: "按“下一项”时",
+      advStart: "立即开始计时",
+      advPause: "载入后暂停",
+      fAdvanceHint: "暂停：下一项显示完整时长并等待，按开始或空格后计时。",
+      fFreeClocks: "自由辩论计时",
+      freeBoth: "双方可同时计时",
+      freeOne: "一次只计一方",
+      fFreeClocksHint: "一次只计一方：开始一方计时会暂停另一方。",
+      fOvertime: "时间到后",
+      otStop: "停在零",
+      otCount: "继续计超时",
+      fOvertimeHint: "超时以红色正数显示，例如 +0:12。",
+      fCap: "超时多久后不再响铃",
+      fCapHint: "超时达到这个时长后不再响任何铃，包括宽限铃。",
+      fBilingual: "中文名称",
+      fBilingualHint: "界面为中文时代替上面的名称显示。留空则两种语言使用相同名称。",
+      fTitleZh: "中文辩题",
+      fProZh: "正方中文名称",
+      fConZh: "反方中文名称",
+      fSoundOn: "播放声音",
+      on: "开",
+      off: "关",
       orderAlternate: "正反方交替",
       orderAlternateTitle: "替换发言顺序？",
       orderAlternateText: "顺序将变为正一、反一、正二、反二……，不含准备时间和自由辩论。",
@@ -536,31 +834,34 @@
             return { name: isDefaultName(side, i, name) ? "" : name, time: Math.max(0, Number(p && p.time) || 0) };
           })
         : [];
-    const events = Array.isArray(raw.event_order)
-      ? raw.event_order
-          .map((e) => {
-            if (e === "prep" || e === "free") return e;
-            const n = Number(e);
-            return Number.isInteger(n) && n !== 0 ? n : null;
-          })
-          .filter((e) => e !== null)
-      : [];
+    const events = Array.isArray(raw.event_order) ? raw.event_order.map(normalizeEvent).filter((e) => e !== null) : [];
     return {
       settings: {
         pro_colors: normalizeColor(s.pro_colors, "#0000FF"),
         con_colors: normalizeColor(s.con_colors, "#FF0000"),
         pro_label: String(s.pro_label || ""),
         con_label: String(s.con_label || ""),
+        pro_label_zh: String(s.pro_label_zh || ""),
+        con_label_zh: String(s.con_label_zh || ""),
         background_color: normalizeColor(s.background_color, "#000000"),
         time_warning: Math.max(0, Number(s.time_warning) || 0),
+        warning_tone: TONES.includes(s.warning_tone) ? s.warning_tone : "warning",
+        extra_cues: normalizeCues(s.extra_cues) || [],
+        time_grace: secs(s.time_grace),
+        overtime_cap: s.overtime_cap == null ? 300 : secs(s.overtime_cap),
         time_prep: Math.max(0, Number(s.time_prep) || 0),
         time_free: Math.max(0, Number(s.time_free) || 0),
+        free_exclusive: s.free_exclusive === true,
         display_minutes: Boolean(s.display_minutes),
         language: normalizeLang(s.language),
+        sound: s.sound !== false,
         audio_warning: String(s.audio_warning || ""),
         audio_end: String(s.audio_end || ""),
+        advance_starts: s.advance_starts !== false,
+        overtime: s.overtime === true,
       },
       title: raw.title != null ? String(raw.title) : "",
+      title_zh: raw.title_zh != null ? String(raw.title_zh) : "",
       pro_side: list(raw.pro_side, "pro"),
       con_side: list(raw.con_side, "con"),
       event_order: events,
@@ -637,6 +938,11 @@
     prep: (id) => `<svg viewBox="0 0 48 48" aria-hidden="true"><defs><mask id="${id}"><rect width="48" height="48" fill="#fff"/><rect x="15" y="3" width="12" height="7" rx="2.5" fill="#000"/><path d="M12.5 19h17M12.5 26h17M12.5 33h10" stroke="#000" stroke-width="3" stroke-linecap="round"/><path d="M30 44 44.5 29.5" stroke="#000" stroke-width="11" stroke-linecap="round"/></mask></defs><g fill="currentColor"><rect mask="url(#${id})" x="5" y="6" width="32" height="38" rx="6"/><rect x="17" y="2" width="8" height="6" rx="2"/><path d="M41.2 25.9a3 3 0 0 1 4.2 0l.7.7a3 3 0 0 1 0 4.2L33.9 43l-6.4 1.5a.9.9 0 0 1-1.1-1.1L28 37.1Z"/></g></svg>`,
     // Done (timeline).
     done: () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7"/></svg>`,
+
+    // Two speech bubbles: both teams share one clock.
+    shared: () => `<svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><path d="M4 10a5 5 0 0 1 5-5h18a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H15l-7 6v-6.2A5 5 0 0 1 4 20Z"/><path d="M36 15h3a5 5 0 0 1 5 5v10a5 5 0 0 1-4 4.9V41l-7-6H23a5 5 0 0 1-5-5v-1h9a9 9 0 0 0 9-9Z"/></svg>`,
+    // A cup: a break.
+    break: () => `<svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><path d="M6 14h28v13a13 13 0 0 1-13 13h-2A13 13 0 0 1 6 27Z"/><path d="M34 18h3a7 7 0 0 1 0 14h-3.5l.5-4.5h3a2.5 2.5 0 0 0 0-5h-3Z"/><rect x="4" y="42" width="32" height="3.5" rx="1.75"/></svg>`,
   };
   const picto = (name) => PICTO[name](`ic${++iconSeq}`);
 
@@ -644,7 +950,11 @@
     el.innerHTML = `<span class="icon-timer">${picto("stopwatch")}</span><span class="icon-arrow">${picto("go")}</span>`;
   });
 
+  // Sounds are off when the screen's "Play sounds" setting is off.
+  const soundOn = () => !state.data || state.data.settings.sound !== false;
+
   function playSound(audio) {
+    if (!soundOn()) return;
     try {
       audio.currentTime = 0;
       const p = audio.play();
@@ -652,6 +962,52 @@
     } catch (_) {
       /* autoplay restrictions – ignore */
     }
+  }
+
+  // A knock made by the browser: soft, or one, two or three firm strikes.
+  let audioCtx = null;
+  function knock(tone) {
+    const strikes = { soft: 1, single: 1, double: 2, triple: 3 }[tone] || 1;
+    const soft = tone === "soft";
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audioCtx = audioCtx || new Ctx();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const t0 = audioCtx.currentTime + 0.02;
+      for (let i = 0; i < strikes; i++) {
+        const at = t0 + i * 0.3;
+        const gain = audioCtx.createGain();
+        gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(soft ? 0.16 : 0.45, at + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + (soft ? 0.5 : 0.9));
+        // A bell-like strike: a fundamental with two inharmonic partials.
+        [
+          [1, 1],
+          [2.76, 0.35],
+          [5.4, 0.12],
+        ].forEach(([ratio, level]) => {
+          const osc = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = (soft ? 620 : 880) * ratio;
+          g.gain.value = level;
+          osc.connect(g).connect(gain);
+          osc.start(at);
+          osc.stop(at + 1);
+        });
+      }
+    } catch (_) {
+      /* no Web Audio – ignore */
+    }
+  }
+
+  function playTone(tone) {
+    if (!soundOn()) return;
+    if (tone === "warning") playSound(els.audioWarning);
+    else if (tone === "end") playSound(els.audioEnd);
+    else knock(tone);
   }
 
   function formatTime(seconds, displayMinutes) {
@@ -669,7 +1025,12 @@
     constructor(ui) {
       this.ui = ui;
       this.total = 180;
-      this.warningThreshold = 30;
+      this.cues = []; // [{ at: seconds left, tone, flash }]
+      this.warnAt = 30; // the ring turns yellow from here
+      this.grace = 0; // a triple knock this long after time runs out
+      this.cap = 300; // no bells past this much overtime
+      this.overtime = false; // keep counting after zero
+      this.protectedSec = 0; // protected time at each end, shown on the ring
       this.displayMinutes = true;
       this.remaining = 0;
       this.running = false;
@@ -687,32 +1048,49 @@
       u.reset.addEventListener("click", () => this.reset());
     }
 
+    // The clock keeps going past zero to count overtime, or until the grace bell.
+    get graceDue() {
+      return this.grace > 0 && this.grace <= this.cap;
+    }
+
     tick(dt) {
       if (!this.running) return;
+      const wasTimedOut = this.timedOut;
       const before = this.remaining;
       this.remaining -= dt;
-      if (this.remaining <= this.warningThreshold && before > this.warningThreshold) {
-        this.warned = true;
-        playSound(els.audioWarning);
-        triggerFlash();
+      const now = this.remaining;
+      const crossed = (at) => now <= at && before > at;
+      for (const c of this.cues) {
+        if (!crossed(c.at)) continue;
+        playTone(c.tone);
+        if (c.flash !== false) triggerFlash();
       }
-      if (this.remaining <= 0) {
-        this.remaining = 0;
-        this.running = false;
+      if (this.warnAt > 0 && crossed(this.warnAt)) this.warned = true;
+      if (crossed(0)) {
         this.timedOut = true;
         playSound(els.audioEnd);
-        this.syncButtons();
       }
+      if (this.timedOut) {
+        if (this.graceDue && crossed(-this.grace)) playTone("triple");
+        if (!this.overtime && !(this.graceDue && now > -this.grace)) this.running = false;
+      }
+      if (this.timedOut !== wasTimedOut || !this.running) this.syncButtons();
     }
 
     get fresh() {
       return !this.running && !this.timedOut && this.remaining === this.total;
     }
 
+    // Only overtime can be paused and resumed once the time is up.
+    get canRun() {
+      return !this.timedOut || this.overtime;
+    }
+
     start() {
       this.remaining = this.total;
       this.running = true;
       this.timedOut = false;
+      if (this.ui.onStart) this.ui.onStart(this);
       this.syncButtons();
     }
     stop() {
@@ -720,20 +1098,21 @@
       this.syncButtons();
     }
     resume() {
-      if (this.timedOut) return;
+      if (!this.canRun) return;
       this.running = true;
+      if (this.ui.onStart) this.ui.onStart(this);
       this.syncButtons();
     }
     reset() {
       this.remaining = this.total;
       this.running = false;
       this.timedOut = false;
-      this.warned = this.total <= this.warningThreshold;
+      this.warned = this.warnAt > 0 && this.total <= this.warnAt;
       this.syncButtons();
     }
     toggle() {
       if (this.running) this.stop();
-      else if (this.timedOut) return;
+      else if (!this.canRun) return;
       else if (this.fresh) this.start();
       else this.resume();
     }
@@ -742,20 +1121,48 @@
       const u = this.ui;
       const fresh = this.fresh;
       show(u.start, fresh);
-      show(u.pause, this.running);
-      show(u.resume, !this.running && !this.timedOut && !fresh);
+      show(u.pause, this.running && this.canRun);
+      show(u.resume, !this.running && !fresh && this.canRun);
       show(u.out, this.timedOut);
       if (u.onRunningChange) u.onRunningChange(this.running);
     }
 
     render() {
       const u = this.ui;
-      u.text.textContent = formatTime(this.remaining, this.displayMinutes);
+      const over = this.overtime && this.remaining < 0;
+      u.text.textContent = over ? "+" + formatTime(-this.remaining, this.displayMinutes) : formatTime(this.remaining, this.displayMinutes);
+      u.text.classList.toggle("over", over);
       u.fg.classList.toggle("warning", this.warned);
       u.bg.classList.toggle("timeout", this.timedOut);
       const frac = this.total > 0 ? Math.min(1, Math.max(0, this.remaining / this.total)) : 0;
       u.paint(frac);
+      if (u.note) {
+        const p = this.protectedSec;
+        const inProtected = p > 0 && this.remaining > 0 && (this.total - this.remaining < p || this.remaining <= p);
+        u.note.textContent = inProtected ? t("protectedNow") : "";
+      }
     }
+  }
+
+  // Sets a timer up for one part of the round.
+  function setupTimer(tm, d, ev, total) {
+    const s = d.settings;
+    const cues = cuesFor(d, ev);
+    tm.total = total;
+    tm.warnAt = cues.reduce((m, c) => Math.max(m, c.at), 0);
+    tm.cues = cues;
+    const prot = evOpts(ev).protected || 0;
+    tm.protectedSec = prot;
+    if (prot > 0 && prot * 2 < total) {
+      tm.cues = cues.concat([
+        { at: total - prot, tone: "single", flash: false },
+        { at: prot, tone: "single", flash: false },
+      ]);
+    }
+    tm.grace = s.time_grace;
+    tm.cap = s.overtime_cap;
+    tm.overtime = s.overtime;
+    tm.displayMinutes = s.display_minutes;
   }
 
   const ringTimer = new Timer({
@@ -767,6 +1174,7 @@
     resume: $("ring-resume"),
     out: $("ring-out"),
     reset: $("ring-reset"),
+    note: $("ring-note"),
     paint: (frac) => {
       els.ringFg.style.strokeDashoffset = String(RING_CIRC * (1 - frac));
       // The rounded ends would leave a dot at the top once the time is up.
@@ -790,6 +1198,10 @@
         fg.style.height = `${frac * 100}%`;
       },
       onRunningChange: (running) => label.classList.toggle("show", running),
+      // One team at a time: starting one clock pauses the other.
+      onStart: (tm) => {
+        if (state.data && state.data.settings.free_exclusive) barTimers.forEach((bt) => bt !== tm && bt.running && bt.stop());
+      },
     });
   }
   const barTimers = Array.from(els.doubleTimer.querySelectorAll(".bar-timer")).map(makeBarTimer);
@@ -823,7 +1235,9 @@
     currentSpeaker: null, // signed index: +n pro, -n con
     nextSpeaker: null,
     prepPhase: true,
+    prepSide: null, // a preparation for one team only
     freePhase: false,
+    sharedLive: null, // the teams on a shared clock
     speakers: { pro: [], con: [] },
     timelineButtons: [],
   };
@@ -853,8 +1267,8 @@
     els.btnLang.textContent = t("langBtn");
     updateNextButton();
     if (state.data) {
-      els.proLabel.textContent = state.data.settings.pro_label || t("proDefault");
-      els.conLabel.textContent = state.data.settings.con_label || t("conDefault");
+      els.proLabel.textContent = teamName(state.data, "pro");
+      els.conLabel.textContent = teamName(state.data, "con");
     }
     updateTitle();
   }
@@ -862,20 +1276,38 @@
   function speakerIdAt(index) {
     const order = state.data.event_order;
     if (index < 0 || index >= order.length) return null;
-    const v = Number(order[index]);
-    return Number.isInteger(v) && v !== 0 ? v : null;
+    return evSpeaker(order[index]);
   }
 
-  function participant(id) {
-    const d = state.data;
-    if (id > 0) return d.pro_side[id - 1] || null;
-    if (id < 0) return d.con_side[-id - 1] || null;
-    return null;
-  }
+  const participant = (id) => speakerOf(state.data, id);
 
   // A speaker's name as shown, falling back to the default for the language.
   function nameOf(id, p) {
     return (p && p.name) || defaultSpeakerName(id > 0 ? "pro" : "con", Math.abs(id) - 1, state.lang);
+  }
+
+  // Names with a Chinese version use it while the screen is in Chinese.
+  const inLang = (base, zh) => (state.lang === "zh" && zh) || base || "";
+  const teamName = (d, side) =>
+    inLang(d.settings[side + "_label"], d.settings[side + "_label_zh"]) || t(side === "pro" ? "proDefault" : "conDefault");
+  const topicOf = (d) => inLang(d.title, d.title_zh);
+  const labelOf = (ev) => inLang(evOpts(ev).label, evOpts(ev).label_zh);
+
+  // What a part is called, e.g. "Alice", "Pro preparation", "Crossfire".
+  function partNameIn(d, ev, short) {
+    const label = labelOf(ev);
+    if (label) return label;
+    const k = evKind(ev);
+    if (k === "prep") {
+      const side = evSide(ev);
+      return side ? t("prepOf")(teamName(d, side)) : t(short ? "prepShort" : "prep");
+    }
+    if (k === "free") return t(short ? "freeShort" : "free");
+    if (k === "shared") return t(short ? "sharedShort" : "shared");
+    if (k === "break") return t("breakName");
+    const id = evSpeaker(ev);
+    const p = speakerOf(d, id);
+    return p ? nameOf(id, p) : `${t("fNoSpeaker")} (${id})`;
   }
 
   // Before the round, the empty centre says what comes first and what to press.
@@ -886,29 +1318,12 @@
     if (!idle) return;
     const s = d.settings;
     const ev = d.event_order[0];
-    const colorOf = (e) =>
-      e === "prep" ? "var(--lime)" : e === "free" ? "var(--yellow)" : Number(e) > 0 ? s.pro_colors : s.con_colors;
-    let what;
-    let sec = 0;
-    if (ev === "prep") {
-      what = t("prep");
-      sec = s.time_prep;
-    } else if (ev === "free") {
-      what = t("free");
-      sec = s.time_free;
-    } else {
-      const p = participant(Number(ev));
-      what = p ? nameOf(Number(ev), p) : String(ev);
-      sec = p ? p.time : 0;
-    }
-    els.idleHint.style.setProperty("--first", colorOf(ev));
-    els.idleName.textContent = what;
-    els.idleTime.textContent = formatTime(sec, s.display_minutes);
+    els.idleHint.style.setProperty("--first", evColor(d, ev));
+    els.idleName.textContent = partNameIn(d, ev);
+    els.idleTime.textContent = formatTime(evTime(d, ev), s.display_minutes);
     // The whole round as one bar, each part as long as it lasts.
     const stats = roundStats(d);
-    els.idleBar.innerHTML = stats.segs
-      .map((g, i) => `<i style="flex-grow:${g.sec || 1};background:${colorOf(d.event_order[i])}"></i>`)
-      .join("");
+    els.idleBar.innerHTML = stats.segs.map((g) => `<i style="flex-grow:${g.sec || 1};background:${g.color}"></i>`).join("");
     els.idleTotal.textContent = t("roundTotal")(d.event_order.length, Math.round(stats.total / 60));
     // "Begin" looks like the button it refers to.
     els.idleText.innerHTML = esc(t("idleHint")).replace("{begin}", `<span class="idle-begin">${esc(t("begin"))}</span>`);
@@ -929,19 +1344,16 @@
       els.titleDot.style.background = dot || "";
       els.title.classList.toggle("has-dot", Boolean(dot));
     };
+    const topic = topicOf(d);
     if (i < 0 || i >= order.length) {
-      set(d.title ? t("motion") : "", d.title, "");
+      set(topic ? t("motion") : "", topic, "");
       return;
     }
     const ev = order[i];
-    const eyebrow = t("partOf")(i + 1, order.length) + (d.title ? " · " + d.title : "");
-    if (ev === "prep") set(eyebrow, t("prep"), "var(--lime)");
-    else if (ev === "free") set(eyebrow, t("free"), "var(--yellow)");
-    else {
-      const id = speakerIdAt(i);
-      const p = participant(id);
-      set(eyebrow, p ? t("speakerTurn")(nameOf(id, p)) : `${t("fNoSpeaker")} (${ev})`, id > 0 ? d.settings.pro_colors : d.settings.con_colors);
-    }
+    const eyebrow = t("partOf")(i + 1, order.length) + (topic ? " · " + topic : "");
+    const p = evKind(ev) === "speech" ? participant(evSpeaker(ev)) : null;
+    const text = p && !labelOf(ev) ? t("speakerTurn")(nameOf(evSpeaker(ev), p)) : partNameIn(d, ev);
+    set(eyebrow, text, evColor(d, ev));
   }
 
   function configHash() {
@@ -987,11 +1399,13 @@
     if (tm.running) {
       // Time kept passing while the page was gone.
       tm.remaining -= elapsed;
-      if (tm.remaining <= tm.warningThreshold) tm.warned = true;
+      if (tm.remaining <= tm.warnAt) tm.warned = true;
       if (tm.remaining <= 0) {
-        tm.remaining = 0;
-        tm.running = false;
         tm.timedOut = true;
+        if (!tm.overtime) {
+          tm.remaining = 0;
+          tm.running = false;
+        }
       }
     }
     tm.syncButtons();
@@ -1003,6 +1417,7 @@
     if (!Number.isInteger(idx) || idx < 0 || idx >= state.data.event_order.length) return false;
     const elapsed = Math.max(0, (Date.now() - (Number(p.savedAt) || Date.now())) / 1000);
     state.eventIndex = idx;
+    enterEvent(state.data.event_order[idx], false);
     state.currentSpeaker = p.currentSpeaker ?? null;
     state.nextSpeaker = p.nextSpeaker ?? null;
     state.prepPhase = Boolean(p.prepPhase);
@@ -1047,12 +1462,8 @@
     state.data = data;
     state.lang = data.settings.language;
 
-    ringTimer.warningThreshold = data.settings.time_warning;
     ringTimer.displayMinutes = data.settings.display_minutes;
-    barTimers.forEach((bt) => {
-      bt.warningThreshold = data.settings.time_warning;
-      bt.displayMinutes = data.settings.display_minutes;
-    });
+    barTimers.forEach((bt) => (bt.displayMinutes = data.settings.display_minutes));
 
     applyTheme(data.settings);
     applyAudio(data.settings);
@@ -1064,7 +1475,9 @@
     state.currentSpeaker = null;
     state.nextSpeaker = null;
     state.prepPhase = true;
+    state.prepSide = null;
     state.freePhase = false;
+    state.sharedLive = null;
     ringTimer.reset();
     barTimers.forEach((bt) => bt.reset());
     show(els.ringTimer, false);
@@ -1138,17 +1551,11 @@
   }
 
   function eventLabel(ev) {
-    return ev === "prep" ? "P" : ev === "free" ? "F" : String(ev);
+    const k = evKind(ev);
+    return { prep: "P", free: "F", shared: "S", break: "B" }[k] || String(evSpeaker(ev));
   }
 
-
-  // What a part is called, e.g. "Pro 1", "Alice", "Preparation Time".
-  function partName(ev) {
-    if (ev === "prep") return t("prep");
-    if (ev === "free") return t("free");
-    const p = participant(Number(ev));
-    return p ? nameOf(Number(ev), p) : String(ev);
-  }
+  const partName = (ev) => partNameIn(state.data, ev);
 
   // The timeline is a stepper: one dot per part, joined by a line that fills
   // up as the round goes on. The dot says who (team colour and number, or an
@@ -1164,28 +1571,23 @@
     track.className = "tl-track";
     track.innerHTML = '<i class="tl-fill"></i>';
     els.timeline.appendChild(track);
+    const d = state.data;
     state.timelineButtons = order.map((ev, i) => {
-      const id = Number(ev);
-      const p = participant(id);
-      let color;
+      const k = evKind(ev);
+      const color = evColor(d, ev);
       let dot;
-      let name = "";
-      let time;
-      if (ev === "prep") {
-        color = "var(--lime)";
-        dot = picto("prep");
-        name = t("prepShort");
-        time = formatTime(s.time_prep, dm);
-      } else if (ev === "free") {
-        color = "var(--yellow)";
-        dot = picto("thinking");
-        name = t("freeShort");
-        time = t("eachSide")(formatTime(s.time_free, dm));
-      } else {
-        color = id > 0 ? s.pro_colors : s.con_colors;
+      let name = labelOf(ev);
+      let time = formatTime(evTime(d, ev), dm);
+      if (k === "speech") {
+        const id = evSpeaker(ev);
+        const p = participant(id);
         dot = String(Math.abs(id));
-        name = p && p.name ? p.name : "";
-        time = p ? formatTime(p.time, dm) : "–";
+        if (!name) name = p && p.name ? p.name : "";
+        if (!p) time = "–";
+      } else {
+        dot = picto({ prep: "prep", free: "thinking", shared: "shared", break: "break" }[k]);
+        if (!name) name = partNameIn(d, ev, true);
+        if (k === "free") time = t("eachSide")(time);
       }
       const b = document.createElement("button");
       b.className = "tl-step";
@@ -1225,7 +1627,7 @@
     updateNextButton();
   }
 
-  const shortPartName = (ev) => (ev === "prep" ? t("prepShort") : ev === "free" ? t("freeShort") : partName(ev));
+  const shortPartName = (ev) => partNameIn(state.data, ev, true);
 
   // "Begin" / "Next" and "Back", each with the part they lead to underneath.
   function updateNextButton() {
@@ -1256,9 +1658,10 @@
     const all = state.speakers.pro.concat(state.speakers.con);
     const currentTimerDone = ringTimer.remaining < 0.1;
     for (const sp of all) {
-      sp.clipboard.classList.toggle("show", state.prepPhase);
+      const side = sp.id > 0 ? "pro" : "con";
+      sp.clipboard.classList.toggle("show", state.prepPhase && (!state.prepSide || state.prepSide === side));
       sp.group.classList.toggle("show", state.freePhase);
-      const isCurrent = sp.id === state.currentSpeaker;
+      const isCurrent = sp.id === state.currentSpeaker || Boolean(state.sharedLive && state.sharedLive.includes(side));
       const isNext = sp.id === state.nextSpeaker;
       sp.speech.classList.toggle("show", isCurrent && ringTimer.running);
       sp.next.classList.toggle("show", isNext);
@@ -1273,51 +1676,59 @@
     state.eventIndex++;
 
     state.nextSpeaker = speakerIdAt(state.eventIndex + 1);
-    state.prepPhase = false;
-    state.freePhase = false;
-    show(els.ringTimer, true);
-    show(els.doubleTimer, false);
 
     if (state.eventIndex >= order.length) {
       state.eventIndex = -1;
       state.currentSpeaker = null;
       state.nextSpeaker = null;
       state.prepPhase = true;
+      state.prepSide = null;
+      state.freePhase = false;
+      state.sharedLive = null;
       ringTimer.reset();
       show(els.ringTimer, false);
+      show(els.doubleTimer, false);
       show(els.endOverlay, true);
     } else {
-      const ev = order[state.eventIndex];
-      if (ev === "prep") {
-        ringTimer.total = d.settings.time_prep;
-        state.currentSpeaker = null;
-        state.prepPhase = true;
-        ringTimer.reset();
-        ringTimer.start();
-      } else if (ev === "free") {
-        state.currentSpeaker = null;
-        state.freePhase = true;
-        ringTimer.reset(); // stop the hidden ring timer so it cannot ring during free debate
-        show(els.ringTimer, false);
-        show(els.doubleTimer, true);
-        barTimers.forEach((bt) => {
-          bt.total = d.settings.time_free;
-          bt.reset();
-        });
-      } else {
-        const id = speakerIdAt(state.eventIndex);
-        state.currentSpeaker = id;
-        const p = participant(id);
-        ringTimer.total = p ? p.time : 0;
-        ringTimer.reset();
-        if (p) ringTimer.start(); // a missing speaker shows 0 instead of ringing instantly
-      }
+      enterEvent(order[state.eventIndex], d.settings.advance_starts);
     }
 
     updateTitle();
     updateTimelineActive();
     updateSpeakerIndicators();
     persistProgress();
+  }
+
+  // Loads a part: sets the clocks up for it and, if `start`, starts them.
+  // Called with start = false when restoring a debate after a refresh.
+  function enterEvent(ev, start) {
+    const d = state.data;
+    const k = evKind(ev);
+    const o = evOpts(ev);
+    state.currentSpeaker = k === "speech" ? evSpeaker(ev) : null;
+    state.prepPhase = k === "prep";
+    state.prepSide = k === "prep" ? o.side || null : null;
+    state.freePhase = k === "free";
+    state.sharedLive = k === "shared" ? o.live || ["pro", "con"] : null;
+    show(els.ringTimer, k !== "free");
+    show(els.doubleTimer, k === "free");
+    if (k === "free") {
+      ringTimer.reset(); // stop the hidden ring timer so it cannot ring during free debate
+      barTimers.forEach((bt) => {
+        setupTimer(bt, d, ev, evTime(d, ev));
+        bt.reset();
+      });
+      // The team that starts gets the first Space, or starts straight away.
+      const first = o.first === "pro" ? barPro : o.first === "con" ? barCon : null;
+      lastBar = first;
+      if (start && first) first.start();
+      return;
+    }
+    const missing = k === "speech" && !participant(state.currentSpeaker);
+    // A missing speaker shows 0 instead of ringing instantly.
+    setupTimer(ringTimer, d, ev, missing ? 0 : evTime(d, ev));
+    ringTimer.reset();
+    if (start && !missing) ringTimer.start();
   }
 
   function previous() {
@@ -1464,22 +1875,11 @@
     let speeches = 0;
     let total = 0;
     const segs = r.event_order.map((ev) => {
-      let sec = 0;
-      let kind;
-      if (ev === "prep") {
-        kind = "prep";
-        sec = r.settings.time_prep;
-      } else if (ev === "free") {
-        kind = "free";
-        sec = r.settings.time_free * 2;
-      } else {
-        kind = ev > 0 ? "pro" : "con";
-        const p = ev > 0 ? r.pro_side[ev - 1] : r.con_side[-ev - 1];
-        sec = p ? p.time : 0;
-        speeches++;
-      }
+      const kind = evKind(ev);
+      const sec = evTime(r, ev) * (kind === "free" ? 2 : 1);
+      if (kind === "speech") speeches++;
       total += sec;
-      return { kind, sec };
+      return { kind, sec, color: evColor(r, ev) };
     });
     return { speeches, total, segs };
   }
@@ -1491,10 +1891,8 @@
   function miniBar(r) {
     const { segs, total } = roundStats(r);
     if (!total) return "";
-    const color = (k) =>
-      k === "pro" ? r.settings.pro_colors : k === "con" ? r.settings.con_colors : k === "free" ? "var(--yellow)" : "var(--lime)";
     return `<span class="mbar" aria-hidden="true">${segs
-      .map((g) => `<i style="flex-grow:${g.sec || 1};background:${color(g.kind)}"></i>`)
+      .map((g) => `<i style="flex-grow:${g.sec || 1};background:${g.color}"></i>`)
       .join("")}</span>`;
   }
 
@@ -1539,6 +1937,8 @@
     show(els.menuOverlay, false);
     show(confirmOverlay, false);
     show(presetOverlay, false);
+    show(partOverlay, false);
+    partCtx = null;
     // Undo any language preview that was not saved.
     if (state.data && state.lang !== state.data.settings.language) {
       state.lang = state.data.settings.language;
@@ -1628,7 +2028,7 @@
       closeMenu();
       return;
     }
-    const missing = draft.event_order.filter((ev) => typeof ev === "number" && !participant2(ev));
+    const missing = draft.event_order.map(evSpeaker).filter((id) => id !== null && !participant2(id));
     if (missing.length) {
       if (page !== "order") goPage("order");
       setError(t("invalidEvents") + missing.join(", "));
@@ -1811,7 +2211,7 @@
       ? `<div class="srow head"><span></span><span>${esc(t("fName"))}</span><span>${esc(t("fSpeakingTime"))}</span><span></span></div>`
       : `<p class="empty-note sm">${esc(t("noSpeakers"))}</p>`;
     list.forEach((p, i) => {
-      const scheduled = draft.event_order.includes(sign * (i + 1));
+      const scheduled = draft.event_order.some((ev) => evSpeaker(ev) === sign * (i + 1));
       const row = document.createElement("div");
       row.className = "srow";
       row.innerHTML = `<span class="num">${i + 1}</span>
@@ -1862,8 +2262,290 @@
           ${timeField("fPrep", "fPrepHint", "settings.time_prep", s.time_prep)}
           ${timeField("fFree", "fFreeHint", "settings.time_free", s.time_free)}
         </div>
+      </section>
+      <section class="sgroup">
+        <h3>${esc(t("fBells"))}</h3>
+        <p class="hint">${esc(t("fBellsHint"))}</p>
+        <div class="opt-row"><span class="flabel">${esc(t("fWarningTone"))}</span>
+          <span class="inline">${toneSelect("settings.warning_tone", s.warning_tone)}${playToneBtn(s.warning_tone)}</span>
+        </div>
+        <div class="opt-row"><span class="flabel">${esc(t("fMoreWarnings"))}</span>
+          <div class="fstack">${cueEditor("round", s.extra_cues)}<span class="fhint">${esc(t("fMoreWarningsHint"))}</span></div>
+        </div>
+        <div class="opt-row"><span class="flabel">${esc(t("fGrace"))}</span>
+          <div class="fstack">${durInput("settings.time_grace", s.time_grace, t("fGrace"))}<span class="fhint">${esc(
+      t("fGraceHint")
+    )}</span></div>
+        </div>
       </section>`;
   }
+
+  // ---- Warnings (cues) ------------------------------------------------------
+  const TONE_KEYS = {
+    warning: "toneWarning",
+    end: "toneEnd",
+    soft: "toneSoft",
+    single: "toneSingle",
+    double: "toneDouble",
+    triple: "toneTriple",
+  };
+  function toneSelect(attr, current) {
+    return `<select data-tone="${attr}" aria-label="${esc(t("cueTone"))}">${TONES.map(
+      (tone) => `<option value="${tone}" ${tone === current ? "selected" : ""}>${esc(t(TONE_KEYS[tone]))}</option>`
+    ).join("")}</select>`;
+  }
+  const playToneBtn = (tone) =>
+    `<button type="button" class="btn btn-quiet sm" data-play-tone="${tone}" title="${esc(t("fPlay"))}">${ICONS.play}<span>${esc(
+      t("fPlay")
+    )}</span></button>`;
+
+  // A list of warnings: "round" is the round's extra warnings, "part" the open part's own.
+  function cueEditor(list, cues) {
+    const rows = cues
+      .map(
+        (c, i) => `<div class="cue-row">
+          ${durInput(`cue:${list}:${i}`, c.at, t("pCues"))}<span class="cue-left">${esc(t("cueLeft"))}</span>
+          ${toneSelect(`cue:${list}:${i}`, c.tone)}${playToneBtn(c.tone)}
+          <button type="button" class="icon-btn danger" data-cue-del="${list}:${i}" title="${esc(t("fRemove"))}" aria-label="${esc(
+          t("fRemove")
+        )}">${ICONS.trash}</button>
+        </div>`
+      )
+      .join("");
+    return `<div class="cue-list">${rows || `<span class="fhint">${esc(t("cuesNone"))}</span>`}</div>
+      <button type="button" class="btn btn-quiet sm cue-add" data-cue-add="${list}">${ICONS.plus}<span>${esc(t("cueAdd"))}</span></button>`;
+  }
+
+  // The array a cue editor edits. Editing a part's warnings works on a copy
+  // that is written back with putPart().
+  function cueList(list) {
+    if (list === "round") return draft.settings.extra_cues;
+    return partCtx ? partCtx.obj.cues || [] : [];
+  }
+  function cueChanged(list) {
+    if (list === "part") putPart();
+  }
+
+  function setTone(attr, tone) {
+    if (attr === "settings.warning_tone") draft.settings.warning_tone = tone;
+    else if (attr === "part") return;
+    else {
+      const [, list, i] = attr.split(":");
+      const c = cueList(list)[Number(i)];
+      if (c) c.tone = tone;
+      cueChanged(list);
+    }
+  }
+
+  function addCue(list) {
+    const cues = cueList(list);
+    const lowest = cues.reduce((m, c) => Math.min(m, c.at), Infinity);
+    const at = lowest === Infinity ? 60 : Math.max(1, Math.round(lowest / 2));
+    if (list === "part") partCtx.obj.cues = cues.concat([{ at, tone: "single" }]);
+    else cues.push({ at, tone: "single" });
+    cueChanged(list);
+  }
+
+  function delCue(spec) {
+    const [list, i] = spec.split(":");
+    cueList(list).splice(Number(i), 1);
+    cueChanged(list);
+  }
+
+  // Plays a tone from the settings, with the sound files being edited.
+  function previewTone(tone) {
+    if (tone === "warning" || tone === "end") {
+      const key = tone === "warning" ? "audio_warning" : "audio_end";
+      const a = new Audio(draft.settings[key] || DEFAULT_AUDIO[tone]);
+      const p = a.play();
+      if (p && p.catch) p.catch(() => setError(t("fCannotPlay")));
+    } else {
+      knock(tone);
+    }
+  }
+
+  // ---- Settings for one part --------------------------------------------------
+  const partOverlay = $("part-overlay");
+  let partCtx = null; // { idx, obj }: the part being edited, in its long form
+
+  function openPartDialog(idx) {
+    if (!commitView() || idx < 0 || idx >= draft.event_order.length) return;
+    partCtx = { idx, obj: expandEvent(draft.event_order[idx]) };
+    renderPartDialog();
+    show(partOverlay, true);
+    const first = $("part-fields").querySelector("button, input, select");
+    if (first) first.focus();
+  }
+
+  function closePartDialog() {
+    show(partOverlay, false);
+    partCtx = null;
+    if (page === "order") renderEventChips();
+  }
+
+  function putPart() {
+    draft.event_order[partCtx.idx] = normalizeEvent(partCtx.obj);
+    updateFoot();
+  }
+
+  function partChoice(field, options, current) {
+    return `<div class="seg" role="radiogroup">${options
+      .map(
+        ([value, label]) =>
+          `<button type="button" class="seg-btn ${JSON.stringify(value) === JSON.stringify(current) ? "active" : ""}" role="radio" aria-checked="${
+            JSON.stringify(value) === JSON.stringify(current)
+          }" data-part-set="${field}" data-value="${esc(JSON.stringify(value))}">${esc(label)}</button>`
+      )
+      .join("")}</div>`;
+  }
+
+  function renderPartDialog() {
+    const o = partCtx.obj;
+    const ev = normalizeEvent(o);
+    const k = evKind(ev);
+    const fmt = (sec) => formatTime(sec, true);
+    $("part-dialog-title").textContent = t("partTitle")(partCtx.idx + 1, eventName(ev));
+    const field = (label, body, hint) =>
+      `<div class="fstack pfield"><span class="flabel">${esc(label)}</span>${body}${hint ? `<span class="fhint">${esc(hint)}</span>` : ""}</div>`;
+    const parts = [];
+
+    // Time
+    const own = o.time != null;
+    if (k === "shared" || k === "break") {
+      parts.push(field(t("pTime"), durInput("pe:time", evTime(draft, ev), t("pTime"))));
+    } else {
+      const usual = evTime(draft, Object.assign({}, o, { time: undefined }));
+      const usualLabel =
+        k === "speech"
+          ? t("pSpeakerTime")(nameOf(o.speaker, participant2(o.speaker)), fmt(usual))
+          : t("pUsualTime")(fmt(usual));
+      parts.push(
+        field(
+          t(k === "free" ? "pTimePerTeam" : "pTime"),
+          `${partChoice("ownTime", [
+            [false, usualLabel],
+            [true, t(k === "speech" ? "pThisSpeech" : "pOwnTime")],
+          ], own)}${own ? durInput("pe:time", o.time, t("pTime")) : ""}`,
+          own ? t("pTimeHint") : ""
+        )
+      );
+    }
+
+    // What only some kinds of part have
+    const pro = teamName(draft, "pro");
+    const con = teamName(draft, "con");
+    if (k === "speech") {
+      parts.push(field(t("pProtected"), durInput("pe:protected", o.protected || 0, t("pProtected")), t("pProtectedHint")));
+    } else if (k === "prep") {
+      parts.push(field(t("pPrepFor"), partChoice("side", [[null, t("pBothTeams")], ["pro", pro], ["con", con]], o.side || null)));
+    } else if (k === "free") {
+      parts.push(
+        field(t("pFirst"), partChoice("first", [[null, t("pOperator")], ["pro", pro], ["con", con]], o.first || null), t("pFirstHint"))
+      );
+    } else if (k === "shared") {
+      const live = o.live && o.live.length === 1 ? o.live[0] : null;
+      parts.push(field(t("pLive"), partChoice("live", [[null, t("pBothTeams")], ["pro", pro], ["con", con]], live)));
+    }
+
+    // Name, in both languages
+    parts.push(
+      field(
+        t("pLabel"),
+        `<div class="pnames">
+          <input type="text" data-part-text="label" value="${esc(o.label || "")}" placeholder="${esc(
+          partNameIn(draft, Object.assign({}, o, { label: "", label_zh: "" }))
+        )}" aria-label="${esc(t("pLabel"))}" />
+          <input type="text" data-part-text="label_zh" value="${esc(o.label_zh || "")}" placeholder="${esc(
+          t("pLabelZh")
+        )}" aria-label="${esc(t("pLabelZh"))}" />
+        </div>`,
+        t("pLabelHint")
+      )
+    );
+
+    // Warnings
+    const ownCues = Array.isArray(o.cues);
+    parts.push(
+      field(
+        t("pCues"),
+        `${partChoice("ownCues", [
+          [false, t("pCuesRound")],
+          [true, t("pCuesOwn")],
+        ], ownCues)}${ownCues ? `<div class="pcues">${cueEditor("part", o.cues)}</div>` : ""}`
+      )
+    );
+
+    $("part-fields").innerHTML = parts.join("");
+  }
+
+  function setPartChoice(fieldName, value) {
+    const o = partCtx.obj;
+    const ev = normalizeEvent(o) || o;
+    if (fieldName === "ownTime") {
+      if (value) o.time = evTime(draft, ev);
+      else delete o.time;
+    } else if (fieldName === "ownCues") {
+      if (value) o.cues = cuesFor(draft, Object.assign({}, o, { cues: undefined }));
+      else delete o.cues;
+    } else if (fieldName === "live") {
+      if (value) o.live = [value];
+      else delete o.live;
+    } else if (value) {
+      o[fieldName] = value;
+    } else {
+      delete o[fieldName];
+    }
+    putPart();
+    renderPartDialog();
+  }
+
+  $("part-dialog").addEventListener("submit", (e) => {
+    e.preventDefault();
+    closePartDialog();
+  });
+  partOverlay.addEventListener("click", (e) => {
+    if (e.target === partOverlay) return closePartDialog();
+    const b = e.target.closest("button");
+    if (!b || !partCtx) return;
+    const d = b.dataset;
+    if (d.partSet) setPartChoice(d.partSet, JSON.parse(d.value));
+    else if (d.cueAdd) {
+      addCue("part");
+      renderPartDialog();
+    } else if (d.cueDel) {
+      delCue(d.cueDel);
+      renderPartDialog();
+    } else if (d.playTone) previewTone(d.playTone);
+  });
+  partOverlay.addEventListener("input", (e) => {
+    const el = e.target;
+    if (!partCtx) return;
+    const group = el.closest(".dur");
+    if (group) {
+      const key = group.dataset.dur;
+      const sec = durValue(group);
+      if (key === "pe:time") partCtx.obj.time = sec;
+      else if (key === "pe:protected") partCtx.obj.protected = sec;
+      else if (key.startsWith("cue:part:")) {
+        const c = cueList("part")[Number(key.split(":")[2])];
+        if (c) c.at = sec;
+      }
+      putPart();
+    } else if (el.dataset.partText) {
+      partCtx.obj[el.dataset.partText] = el.value;
+      putPart();
+    }
+  });
+  partOverlay.addEventListener("change", (e) => {
+    const el = e.target;
+    if (!partCtx) return;
+    const group = el.closest(".dur");
+    if (group) normalizeDur(group);
+    if (el.dataset.tone) {
+      setTone(el.dataset.tone, el.value);
+      renderPartDialog();
+    }
+  });
 
   function segView() {
     return `<div class="seg" role="radiogroup" aria-label="${esc(t("fEvents"))}">
@@ -1919,6 +2601,14 @@
       </section>
       <section class="sgroup">
         <h3>${esc(t("fSounds"))}</h3>
+        <div class="opt-row"><span class="flabel">${esc(t("fSoundOn"))}</span>${seg(
+      "settings.sound",
+      [
+        [true, t("on")],
+        [false, t("off")],
+      ],
+      s.sound
+    )}</div>
         ${audioRow("fWarningSound", "audio_warning", DEFAULT_AUDIO.warning)}
         ${audioRow("fEndSound", "audio_end", DEFAULT_AUDIO.end)}
       </section>`;
@@ -1959,8 +2649,33 @@
       ["Ctrl + S", "kSave"],
       ["Esc", "kEsc"],
     ];
+    const s = draft.settings;
+    const choice = (labelKey, path, options, current, hintKey, extra) =>
+      `<div class="opt-row"><span class="flabel">${esc(t(labelKey))}</span><div class="fstack">${
+        options ? seg(path, options, current) : extra
+      }<span class="fhint">${esc(t(hintKey))}</span></div></div>`;
+    const zhName = (labelKey, path, value, placeholder) =>
+      `<label class="fstack"><span class="flabel">${esc(t(labelKey))}</span><input type="text" data-path="${path}" value="${esc(
+        value
+      )}" placeholder="${esc(placeholder)}" /></label>`;
     return `
       ${pageIntro("advancedTitle", "advancedIntro")}
+      <section class="sgroup">
+        <h3>${esc(t("fBehaviour"))}</h3>
+        ${choice("fAdvance", "settings.advance_starts", [[true, t("advStart")], [false, t("advPause")]], s.advance_starts, "fAdvanceHint")}
+        ${choice("fFreeClocks", "settings.free_exclusive", [[false, t("freeBoth")], [true, t("freeOne")]], s.free_exclusive, "fFreeClocksHint")}
+        ${choice("fOvertime", "settings.overtime", [[false, t("otStop")], [true, t("otCount")]], s.overtime, "fOvertimeHint")}
+        ${choice("fCap", "", null, null, "fCapHint", durInput("settings.overtime_cap", s.overtime_cap, t("fCap")))}
+      </section>
+      <section class="sgroup">
+        <h3>${esc(t("fBilingual"))}</h3>
+        <p class="hint">${esc(t("fBilingualHint"))}</p>
+        <div class="zh-names">
+          ${zhName("fTitleZh", "title_zh", draft.title_zh, draft.title)}
+          ${zhName("fProZh", "settings.pro_label_zh", s.pro_label_zh, s.pro_label || I18N.zh.proDefault)}
+          ${zhName("fConZh", "settings.con_label_zh", s.con_label_zh, s.con_label || I18N.zh.conDefault)}
+        </div>
+      </section>
       <section class="sgroup">
         <h3>${esc(t("fJson"))}</h3>
         <p class="hint">${esc(t("fJsonHint"))}</p>
@@ -1983,47 +2698,49 @@
 
   // ---- Event order ------------------------------------------------------------
   function eventName(ev) {
-    if (ev === "prep") return t("prep");
-    if (ev === "free") return t("free");
-    const p = participant2(Number(ev));
-    return p ? nameOf(Number(ev), p) : t("fNoSpeaker");
+    const id = evSpeaker(ev);
+    if (id !== null && !participant2(id)) return t("fNoSpeaker");
+    return partNameIn(draft, ev);
   }
 
-  function sideName(id) {
-    const s = draft.settings;
-    return id > 0 ? s.pro_label || t("proDefault") : s.con_label || t("conDefault");
-  }
+  const sideName = (id) => teamName(draft, id > 0 ? "pro" : "con");
 
   // Long description for the detailed view, e.g. "Pro 1 · 正一" and "3:00".
   function eventDetail(ev) {
-    const s = draft.settings;
-    if (ev === "prep") return { text: t("prep"), time: formatTime(s.time_prep, true) };
-    if (ev === "free") return { text: t("free"), time: `${formatTime(s.time_free, true)} ${t("perSide")}` };
-    const id = Number(ev);
+    const k = evKind(ev);
+    const label = labelOf(ev);
+    let time = formatTime(evTime(draft, ev), true);
+    if (k === "free") time += ` ${t("perSide")}`;
+    if (k !== "speech") return { text: partNameIn(draft, ev), time };
+    const id = evSpeaker(ev);
     const p = participant2(id);
     const who = `${sideName(id)} ${Math.abs(id)}`;
     if (!p) return { text: `${who} · ${t("fNoSpeaker")}`, time: "" };
-    return { text: p.name ? `${who} · ${p.name}` : who, time: formatTime(p.time, true) };
+    const name = label || p.name;
+    return { text: name ? `${who} · ${name}` : who, time };
   }
 
   function makeChip(ev, extra) {
     const chip = document.createElement("span");
-    const id = Number(ev);
-    const missing = Number.isInteger(id) && id !== 0 && !participant2(id);
+    const k = evKind(ev);
+    const id = evSpeaker(ev);
+    const missing = id !== null && !participant2(id);
+    const custom = typeof ev === "object" && !extra;
     chip.className =
       "chip " +
-      (ev === "prep" ? "c-prep" : ev === "free" ? "c-free" : id > 0 ? "c-pro" : "c-con") +
+      (k === "speech" ? (id > 0 ? "c-pro" : "c-con") : "c-" + k) +
       (missing ? " c-missing" : "") +
+      (custom ? " c-custom" : "") +
       (extra ? " " + extra : "");
-    chip.dataset.ev = String(ev);
-    chip.title = eventName(ev);
+    chip.title = eventName(ev) + (custom ? ` · ${t("partCustom")}` : "");
+    const mark = custom ? `<i class="opt-dot" aria-hidden="true"></i>` : "";
     if (orderView === "detailed") {
       const d = eventDetail(ev);
-      chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span><span class="txt">${esc(d.text)}</span><span class="dur-t">${esc(
+      chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span><span class="txt">${esc(d.text)}</span>${mark}<span class="dur-t">${esc(
         d.time
       )}</span>`;
     } else {
-      chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span>`;
+      chip.innerHTML = `<span class="lbl">${esc(eventLabel(ev))}</span>${mark}`;
     }
     return chip;
   }
@@ -2039,6 +2756,16 @@
     }
     draft.event_order.forEach((ev, i) => {
       const chip = makeChip(ev);
+      chip.dataset.idx = String(i);
+      chip.tabIndex = 0;
+      if (orderView === "detailed") {
+        chip.insertAdjacentHTML(
+          "beforeend",
+          `<button type="button" class="ed" data-edit-event="${i}" title="${esc(t("partSettings"))}" aria-label="${esc(
+            t("partSettings") + ": " + eventName(ev)
+          )}">${ICONS.sliders}</button>`
+        );
+      }
       chip.insertAdjacentHTML(
         "beforeend",
         `<button type="button" class="x" data-del-event="${i}" title="${esc(t("fRemove"))}" aria-label="${esc(
@@ -2056,7 +2783,7 @@
     const root = $("event-palette");
     root.innerHTML = "";
     const groups = [
-      { label: t("fPhases"), items: ["prep", "free"] },
+      { label: t("fPhases"), items: ["prep", "free", { kind: "shared" }, { kind: "break" }] },
       { label: sideName(1), items: draft.pro_side.map((_, i) => i + 1) },
       { label: sideName(-1), items: draft.con_side.map((_, i) => -(i + 1)) },
     ];
@@ -2066,7 +2793,7 @@
       group.innerHTML = `<span class="palette-group-label">${esc(label)}</span>`;
       items.forEach((ev) => {
         const chip = makeChip(ev, "add");
-        chip.dataset.addEv = String(ev);
+        chip.dataset.addEv = JSON.stringify(ev);
         chip.setAttribute("role", "button");
         chip.tabIndex = 0;
         group.appendChild(chip);
@@ -2075,10 +2802,8 @@
     });
   }
 
-  function chipValue(chip) {
-    const v = chip.dataset.ev;
-    return v === "prep" || v === "free" ? v : Number(v);
-  }
+  // A click on a chip that was just dragged is not a request to open it.
+  let justDragged = false;
 
   // Pointer-based drag reordering for the event chips (mouse + touch).
   (function enableChipDrag() {
@@ -2126,7 +2851,7 @@
       root = rootEl();
       if (!root || !root.contains(e.target)) return;
       const chip = e.target.closest(".chip");
-      if (!chip || e.target.closest(".x") || e.button !== 0) return;
+      if (!chip || e.target.closest(".x, .ed") || e.button !== 0) return;
       dragEl = chip;
       dragging = false;
       sx = e.clientX;
@@ -2188,7 +2913,10 @@
         /* capture may already have been released by the browser */
       }
       if (didDrag && finishedRoot && finishedRoot.isConnected) {
-        draft.event_order = Array.from(finishedRoot.querySelectorAll(".chip")).map(chipValue);
+        const before = draft.event_order.slice();
+        draft.event_order = Array.from(finishedRoot.querySelectorAll(".chip")).map((c) => before[Number(c.dataset.idx)]);
+        justDragged = true;
+        setTimeout(() => (justDragged = false), 0);
         renderEventChips();
       }
     }
@@ -2201,11 +2929,7 @@
     });
   })();
 
-  function participant2(id) {
-    if (id > 0) return draft.pro_side[id - 1] || null;
-    if (id < 0) return draft.con_side[-id - 1] || null;
-    return null;
-  }
+  const participant2 = (id) => speakerOf(draft, id);
 
   function setPath(obj, path, value) {
     const parts = path.split(".");
@@ -2289,7 +3013,11 @@
 
   // ---- Durations --------------------------------------------------------------
   function setDur(key, sec) {
-    if (key.startsWith("sp:")) {
+    if (key.startsWith("cue:")) {
+      const [, list, i] = key.split(":");
+      const c = cueList(list)[Number(i)];
+      if (c) c.at = sec;
+    } else if (key.startsWith("sp:")) {
       const [, side, idx] = key.split(":");
       const p = draft[side + "_side"][Number(idx)];
       if (p) p.time = sec;
@@ -2327,8 +3055,12 @@
     const n = idx + 1;
     draft[side + "_side"].splice(idx, 1);
     draft.event_order = draft.event_order
-      .filter((ev) => ev !== sign * n)
-      .map((ev) => (typeof ev === "number" && Math.sign(ev) === sign && Math.abs(ev) > n ? ev - sign : ev));
+      .filter((ev) => evSpeaker(ev) !== sign * n)
+      .map((ev) => {
+        const id = evSpeaker(ev);
+        if (id === null || Math.sign(id) !== sign || Math.abs(id) <= n) return ev;
+        return typeof ev === "number" ? ev - sign : Object.assign({}, ev, { speaker: id - sign });
+      });
     renderSpeakerList(side);
     updateFoot();
   }
@@ -2497,23 +3229,42 @@
   els.form.addEventListener("change", (e) => {
     const group = e.target.closest(".dur");
     if (group) normalizeDur(group);
+    if (e.target.dataset.tone) {
+      setTone(e.target.dataset.tone, e.target.value);
+      renderForm();
+      updateFoot();
+    }
     if (e.target.dataset.path === "settings.background_color" && page === "display") renderForm();
   });
 
   // Palette chips act as buttons for the keyboard too.
   els.form.addEventListener("keydown", (e) => {
-    const chip = e.target.closest && e.target.closest(".chip.add");
-    if (chip && (e.key === "Enter" || e.key === " ")) {
+    const chip = e.target.closest && e.target.closest(".chip.add, #event-chips .chip");
+    if (chip && e.target === chip && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       chip.click();
     }
   });
 
   els.form.addEventListener("click", (e) => {
+    // A chip in the order opens that part's settings.
+    const chip = e.target.closest("#event-chips .chip");
+    if (chip && !e.target.closest("button") && !justDragged) {
+      openPartDialog(Number(chip.dataset.idx));
+      return;
+    }
     const b = e.target.closest("button, .chip.add");
     if (!b) return;
     const d = b.dataset;
-    if (d.usePreset) {
+    if (d.playTone) {
+      previewTone(d.playTone);
+    } else if (d.cueAdd) {
+      addCue(d.cueAdd);
+      renderForm();
+    } else if (d.cueDel) {
+      delCue(d.cueDel);
+      renderForm();
+    } else if (d.usePreset) {
       usePreset(d.usePreset);
     } else if (d.presetNew !== undefined) {
       if (commitView()) openPresetDialog("new");
@@ -2564,8 +3315,10 @@
       });
       renderEventChips();
     } else if (d.addEv !== undefined) {
-      draft.event_order.push(chipValue(b));
+      draft.event_order.push(JSON.parse(d.addEv));
       renderEventChips();
+    } else if (d.editEvent !== undefined) {
+      openPartDialog(Number(d.editEvent));
     } else if (d.delEvent !== undefined) {
       slideRemove(b.closest(".chip"), () => {
         draft.event_order.splice(Number(d.delEvent), 1);
@@ -2740,14 +3493,16 @@
     const menuOpen = !els.menuOverlay.classList.contains("hidden");
     const confirmOpen = !confirmOverlay.classList.contains("hidden");
     const presetOpen = !presetOverlay.classList.contains("hidden");
+    const partOpen = !partOverlay.classList.contains("hidden");
     if (e.key === "Escape") {
       if (confirmOpen) show(confirmOverlay, false);
       else if (presetOpen) closePresetDialog();
+      else if (partOpen) closePartDialog();
       else if (menuOpen) requestClose();
       else if (!els.endOverlay.classList.contains("hidden")) show(els.endOverlay, false);
       return;
     }
-    if (menuOpen && !confirmOpen && !presetOpen && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    if (menuOpen && !confirmOpen && !presetOpen && !partOpen && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       saveAndApply();
       return;
