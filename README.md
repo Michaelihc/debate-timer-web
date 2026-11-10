@@ -30,6 +30,12 @@ python -m http.server 8000
 - Settings panel split into pages: **Presets**, **Teams & speakers**, **Order & times**, **Display & sound**, and **Advanced** (raw JSON, keyboard shortcuts, reset). Times are entered as minutes and seconds
 - Presets: built-in **Default** (3 / 2 / 2 / 3 min, order `1, -1, -2, 3, 2, -3, free, 4, -4`) and **Round robin (quick)** (2 / 1 / 1 / 2 min, alternating, no free debate, warning at 15 s), plus your own presets with a name and icon. Presets can be downloaded and opened as `.json` files to share between computers
 - Event order as a detailed vertical list or compact chips, with drag-and-drop reordering, an "Alternate Pro and Con" shortcut, and a running total. Removing a speaker also removes and renumbers their turns
+- Besides speeches, preparation and free debate, the order can hold a **shared clock** (one clock for both teams or one team, e.g. crossfire) and a **break**
+- Each part of the order has its own settings, opened with its settings button or by clicking it: a time for that part only, protected time at each end of a speech (a knock as it starts and ends), which team a preparation is for, which team starts free debate, a name in English and Chinese, and its own warnings. Parts with settings of their own carry a dot
+- Warnings and bells: the warning time with a choice of tone, more warnings each with its own time and tone, and a grace bell (a triple knock) a set time after time runs out. Tones are the warning sound, the time's-up sound, or a soft, single, double or triple knock
+- Timing behaviour (Advanced page): whether Next starts the next part's clock or loads it paused, whether free-debate clocks can run together or only one team at a time, whether the clock stops at zero or counts overtime in red, and how much overtime silences the bells
+- Chinese versions of the topic and team names (Advanced page), used while the screen is in Chinese
+- Sounds can be turned off (Display & sound)
 - Custom background color (text and ring colors adapt to light backgrounds)
 - Custom warning and end sounds, from a URL or an uploaded file
 - English and Simplified Chinese UI
@@ -54,7 +60,7 @@ Debate progress (current event and timers) survives an accidental page refresh w
 
 ## Presets
 
-A preset is the round itself: topic, team names and colours, speakers, event order, and the warning, preparation, and free-debate times. Language, timer format, background, and sounds belong to the screen and are left alone when a preset is loaded. A preset without a topic keeps the current topic.
+A preset is the round itself: topic, team names and colours, speakers, event order (with each part's own settings), the warning, preparation and free-debate times, the warnings and grace bell, how much overtime silences the bells, and whether free-debate clocks run one team at a time. Language, timer format, background, sounds, what Next does, and overtime counting belong to the screen and are left alone when a preset is loaded. A preset without a topic keeps the current topic.
 
 A preset file is a save file holding just those fields, plus a `name` and an `icon`:
 
@@ -92,7 +98,7 @@ A preset file is a save file holding just those fields, plus a `name` and an `ic
 
 ## Save file format
 
-Compatible with the original. New optional fields are `pro_label`, `con_label`, `background_color`, `audio_warning`, and `audio_end`. `language` accepts `"en"`, `"zh"`, or the original numeric values (`0` = Chinese, `1` = English). The default language follows the browser: Chinese if its preferred language is Chinese, otherwise English.
+Compatible with the original; every field added since is optional. `language` accepts `"en"`, `"zh"`, or the original numeric values (`0` = Chinese, `1` = English). The default language follows the browser: Chinese if its preferred language is Chinese, otherwise English.
 
 ```json
 {
@@ -101,16 +107,27 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
     "con_colors": "#FF0000",
     "pro_label": "",
     "con_label": "",
+    "pro_label_zh": "",
+    "con_label_zh": "",
     "background_color": "#000000",
     "time_warning": 30,
+    "warning_tone": "warning",
+    "extra_cues": [],
+    "time_grace": 0,
+    "overtime_cap": 300,
     "time_prep": 300,
     "time_free": 300,
+    "free_exclusive": false,
     "display_minutes": true,
     "language": "en",
+    "sound": true,
     "audio_warning": "",
-    "audio_end": ""
+    "audio_end": "",
+    "advance_starts": true,
+    "overtime": false
   },
   "title": "",
+  "title_zh": "",
   "pro_side": [
     { "name": "", "time": 180 },
     { "name": "", "time": 120 },
@@ -128,7 +145,18 @@ Compatible with the original. New optional fields are `pro_label`, `con_label`, 
 ```
 
 - Speaker `name`: leave it empty to use the default name in the screen language (Pro 1, Con 1… in English; 正一, 反一… in Chinese).
-- `event_order` entries: `"prep"` for preparation time, `"free"` for free debate, a positive number for a pro speaker, a negative number for a con speaker.
+- `event_order` entries: `"prep"` for preparation time, `"free"` for free debate, a positive number for a pro speaker, a negative number for a con speaker. A part with settings of its own is an object instead:
+  - `{ "speaker": 1, "time": 150, "protected": 30 }`: a speech with its own time and protected time
+  - `{ "kind": "prep", "side": "con" }`: preparation for one team
+  - `{ "kind": "free", "first": "pro", "time": 240 }`: free debate where Pro starts, with 4 minutes each
+  - `{ "kind": "shared", "time": 180, "live": ["con"], "label": "Crossfire", "label_zh": "盘问" }`: one clock (`live` is left out when both teams speak)
+  - `{ "kind": "break", "time": 300 }`
+
+  Any of them can carry `label`, `label_zh` and `cues`. Anything left out uses the round's settings.
+- Warnings (`extra_cues`, and a part's `cues`) are `{ "at": seconds left, "tone": ... }`, with `tone` one of `"warning"`, `"end"`, `"soft"`, `"single"`, `"double"`, `"triple"`. A part's `cues` replaces the round's warnings, including `time_warning`; `[]` means none.
+- `time_grace`: seconds after time runs out for a triple knock, `0` for none. `overtime_cap`: no bell rings once this far over time.
+- `advance_starts`: `false` loads the next part paused. `free_exclusive`: `true` lets only one team's free-debate clock run. `overtime`: `true` keeps counting after zero. `sound`: `false` silences everything.
+- `title_zh`, `pro_label_zh`, `con_label_zh`, `label_zh`: used instead of the plain field while the screen is in Chinese.
 - Empty labels fall back to "Pro" / "Con" (or 正方 / 反方 in Chinese).
 - Empty audio fields use the bundled sounds. Uploaded files are stored inline as data URLs (2 MB limit); larger sounds should be referenced by URL.
 

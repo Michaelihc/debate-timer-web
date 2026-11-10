@@ -7,6 +7,7 @@
   --blue: #5581f5;
   --red: #f26b6b;
   --yellow: #f5c74a;
+  --violet: #b59cff;
   --grey: #8e8e8e;
   --tile: #ececec;
   --active: #00e100;
@@ -590,6 +591,24 @@ body {
 }
 .ring-fg.warning {
   stroke: var(--ring-fg-warning);
+}
+/* Overtime counts up in red. */
+.ring-text.over,
+.bar-text.over {
+  color: var(--red);
+}
+/* "Protected time", under the numbers. */
+.ring-note {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 66%;
+  text-align: center;
+  font-size: calc(var(--ring) * 0.06);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  pointer-events: none;
 }
 .ring-text {
   position: absolute;
@@ -1306,6 +1325,110 @@ body {
   color: var(--p-muted);
   font-style: italic;
 }
+/* Drop-down lists */
+.panel select,
+.confirm-card select {
+  font: inherit;
+  color: var(--p-text);
+  background: var(--p-input);
+  border: 1px solid var(--p-input-line);
+  border-radius: 8px;
+  padding: 0.45em 0.6em;
+  min-width: 0;
+}
+.panel select:focus,
+.confirm-card select:focus {
+  outline: none;
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px rgba(195, 242, 106, 0.2);
+}
+
+/* A list of warnings: time left, tone, play, remove */
+.cue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cue-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.cue-left {
+  color: var(--p-muted);
+  font-size: 0.88em;
+}
+.cue-add {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.opt-row > .fstack {
+  align-items: flex-start;
+}
+.zh-names {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* Settings for one part */
+.part-dialog {
+  width: min(600px, calc(100vw - 32px));
+}
+.part-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.pfield {
+  align-items: flex-start;
+}
+.pfield > .seg,
+.pfield > .dur {
+  max-width: 100%;
+}
+.pfield > .dur,
+.pcues {
+  margin-top: 4px;
+}
+.pcues {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+.pnames {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.part-dialog .dur input[type="text"] {
+  width: 2.4em;
+  padding: 0.5em 0.15em;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: right;
+  font: inherit;
+  color: var(--p-text);
+  font-variant-numeric: tabular-nums;
+}
+.part-dialog .dur input[type="text"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+.part-dialog .icon-btn {
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+@media (max-width: 520px) {
+  .pnames {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .panel ::placeholder {
   color: #74747e;
 }
@@ -1837,6 +1960,61 @@ kbd {
 }
 .chip.c-con {
   background: #ffd0d0;
+}
+.chip.c-shared {
+  background: #ddd2ff;
+}
+.chip.c-break {
+  background: #d4d4d8;
+}
+.chip.add.c-shared {
+  background: transparent;
+  color: var(--violet);
+}
+.chip.add.c-break {
+  background: transparent;
+  color: #c2c2ca;
+}
+/* A part with settings of its own. */
+.chip .opt-dot {
+  flex: none;
+  width: 0.5em;
+  height: 0.5em;
+  margin-left: 0.35em;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+.chips.vertical .chip .opt-dot {
+  margin-left: 0;
+}
+.chip .ed {
+  display: none;
+}
+.chips.vertical .chip .ed {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.9em;
+  height: 1.9em;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.1);
+  color: #222;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.chips.vertical .chip .ed svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.chips.vertical .chip:hover .ed,
+.chips.vertical .chip .ed:focus-visible {
+  opacity: 1;
+}
+.chips.order .chip:not(.ghost) {
+  cursor: pointer;
 }
 .chip.c-missing {
   background: #777;
